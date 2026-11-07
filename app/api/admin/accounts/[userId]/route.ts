@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdminPermission, writeAdminAudit } from "@/lib/auth/authorization";\nimport { getActiveAppSession } from "@/lib/auth/session";
+import { requireAdminPermission, writeAdminAudit } from "@/lib/auth/authorization";
+import { getActiveAppSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -12,7 +13,10 @@ function fail(error:unknown){
 export async function PATCH(request:Request,context:{params:Promise<{userId:string}>}){
  try{
   if(request.headers.get("origin")!==new URL(request.url).origin)return NextResponse.json({ok:false},{status:403});
-  const current=await getActiveAppSession();\n  if(!current)return NextResponse.json({ok:false},{status:401});\n  if(current.mustChangePassword)return NextResponse.json({ok:false},{status:403});\n  const {userId}=await context.params;
+  const current=await getActiveAppSession();
+  if(!current)return NextResponse.json({ok:false},{status:401});
+  if(current.mustChangePassword)return NextResponse.json({ok:false},{status:403});
+  const {userId}=await context.params;
   const body=await request.json() as {action?:string;password?:string;enabled?:boolean};
   const action=String(body.action??"").toUpperCase();
   const admin=createAdminClient();
