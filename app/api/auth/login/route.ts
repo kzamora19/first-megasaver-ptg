@@ -68,14 +68,14 @@ export async function POST(request: Request) {
 
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
     const admin = createAdminClient();
-    const { error: sessionError } = await admin.from("app_sessions").insert({
+    const { data: appSession, error: sessionError } = await admin.from("app_sessions").insert({
       user_id: identity.auth_user_id,
       branch_id: identity.branch_id,
       session_version: identity.session_version,
       device_label: String(request.headers.get("user-agent") ?? "Browser").slice(0, 200),
       last_activity_at: new Date().toISOString(),
       expires_at: expiresAt,
-    });
+    }).select("id").single();
 
     if (sessionError) {
       await supabase.auth.signOut();
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         ok: true,
         account: {
@@ -102,6 +102,14 @@ export async function POST(request: Request) {
       },
       { headers: { "Cache-Control": "no-store", "Pragma": "no-cache" } },
     );
+    response.cookies.set("ptg_app_session", appSession.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 8 * 60 * 60,
+    });
+    return response;
   } catch {
     return NextResponse.json(
       { ok: false, message: "Authentication service is temporarily unavailable." },
