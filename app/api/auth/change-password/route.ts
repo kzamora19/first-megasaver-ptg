@@ -17,7 +17,7 @@ export async function POST(request:Request){
  const {error}=await supabase.auth.updateUser({password});
  if(error)return NextResponse.json({ok:false,message:"Unable to update password."},{status:400});
  const admin=createAdminClient();
- const {error:profileError}=await admin.from("user_profiles").update({must_change_password:false,updated_at:new Date().toISOString()}).eq("id",session.userId);
+ const {error:profileError}=await admin.from("user_profiles").update({must_change_password:false,invitation_status:"ACTIVATED",activated_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",session.userId);
  if(profileError)return NextResponse.json({ok:false,message:"Password changed, but account setup could not be finalized. Contact your System Admin."},{status:503});
  await admin.from("security_audit_logs").insert({actor_user_id:session.userId,branch_id:session.branchId,event_category:"ACCOUNT_SECURITY",action:"CHANGE_INITIAL_PASSWORD",target_identifier:session.username,outcome:"SUCCESS",message:"User completed required initial password change."});
  return NextResponse.json({ok:true},{headers:{"Cache-Control":"no-store"}});
