@@ -90,12 +90,9 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
     branchCode = branch.branch_code;
   }
 
-  const { data: identity } = await admin
-    .schema("private")
-    .from("login_identities")
-    .select("username")
-    .eq("auth_user_id", authData.user.id)
-    .maybeSingle();
+  const { data: username } = await admin.rpc("get_ptg_login_username", {
+    p_user_id: authData.user.id,
+  });
 
   return {
     id: session.id,
@@ -103,7 +100,7 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
     role: profile.role_key,
     branchId: session.branch_id,
     branchCode,
-    username: identity?.username ?? "",
+    username: typeof username === "string" ? username : "",
     displayName: profile.display_name ?? "",
   };
 }
