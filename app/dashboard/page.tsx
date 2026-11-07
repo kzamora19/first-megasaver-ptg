@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   if (session.mustChangePassword) redirect("/change-password");
 
   const isSystemAdmin = session.role === "SYSTEM_ADMIN";
-  const canManageMemos = ["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role);
+  const canManageMemos = ["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role);\n  const canUsePTG = canManageMemos || (session.role === "BRANCH_USER" && session.legacyRole.trim().toUpperCase() === "TEAM LEADER");
   const modules: ModuleCard[] = [
     {
       title: "Price Memo Import",
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
         </a>
         <div className="ptg-nav-label">WORKSPACE</div>
         <a className="ptg-nav-item active" href="/dashboard"><span>▦</span> Dashboard</a>
-        {canManageMemos && <a className="ptg-nav-item" href="/price-memos/import"><span>▤</span> Price Memo Import</a>}
+        {canManageMemos && <a className="ptg-nav-item" href="/price-memos/import"><span>▤</span> Price Memo Import</a>}\n        {canUsePTG && <a className="ptg-nav-item" href="/products"><span>⌕</span> Product Search &amp; Queue</a>}
         {isSystemAdmin && <a className="ptg-nav-item" href="/product-master"><span>▧</span> Product Master</a>}
         {canManageMemos && <a className="ptg-nav-item" href="/admin/accounts"><span>♙</span> Account Administration</a>}
         <div className="ptg-sidebar-bottom">
