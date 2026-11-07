@@ -23,6 +23,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
   const {data:target,error:targetError}=await admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,is_active").eq("id",userId).maybeSingle();
   if(targetError||!target)return NextResponse.json({ok:false,message:"Account not found."},{status:404});
   if(action==="RESET_PASSWORD"){
+   if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
    const password=String(body.password??"");
    if(password.length<12||password.length>1024)return NextResponse.json({ok:false,message:"Temporary password must be at least 12 characters."},{status:400});
    const {session}=await requireAdminPermission("PASSWORD_RESET","EXECUTE",target.branch_id);
@@ -34,6 +35,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
    return NextResponse.json({ok:true});
   }
   if(action==="SET_STATUS"){
+   if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
    if(typeof body.enabled!=="boolean")return NextResponse.json({ok:false,message:"enabled must be true or false."},{status:400});
    const {session}=await requireAdminPermission("USER_STATUS_CONTROL","EXECUTE",target.branch_id);
    const {error}=await admin.rpc("set_ptg_user_status",{p_user_id:userId,p_enabled:body.enabled});
@@ -42,6 +44,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
    return NextResponse.json({ok:true});
   }
   if(action==="FORCE_LOGOUT"){
+   if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
    const {session}=await requireAdminPermission("FORCE_LOGOUT","EXECUTE",target.branch_id);
    const {error}=await admin.rpc("bump_ptg_user_session_version",{p_user_id:userId});
    if(error)throw error;
