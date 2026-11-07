@@ -11,7 +11,7 @@ export type MemoProduct = {
 export type MemoType = "MEMO_LIST" | "KIOSK_MEMO_LIST";
 export type ParsedMemo = {
   memoId: string; period: string; memoType: MemoType; products: MemoProduct[];
-  eligible: number; unitOnly: number; otherPromo: number; noRemarks: number;
+  eligible: number;
 };
 const norm = (v: unknown) => String(v ?? "").normalize("NFKC").trim().toUpperCase().replace(/[\s_\-]+/g, " ");
 const clean = (v: unknown) => String(v ?? "").trim();
