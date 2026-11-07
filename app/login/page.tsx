@@ -42,7 +42,7 @@ export default function LoginPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <div className="auth-brand">FIRST MEGASAVER</div>
+        <div className="auth-brand"><img src="/branchline-logo.svg" alt="Branchline" /></div>
         <p className="auth-eyebrow">SECURE ACCESS</p>
         <h1>Price Tag Generator</h1>
         <p className="auth-intro">Sign in using your existing username and your assigned password.</p>
