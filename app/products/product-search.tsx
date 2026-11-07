@@ -31,6 +31,8 @@ type Product = {
   price_memos: MemoInfo | MemoInfo[];
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
+type LogoKey = "header" | "promo" | "social" | "appHeader";
+type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; updatedAt: string }>>;
 
 const formats: { key: FormatKey; label: string }[] = [
   { key: "ONE", label: "1 WHOLE" },
@@ -103,6 +105,19 @@ export default function ProductSearch({
   const [message, setMessage] = useState("");
   const [format, setFormat] = useState<FormatKey>("ONE");
   const [logoVersion, setLogoVersion] = useState(0);
+  const [logos, setLogos] = useState<LogoMap>({});
+
+  const refreshLogos = useCallback(async () => {
+    try {
+      const response = await fetch("/api/logos", { cache: "no-store" });
+      const payload = await response.json();
+      if (response.ok && payload.ok) setLogos(payload.logos || {});
+    } catch {
+      // Keep the built-in artwork if managed logos cannot be loaded.
+    }
+  }, []);
+
+  useEffect(() => { void refreshLogos(); }, [refreshLogos]);
 
   const loadProducts = useCallback(async (query: string, requestedPage: number) => {
     setLoading(true);
@@ -135,7 +150,7 @@ export default function ProductSearch({
   const currentMemo = memoInfo(activeProduct);
   const canImport = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
   const canManageUsers = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
-  const isBranchToolsUser = ["BRANCH ADMIN", "TEAM LEADER"].includes(legacyRole.trim().toUpperCase());
+  const isBranchToolsUser = systemRole === "SYSTEM_ADMIN" || ["BRANCH ADMIN", "TEAM LEADER"].includes(legacyRole.trim().toUpperCase());
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -183,7 +198,7 @@ export default function ProductSearch({
   return (
     <main className="ptg-main legacy-ptg-main">
       <header className="legacy-ptg-banner ptg-print-hide">
-        <img src="/legacy-ptg/app-header.png" alt="1st Megasaver · Appliance · Gadgets · Furniture" />
+        <img src={(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
         <span>{username}{username && " · "}{branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</span>
       </header>
 
@@ -193,6 +208,7 @@ export default function ProductSearch({
           {canManageUsers && <a href="/admin/accounts">CHANGE BRANCH USER PASSWORD</a>}
           <a href="/change-password">CHANGE MY PASSWORD</a>
           {canImport && <a href="/price-memos/import">IMPORT PRICE MEMOS</a>}
+          {systemRole === "SYSTEM_ADMIN" && <a href="/admin/logos">LOGO MANAGER</a>}
           <button type="button" disabled title="Memo cleanup tools are being migrated">DELETE OLD MEMO</button>
         </nav>
       </section>}
@@ -284,7 +300,7 @@ export default function ProductSearch({
           <div className="legacy-preview-controls">
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
             <div className="legacy-output-buttons ptg-print-hide">
-              <button type="button" className="refresh-logos" onClick={() => setLogoVersion(value => value + 1)}>↻ Refresh Logos</button>
+              <button type="button" className="refresh-logos" onClick={() => { setLogoVersion(value => value + 1); void refreshLogos(); }}>↻ Refresh Logos</button>
               <button type="button" className="save-pdf" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ SAVE AS PDF</button>
               <button type="button" className="print-tags" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ Print Price Tags</button>
             </div>
@@ -298,7 +314,7 @@ export default function ProductSearch({
             const savings = amount(product.srp) - pay;
             return <div className="legacy-print-sheet" key={product.id}>
               <article className="legacy-price-tag">
-                <div className="legacy-tag-header"><img src={"/legacy-ptg/price-tag-header.png?v=" + logoVersion} alt="1st Megasaver header" /></div>
+                <div className="legacy-tag-header"><img src={(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
                 <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value">{product.description || product.model}</div>
@@ -314,7 +330,7 @@ export default function ProductSearch({
                     return <div className="legacy-installment-row" key={months}><span>{months} months:</span><strong>{installmentTotal ? peso(installmentTotal / months) + " / month" : "—"}</strong></div>;
                   })}
                 </div>
-                <img className="legacy-tag-footer" src={"/legacy-ptg/price-tag-footer.png?v=" + logoVersion} alt="Megasaver payment and social footer" />
+                <img className="legacy-tag-footer" src={(logos.social?.url || "/legacy-ptg/price-tag-footer.png") + (logos.social?.url ? "&" : "?") + "refresh=" + logoVersion} alt="Megasaver payment and social footer" />
               </article>
             </div>;
           })}
