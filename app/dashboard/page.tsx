@@ -21,7 +21,7 @@ export default async function DashboardPage() {
 
   const isSystemAdmin = session.role === "SYSTEM_ADMIN";
   const canManageMemos = ["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role);
-  const canUsePTG = canManageMemos || (session.role === "BRANCH_USER" && session.legacyRole.trim().toUpperCase() === "TEAM LEADER");
+  const canUsePTG = canManageMemos || session.role === "BRANCH_USER";
   const modules: ModuleCard[] = [
     {
       title: "Price Memo Import",
