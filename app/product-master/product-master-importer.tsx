@@ -8,8 +8,8 @@ type ImportSummary = { received: number; uniqueValid: number; inserted: number; 
 
 const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
 const aliases = {
-  barcode: ["barcode", "itemcode", "itemnumber", "itemno", "sku"],
-  description: ["description", "itemname", "productdescription", "model"],
+  barcode: ["barcode", "itemcode", "itemnumber", "itemno", "sku", "code", "productcode"],
+  description: ["description", "itemname", "productdescription", "productname", "model"],
   brand: ["brand", "brandname"],
   category: ["category", "majorcategory"],
   sub_category: ["subcategory", "subcategoryname", "minorcategory"],
