@@ -30,6 +30,7 @@ export async function GET(request: Request) {
   for (const result of results) for (const product of result.data ?? []) unique.set(product.barcode, product);
   const products = [...unique.values()].sort((a, b) => String(a.brand).localeCompare(String(b.brand)) || a.description.localeCompare(b.description)).slice(0, 50);
   return NextResponse.json({ ok: true, products }, { headers: { "Cache-Control": "no-store" } });
+}
 
 export async function POST(request: Request) {
   const session = await getActiveAppSession();
