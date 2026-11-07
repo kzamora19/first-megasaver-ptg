@@ -1,33 +1,41 @@
-# PTG account invitation email setup
+# Branchline PTG account invitation email setup
 
-The account invitation and generated password-reset flows use Resend's transactional email API.
+PTG now uses the same email-provider pattern as the existing Branchline Sales Tracker.
 
-## Required Vercel environment variables
+## Preferred: Gmail SMTP (no custom domain required)
 
-Add these variables to the Vercel project `first-megasaver-ptg`:
+Add these server-only variables to the Vercel project `first-megasaver-ptg`:
 
-- `RESEND_API_KEY` — server-side Resend API key (keep it encrypted; never prefix with `NEXT_PUBLIC_`).
-- `RESEND_FROM_EMAIL` — sender identity on a domain verified in Resend, e.g. `First Megasaver PTG <ptg-notifications@your-verified-domain.example>`.
+- `GMAIL_USER` — the Gmail address that will send Branchline messages.
+- `GMAIL_APP_PASSWORD` — a Google App Password generated for that Gmail account. This is not the normal Gmail sign-in password.
 
-Set them for Preview on branch `migration/scaffold` first. Add Production only after the email flow is tested and the production domain is verified. Do not commit actual values.
+The sender displays as `Branchline <your-gmail-address>`. PTG connects to `smtp.gmail.com` on port 465 using implicit TLS. Sending is awaited before the API responds.
 
-## Resend setup
+To create an App Password, the Google account must have 2-Step Verification enabled. Open Google Account → Security → 2-Step Verification → App passwords, create one named `Branchline PTG`, and copy it into Vercel. If App passwords is unavailable, the account's Google Workspace/security policy may prohibit it.
 
-1. Create or sign in to the Resend account used by First Megasaver.
-2. Add and verify a company-controlled sending domain.
-3. Publish the DNS records Resend provides (SPF/DKIM and any recommended DMARC policy).
-4. Create a restricted API key for transactional sending.
-5. Add both values to Vercel Project Settings → Environment Variables. Never paste the API key into chat, source code, or GitHub.
-6. Redeploy the Preview branch so the new server-side variables are loaded.
+Set both variables for Preview on branch `migration/scaffold`. Never put them in `NEXT_PUBLIC_*`, source code, GitHub, or chat. Do not use your normal Gmail password.
+
+## Optional fallback: Resend
+
+If Gmail SMTP variables are not both configured, PTG can use:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` — a sender identity authorized by a verified Resend domain.
+
+Gmail SMTP takes priority when both provider configurations are present.
+
+## After configuring
+
+1. Save the environment variables in Vercel Preview.
+2. Redeploy the latest Preview deployment so the server loads the new variables.
+3. Test with an invitation to an email address you control.
+4. Confirm receipt and the 48-hour invitation acceptance flow before inviting branch users.
 
 ## Account lifecycle
 
 - Account creation generates a cryptographically random temporary password and a single-use 48-hour invitation token.
-- The employee email receives the username, temporary password, and invitation-acceptance link.
-- The profile remains inactive until the employee explicitly accepts the invitation.
-- After acceptance, login is allowed only to complete the mandatory password change. The dashboard and account administration redirect to the password-change page.
-- After the new password is saved, the account status becomes ACTIVATED.
-- Password resets generate a new random temporary password, revoke sessions, and email the temporary password to the account's registered address.
-- Admin screens and API responses never return temporary passwords.
-
-The current code does not send mail until both Vercel variables are configured. Use a verified sender address; Resend may reject unverified sender identities.
+- The invitation email contains the username, temporary password, and acceptance link.
+- The profile remains inactive until the employee accepts the invitation.
+- The employee must change the temporary password before accessing PTG.
+- Password resets generate a new random temporary password, revoke sessions, and email the password to the registered address.
+- Admin screens and API responses do not reveal temporary passwords.
