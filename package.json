@@ -11,7 +11,9 @@
   "dependencies": {
     "next": "16.0.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "@supabase/ssr": "0.7.0",
+    "@supabase/supabase-js": "2.89.0"
   },
   "devDependencies": {
     "@types/node": "22.19.1",
@@ -19,6 +21,7 @@
     "@types/react-dom": "19.2.2",
     "eslint": "9.39.1",
     "eslint-config-next": "16.0.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "@eslint/eslintrc": "3.3.1"
   }
 }
