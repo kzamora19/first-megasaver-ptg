@@ -30,7 +30,16 @@ function classify(remarks: string) {
   if (s.includes("UNIT ONLY")) return { eligible: false, status: "UNIT ONLY" };
   return { eligible: false, status: "OTHER PROMO" };
 }
-function findCol(headers: string[], name: string) { return headers.findIndex(h => h === name); }
+function findHeaderColumn(rows: unknown[][], headerRow: number, name: string) {
+  // Some Head Office memos split labels across multiple header rows
+  // (for example REMARKS may be above BRAND / CATEGORY / BARCODE / MODEL).
+  // Resolve each column independently, preferring the row nearest the product headers.
+  for (let r = headerRow; r >= 0; r--) {
+    const i = rows[r].findIndex(v => norm(v) === name);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
 function findHeaderAbove(rows: unknown[][], headerRow: number, name: string) {
   // Head Office memos can have merged/grouped header rows several lines above
   // the product headings. Search the entire preceding header area.
@@ -65,15 +74,15 @@ export async function parsePriceMemo(file: File): Promise<ParsedMemo> {
     return ["BRAND","CATEGORY","BARCODE","MODEL"].every(k => h.includes(k));
   });
   if (headerRow < 0) throw new Error("Could not find the product header row (BRAND / CATEGORY / BARCODE / MODEL).");
-  const headers = rows[headerRow].map(norm);
   const required = ["BRAND","CATEGORY","BARCODE","MODEL","SRP","REMARKS"];
-  const missing = required.filter(k => findCol(headers,k) < 0);
+  const columns = Object.fromEntries(required.map(k => [k, findHeaderColumn(rows,headerRow,k)])) as Record<string,number>;
+  const missing = required.filter(k => columns[k] < 0);
   if (missing.length) throw new Error(`Missing required memo columns: ${missing.join(", ")}.`);
   const c = {
-    brand: findCol(headers,"BRAND"), category: findCol(headers,"CATEGORY"),
-    barcode: findCol(headers,"BARCODE"), model: findCol(headers,"MODEL"),
-    srp: findCol(headers,"SRP"), cash: findCol(headers,"CASH PAYMENT ONLY"),
-    tag: findCol(headers,"TAG THIS"), remarks: findCol(headers,"REMARKS"),
+    brand: columns.BRAND, category: columns.CATEGORY,
+    barcode: columns.BARCODE, model: columns.MODEL,
+    srp: columns.SRP, cash: findHeaderColumn(rows,headerRow,"CASH PAYMENT ONLY"),
+    tag: findHeaderColumn(rows,headerRow,"TAG THIS"), remarks: columns.REMARKS,
     m6: findHeaderAbove(rows,headerRow,"6 MONTHS"), m9: findHeaderAbove(rows,headerRow,"9 MONTHS"),
     m12: findHeaderAbove(rows,headerRow,"12 MONTHS"), m18: findHeaderAbove(rows,headerRow,"18 MONTHS"),
     m24: findHeaderAbove(rows,headerRow,"24 MONTHS")
