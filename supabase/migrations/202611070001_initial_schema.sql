@@ -214,3 +214,13 @@ revoke insert,update,delete on public.user_profiles,public.app_sessions,public.s
 -- Explicitly remove default anonymous grants; authenticated access is policy-scoped.
 revoke all privileges on all tables in schema public from anon;
 revoke all privileges on all sequences in schema public from anon;
+
+-- Foreign-key indexes for common branch/session/audit joins.
+create index if not exists app_sessions_branch_idx on public.app_sessions(branch_id);
+create index if not exists branch_installations_branch_idx on public.branch_installations(branch_id);
+create index if not exists deployment_config_updated_by_idx on public.deployment_config(updated_by);
+create index if not exists logo_assets_updated_by_idx on public.logo_assets(updated_by);
+create index if not exists price_memos_imported_by_idx on public.price_memos(imported_by);
+create index if not exists role_permissions_permission_idx on public.role_permissions(permission_key);
+create index if not exists security_audit_logs_actor_idx on public.security_audit_logs(actor_user_id);
+create index if not exists system_controls_updated_by_idx on public.system_controls(updated_by);
