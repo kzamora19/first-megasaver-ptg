@@ -170,3 +170,5 @@ footer {
 .install-note{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
 .install-panel .admin-link{display:inline-block;margin-top:12px}
 @media(max-width:640px){.install-panel ol,.install-reminders{padding-left:20px}}
+
+.upload-drop{display:grid;gap:8px;justify-items:center;margin:20px 0;padding:28px 18px;border:2px dashed #c7d7ea;border-radius:12px;background:#f8fbff;color:#29415f;text-align:center;cursor:pointer}.upload-drop input{max-width:100%;font:inherit;font-size:12px}.upload-drop strong{font-size:14px}.upload-drop span{color:var(--muted);font-size:11px}.import-summary{margin-top:18px;padding:16px;border:1px solid #cfe4d6;border-radius:10px;background:#f5fbf7;color:#175c36}.import-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-top:12px}.import-summary-grid span{display:grid;gap:4px;color:#526b5b;font-size:11px}.import-summary-grid b{color:#174a2d;font-size:18px}@media(max-width:640px){.upload-drop{padding:22px 12px}}
