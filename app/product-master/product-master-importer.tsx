@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 type Product = { barcode: string; description: string; brand: string; category: string; sub_category: string };
 type ImportSummary = { received: number; uniqueValid: number; inserted: number; updated: number; invalidRows: number; duplicateRows: number };
 
-const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[\\s_\\-]+/g, "");
+const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
 const aliases = {
   barcode: ["barcode", "itemcode", "itemnumber", "itemno", "sku"],
   description: ["description", "itemname", "productdescription", "model"],
@@ -56,7 +56,7 @@ export default function ProductMasterImporter() {
     try {
       const buffer = await file.arrayBuffer();
       let rows: unknown[][];
-      if (/\\.csv$/i.test(file.name)) {
+      if (/\.csv$/i.test(file.name)) {
         const text = new TextDecoder("utf-8").decode(buffer);
         const workbook = XLSX.read(text, { type: "string" });
         rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: "" }) as unknown[][];
