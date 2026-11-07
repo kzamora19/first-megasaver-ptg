@@ -22,7 +22,10 @@ export async function GET(request: Request) {
   if(current.role==="BRANCH_ADMIN")query=query.eq("branch_id",current.branchId);
   else if(branchId)query=query.eq("branch_id",branchId);
   const {data,error}=await query;if(error)throw error;
-  let branches: {id:string;branch_code:string;branch_name:string;status:string;operational_status:string}[] = [];\n  if(current.role.startsWith("SYSTEM_")){ const {data:branchRows}=await admin.from("branches").select("id,branch_code,branch_name,status,operational_status").order("branch_code"); branches=branchRows??[]; }\n  else if(current.role==="BRANCH_ADMIN" && current.branchId){ const {data:branchRows}=await admin.from("branches").select("id,branch_code,branch_name,status,operational_status").eq("id",current.branchId); branches=branchRows??[]; }\n  return NextResponse.json({ok:true,accounts:data??[],branches},{headers:{"Cache-Control":"no-store"}});
+  let branches: {id:string;branch_code:string;branch_name:string;status:string;operational_status:string}[] = [];
+  if(current.role.startsWith("SYSTEM_")){ const {data:branchRows}=await admin.from("branches").select("id,branch_code,branch_name,status,operational_status").order("branch_code"); branches=branchRows??[]; }
+  else if(current.role==="BRANCH_ADMIN" && current.branchId){ const {data:branchRows}=await admin.from("branches").select("id,branch_code,branch_name,status,operational_status").eq("id",current.branchId); branches=branchRows??[]; }
+  return NextResponse.json({ok:true,accounts:data??[],branches},{headers:{"Cache-Control":"no-store"}});
  } catch(error){return failure(error);}
 }
 export async function POST(request: Request) {
