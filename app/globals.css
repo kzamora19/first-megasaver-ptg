@@ -127,7 +127,8 @@ footer {
   background: var(--surface);
   box-shadow: 0 20px 60px rgba(16,43,77,.12);
 }
-.auth-brand { display: flex; align-items: center; min-height: 32px; }\n.auth-brand img { display: block; width: 178px; height: auto; max-width: 100%; }
+.auth-brand { display: flex; align-items: center; min-height: 32px; }
+.auth-brand img { display: block; width: 182px; height: 46px; max-width: 100%; }
 .auth-eyebrow { margin: 30px 0 8px; color: #6d83a0; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
 .auth-card h1 { color: #142f50; font-size: 32px; }
 .auth-intro { margin: 13px 0 25px; color: var(--muted); font-size: 14px; line-height: 1.6; }
