@@ -14,7 +14,8 @@
     "react-dom": "19.2.1",
     "@supabase/ssr": "0.7.0",
     "@supabase/supabase-js": "2.89.0",
-    "nodemailer": "10.3.1"
+    "nodemailer": "10.3.1",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@types/node": "22.19.1",
