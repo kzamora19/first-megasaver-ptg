@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { makeTemporaryPassword, sendPasswordResetEmail } from "@/lib/email/send-account-invitation";
+import { isEmailConfigured, makeTemporaryPassword, sendPasswordResetEmail } from "@/lib/email/send-account-invitation";
 import { requireAdminPermission, writeAdminAudit } from "@/lib/auth/authorization";
 import { getActiveAppSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -28,7 +28,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
   if(action==="RESET_PASSWORD"){
    if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
    if(target.role_key==="SYSTEM_ADMIN"||!target.email)throw new Error("PERMISSION_DENIED");
-   if(!process.env.RESEND_API_KEY||!process.env.RESEND_FROM_EMAIL)throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
+   if(!isEmailConfigured())throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
    const {session}=await requireAdminPermission("PASSWORD_RESET","EXECUTE",target.branch_id);
    const temporaryPassword=makeTemporaryPassword();
    const {error}=await admin.auth.admin.updateUserById(userId,{password:temporaryPassword});
