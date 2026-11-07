@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {makeInvitationToken,makeTemporaryPassword,sendAccountInvitation} from "@/lib/email/send-account-invitation";
+import {isEmailConfigured,makeInvitationToken,makeTemporaryPassword,sendAccountInvitation} from "@/lib/email/send-account-invitation";
 import {requireAdminPermission,writeAdminAudit} from "@/lib/auth/authorization";
 import {getActiveAppSession} from "@/lib/auth/session";
 import {createAdminClient} from "@/lib/supabase/admin";
@@ -9,7 +9,7 @@ export async function POST(request:Request,context:{params:Promise<{userId:strin
   if(request.headers.get("origin")!==new URL(request.url).origin)return NextResponse.json({ok:false},{status:403});
   const current=await getActiveAppSession();if(!current)return NextResponse.json({ok:false},{status:401});
   if(current.mustChangePassword)return NextResponse.json({ok:false},{status:403});
-  if(!process.env.RESEND_API_KEY||!process.env.RESEND_FROM_EMAIL)return NextResponse.json({ok:false,message:"Email delivery is not configured."},{status:503});
+  if(!isEmailConfigured())return NextResponse.json({ok:false,message:"Email delivery is not configured."},{status:503});
   const {userId}=await context.params,admin=createAdminClient();
   const {data:target,error}=await admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,email,invitation_status").eq("id",userId).maybeSingle();
   if(error||!target)return NextResponse.json({ok:false,message:"Account not found."},{status:404});
