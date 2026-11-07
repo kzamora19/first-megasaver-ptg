@@ -88,14 +88,13 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
         <span>Total product rows <b>{totalProducts.toLocaleString()}</b></span>
       </div></div>
       <h3>Memo summary</h3>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Memo No.</th><th>Period</th><th>Source file</th><th>Memo type</th><th>Products</th><th>Eligible</th><th>Status</th></tr></thead><tbody>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Memo No.</th><th>Period</th><th>Source file</th><th>Memo type</th><th>Products</th><th>Status</th></tr></thead><tbody>
         {entries.map(entry=><tr key={entry.id}>
           <td>{entry.parsed?.memoId??"—"}</td>
           <td>{entry.parsed?.period||"—"}</td>
           <td title={entry.fileName}>{entry.fileName}</td>
           <td>{entry.parsed?.memoType==="MEMO_LIST"?"MEMO LIST":entry.parsed?.memoType==="KIOSK_MEMO_LIST"?"KIOSK MEMO LIST":"—"}</td>
           <td>{entry.parsed?.products.length.toLocaleString()??"—"}</td>
-          <td>{entry.parsed?.eligible.toLocaleString()??"—"}</td>
           <td>{entry.status==="READY"?"Ready":entry.status==="IMPORTED"?"Imported":entry.status==="SKIPPED"?"Skipped":entry.status==="FAILED"||entry.status==="ERROR"?"Failed":"—"}{entry.error&&<span title={entry.error}> · Error</span>}</td>
         </tr>)}
       </tbody></table></div>
