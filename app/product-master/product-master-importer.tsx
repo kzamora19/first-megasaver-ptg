@@ -15,7 +15,7 @@ const aliases = {
   sub_category: ["subcategory", "subcategoryname", "minorcategory"],
 };
 
-function parseSheet(fileName: string, rows: unknown[][]): Product[] {
+function parseSheet(rows: unknown[][]): Product[] {
   const headerIndex = rows.findIndex(row => {
     const headers = row.map(normalize);
     return aliases.barcode.some(a => headers.includes(a)) && aliases.description.some(a => headers.includes(a));
@@ -65,7 +65,7 @@ export default function ProductMasterImporter() {
         if (!workbook.SheetNames.length) throw new Error("The workbook has no worksheets.");
         rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: "" }) as unknown[][];
       }
-      const parsed = parseSheet(file.name, rows);
+      const parsed = parseSheet(rows);
       if (!parsed.length) throw new Error("No product rows were found below the header.");
       if (parsed.length > 5000) throw new Error("This file contains more than 5,000 product rows. Split it before importing.");
       setProducts(parsed); setFileName(file.name);
