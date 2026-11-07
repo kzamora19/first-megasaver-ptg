@@ -37,17 +37,18 @@ export async function POST(request: Request) {
   const role=String(body.role??"").trim().toUpperCase(), legacyRole=String(body.legacyRole??role.replaceAll("_"," ")).trim().toUpperCase(), branchId=body.branchId??null;
   if(!/^[A-Z0-9._-]{3,32}$/.test(username)||!displayName||password.length<12||password.length>1024)
    return NextResponse.json({ok:false,message:"Provide a valid username, display name, and an initial password of at least 12 characters."},{status:400});
-  if(!["SYSTEM_ADMIN","SYSTEM_VIEWER","BRANCH_ADMIN","BRANCH_USER"].includes(role))
+  if(!["SYSTEM_ADMIN","BRANCH_ADMIN","BRANCH_USER"].includes(role))
    return NextResponse.json({ok:false,message:"Invalid application role."},{status:400});
   if(role.startsWith("BRANCH_")!==!!branchId)
    return NextResponse.json({ok:false,message:"Select a branch for branch accounts only."},{status:400});
   if(role==="BRANCH_USER"&&!["BRANCH USER","TEAM LEADER"].includes(legacyRole))
    return NextResponse.json({ok:false,message:"Invalid branch account title."},{status:400});
-  if(role==="BRANCH_ADMIN"&&legacyRole!=="BRANCH ADMIN")
+  if(role==="BRANCH_ADMIN"&& !["BRANCH ADMIN","BRANCH MANAGER"].includes(legacyRole))
    return NextResponse.json({ok:false,message:"Invalid Branch Admin title."},{status:400});
   const permission=role.startsWith("SYSTEM_")?"SYSTEM_ADMIN_ACCOUNT_MANAGEMENT":"BRANCH_USER_ACCOUNT_MANAGEMENT";
   const {session,admin}=await requireAdminPermission(permission,"EXECUTE",branchId);
-  if(role.startsWith("SYSTEM_")&&session.role!=="SYSTEM_ADMIN")throw new Error("PERMISSION_DENIED");
+  if(role==="SYSTEM_ADMIN"&&session.role!=="SYSTEM_ADMIN")throw new Error("PERMISSION_DENIED");
+  if(session.role==="BRANCH_ADMIN"&&role!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
   if(role.startsWith("BRANCH_")){
    const {data:branch,error}=await admin.from("branches").select("id,status,operational_status").eq("id",branchId).maybeSingle();
    if(error||!branch||branch.status!=="ACTIVE"||branch.operational_status!=="ON")
