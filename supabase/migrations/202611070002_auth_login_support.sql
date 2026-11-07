@@ -100,7 +100,7 @@ as $$
          locked_until = null,
          updated_at = now()
    where p.id = p_user_id
-$;
+$$;
 
 revoke all on function public.resolve_ptg_login_identity(text,text) from public, anon, authenticated;
 revoke all on function public.record_ptg_login_failure(uuid) from public, anon, authenticated;
