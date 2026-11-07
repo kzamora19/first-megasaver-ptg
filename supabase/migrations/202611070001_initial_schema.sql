@@ -66,7 +66,7 @@ on conflict(permission_key) do update set label=excluded.label,scope_description
 insert into public.role_permissions
 select r.role_key,p.permission_key,
  case when r.role_key='SYSTEM_ADMIN' then 'FULL'
- when r.role_key='SYSTEM_VIEWER' then case when p.permission_key in ('IMPORT_SRP','PASSWORD_RESET','BRANCH_USER_ACCOUNT_MANAGEMENT') then 'NONE' else 'VIEW' end
+ when r.role_key='SYSTEM_VIEWER' then case when p.permission_key='IMPORT_SRP' or p.permission_key='PASSWORD_RESET' then 'NONE' else 'VIEW' end
  when r.role_key='BRANCH_ADMIN' then case when p.permission_key='VIEW_SYSTEM_STATUS' then 'LIMITED' when p.permission_key='BRANCH_REGISTRY_VIEW' then 'OWN_BRANCH' when p.permission_key in ('BRANCH_USER_ACCOUNT_MANAGEMENT','PASSWORD_RESET','USER_STATUS_CONTROL','FORCE_LOGOUT','SECURITY_LOG_VIEW') then 'OWN_BRANCH' else 'NONE' end
  when p.permission_key='BRANCH_REGISTRY_VIEW' then 'OWN_BRANCH' else 'NONE' end
 from (values('SYSTEM_ADMIN'),('SYSTEM_VIEWER'),('BRANCH_ADMIN'),('BRANCH_USER')) r(role_key)
@@ -210,3 +210,7 @@ grant select on public.branches,public.permission_catalog,public.role_permission
 grant insert,update,delete on public.branches,public.role_permissions,public.system_controls,public.price_memos,
  public.memo_products,public.product_master,public.product_srp,public.logo_assets,public.branch_installations,public.deployment_config to authenticated;
 revoke insert,update,delete on public.user_profiles,public.app_sessions,public.security_audit_logs from authenticated;
+
+-- Explicitly remove default anonymous grants; authenticated access is policy-scoped.
+revoke all privileges on all tables in schema public from anon;
+revoke all privileges on all sequences in schema public from anon;
