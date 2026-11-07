@@ -57,8 +57,6 @@ export async function POST(request:Request){
    const {data:branch,error}=await admin.from("branches").select("id,status,operational_status").eq("id",branchId).maybeSingle();
    if(error||!branch||branch.status!=="ACTIVE"||branch.operational_status!=="ON")return NextResponse.json({ok:false,message:"The selected branch is not active."},{status:400});
   }
-  const {data:existing}=await admin.from("user_profiles").select("id").ilike("email",email).maybeSingle();
-  if(existing)return NextResponse.json({ok:false,message:"That email address is already assigned to an account."},{status:409});
   const normalized=username.toLowerCase();
   const authEmail=role==="SYSTEM_ADMIN"?`ptg.system.${normalized}@accounts.firstmegasaver.invalid`:`ptg.${String(branchId).replace(/-/g,"")}.${normalized}@accounts.firstmegasaver.invalid`;
   const temporaryPassword=makeTemporaryPassword();
