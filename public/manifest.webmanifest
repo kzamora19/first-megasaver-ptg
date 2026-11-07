@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "First Megasaver Price Tag Generator",
-  "short_name": "First Megasaver PTG",
-  "description": "First Megasaver Price Tag Generator",
+  "name": "Branchline Price Tag Generator",
+  "short_name": "Branchline PTG",
+  "description": "Branchline Price Tag Generator",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",
