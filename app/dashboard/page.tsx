@@ -71,9 +71,11 @@ export default async function DashboardPage() {
   return (
     <main className="ptg-app">
       <aside className="ptg-sidebar">
-        <a className="ptg-brand" href="/dashboard" aria-label="First Megasaver PTG home">
-          <span className="ptg-brand-mark">1M</span>
-          <span><strong>FIRST MEGASAVER</strong><small>PRICE TAG GENERATOR</small></span>
+        <a className="ptg-brand" href="/dashboard" aria-label="Branchline Price Tag Generator home">
+          <span className="ptg-brand-lockup">
+            <img src="/branchline-logo.png" alt="" />
+            <small>PRICE TAG GENERATOR</small>
+          </span>
         </a>
         <div className="ptg-nav-label">WORKSPACE</div>
         <a className="ptg-nav-item active" href="/dashboard"><span>▦</span> Dashboard</a>

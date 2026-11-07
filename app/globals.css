@@ -177,11 +177,11 @@ footer {
 /* PTG workspace */
 .ptg-app{min-height:100vh;display:grid;grid-template-columns:258px minmax(0,1fr);background:#f3f6fa}
 .ptg-sidebar{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:25px 17px;background:#102b4d;color:#fff}
-.ptg-brand{display:flex;align-items:center;gap:11px;padding:4px 8px 30px;color:#fff;text-decoration:none}
-.ptg-brand-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#f4b544;color:#17314e;font-size:17px;font-weight:1000}
-.ptg-brand strong,.ptg-brand small,.ptg-user-chip strong,.ptg-user-chip small{display:block}
-.ptg-brand strong{font-size:11px;letter-spacing:.08em}
-.ptg-brand small{margin-top:4px;color:#b8cbe0;font-size:9px;letter-spacing:.13em}
+.ptg-brand{display:block;padding:4px 8px 30px;color:#fff;text-decoration:none}
+.ptg-brand-lockup{display:block}
+.ptg-brand img{display:block;width:100%;height:auto;border-radius:9px;background:#fff}
+.ptg-brand small{display:block;margin-top:8px;color:#b8cbe0;font-size:9px;letter-spacing:.13em}
+.ptg-user-chip strong,.ptg-user-chip small{display:block}
 .ptg-nav-label{padding:12px 11px 9px;color:#829bb7;font-size:9px;font-weight:900;letter-spacing:.16em}
 .ptg-nav-item{display:flex;align-items:center;gap:12px;margin:3px 0;padding:12px 13px;border-radius:9px;color:#c7d5e5;text-decoration:none;font-size:12px;font-weight:700}
 .ptg-nav-item span{width:18px;text-align:center;font-size:16px}
