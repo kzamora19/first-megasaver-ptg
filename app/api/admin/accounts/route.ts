@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   if(!sameOrigin(request))return NextResponse.json({ok:false},{status:403});
   const current=await getActiveAppSession(); if(!current)throw new Error("AUTH_REQUIRED");
   const branchId=current.role==="BRANCH_ADMIN"?current.branchId:new URL(request.url).searchParams.get("branchId");
-  const permission=current.role.startsWith("SYSTEM_")?"SYSTEM_ADMIN_ACCOUNT_MANAGEMENT":"BRANCH_USER_ACCOUNT_MANAGEMENT";
+  const permission=current.role==="SYSTEM_ADMIN"?"SYSTEM_ADMIN_ACCOUNT_MANAGEMENT":"BRANCH_USER_ACCOUNT_MANAGEMENT";
   const {admin}=await requireAdminPermission(permission,"VIEW",branchId);
   let query=admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,is_active,failed_login_attempts,locked_until,must_change_password,created_at,updated_at").order("display_name");
   if(current.role==="BRANCH_ADMIN")query=query.eq("branch_id",current.branchId);
