@@ -9,8 +9,7 @@ export async function GET(request: Request) {
   const session = await getActiveAppSession();
   if (!session) return NextResponse.json({ ok: false, message: "Authentication required." }, { status: 401 });
   if (session.mustChangePassword) return NextResponse.json({ ok: false, message: "Password change required." }, { status: 403 });
-  const isAllowed = ["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role) ||
-    (session.role === "BRANCH_USER" && session.legacyRole.trim().toUpperCase() === "TEAM LEADER");
+  const isAllowed = ["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role);
   if (!isAllowed) return NextResponse.json({ ok: false, message: "PTG access is not enabled for this account." }, { status: 403 });
 
   const params = new URL(request.url).searchParams;
