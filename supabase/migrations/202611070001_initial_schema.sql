@@ -224,3 +224,7 @@ create index if not exists price_memos_imported_by_idx on public.price_memos(imp
 create index if not exists role_permissions_permission_idx on public.role_permissions(permission_key);
 create index if not exists security_audit_logs_actor_idx on public.security_audit_logs(actor_user_id);
 create index if not exists system_controls_updated_by_idx on public.system_controls(updated_by);
+
+-- Private username-to-auth mapping: RLS enabled with intentionally no client policies.
+-- Privileged server-side auth code may access this table using server credentials only.
+alter table private.login_identities enable row level security;
