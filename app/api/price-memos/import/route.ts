@@ -20,15 +20,16 @@ export async function POST(request: Request) {
   if (!["SYSTEM_ADMIN","BRANCH_ADMIN"].includes(session.role)) {
     return NextResponse.json({ok:false,message:"Only Branch Admin and System Admin can import price memos."},{status:403});
   }
-  let body: { branchId?: string; memoId?: string; period?: string; sourceFile?: string; duplicateAction?: string; products?: MemoProduct[] };
+  let body: { branchId?: string; memoId?: string; period?: string; memoType?: string; sourceFile?: string; duplicateAction?: string; products?: MemoProduct[] };
   try { body = await request.json(); }
   catch { return NextResponse.json({ok:false,message:"Invalid import payload."},{status:400}); }
   const branchId = session.role === "BRANCH_ADMIN" ? session.branchId : clean(body.branchId,64);
   const memoId = clean(body.memoId,120);
   const sourceFile = clean(body.sourceFile,240);
+  const memoType = clean(body.memoType,40).toUpperCase();
   const period = clean(body.period,120);
   const action = clean(body.duplicateAction,20).toUpperCase();
-  if (!branchId || !memoId || !sourceFile || !Array.isArray(body.products) || !body.products.length || body.products.length > MAX_ROWS || !["SKIP","REPLACE"].includes(action)) {
+  if (!branchId || !memoId || !sourceFile || !["MEMO_LIST","KIOSK_MEMO_LIST"].includes(memoType) || !Array.isArray(body.products) || !body.products.length || body.products.length > MAX_ROWS || !["SKIP","REPLACE"].includes(action)) {
     return NextResponse.json({ok:false,message:"A destination branch, memo number, source file and valid product rows are required."},{status:400});
   }
   const products = body.products.map(p => ({
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ok:false,message:"You can only import memos for your assigned branch."},{status:403});
   }
   const {data,error} = await admin.rpc("import_price_memo",{
-    p_branch_id:branchId,p_memo_id:memoId,p_period:period,p_source_file:sourceFile,
+    p_branch_id:branchId,p_memo_id:memoId,p_period:period,p_memo_type:memoType,p_source_file:sourceFile,
     p_imported_by:session.userId,p_duplicate_action:action,p_products:products
   });
   if (error) {
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
     await admin.from("security_audit_logs").insert({
       actor_user_id:session.userId,branch_id:branchId,event_category:"PRICE_MEMO",action:result.duplicate?"REPLACE":"IMPORT",
       target_identifier:memoId,outcome:"SUCCESS",message:"Price memo import completed.",
-      metadata:{source_file:sourceFile,period,total_products:result.totalProducts,eligible_products:products.filter(p=>p.eligible_for_price_tag).length}
+      metadata:{source_file:sourceFile,period,memo_type:memoType,total_products:result.totalProducts,eligible_products:products.filter(p=>p.eligible_for_price_tag).length}
     });
   }
   return NextResponse.json({ok:true,summary:{skipped:result.skipped===true,duplicate:result.duplicate===true,totalProducts:result.totalProducts??0}});
