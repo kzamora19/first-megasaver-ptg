@@ -13,7 +13,6 @@ const ALLOWED = {
   "image/webp": "webp",
 } as const;
 const VISIBLE_SLOTS = new Set(["header", "promo", "social", "appHeader"]);
-type LogoKey = keyof typeof ALLOWED extends never ? never : "header" | "promo" | "social" | "appHeader";
 
 async function requireSystemAdmin() {
   const session = await getActiveAppSession();
@@ -104,7 +103,8 @@ export async function PUT(request: Request) {
   if (!(file.type in ALLOWED)) return NextResponse.json({ ok: false, message: "Upload a PNG, JPG/JPEG, or WEBP image." }, { status: 400 });
   if (!file.size || file.size > MAX_FILE_BYTES) return NextResponse.json({ ok: false, message: "Images must be 5 MB or smaller." }, { status: 400 });
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
   if (!signatureMatches(bytes, file.type)) return NextResponse.json({ ok: false, message: "The selected file does not match its image type." }, { status: 400 });
 
   const admin = createAdminClient();
@@ -122,7 +122,7 @@ export async function PUT(request: Request) {
 
   const extension = ALLOWED[file.type as keyof typeof ALLOWED];
   const path = key + "/" + crypto.randomUUID() + "." + extension;
-  const upload = await admin.storage.from(BUCKET).upload(path, bytes, {
+  const upload = await admin.storage.from(BUCKET).upload(path, arrayBuffer, {
     contentType: file.type,
     cacheControl: "3600",
     upsert: false,
