@@ -66,6 +66,27 @@ The HTML interfaces call Apps Script through `google.script.run`. The new applic
 - Keep privileged Supabase keys server-only; do not expose them in `NEXT_PUBLIC_*` variables.
 - Audit every write/import/delete operation before enabling it.
 
-## Initial migration status
+## Authentication migration progress
 
-This branch contains only a Next.js application scaffold and this inventory. No Supabase schema, auth configuration, production data, or production secrets have been added.
+The development branch now includes:
+
+- A server-only Supabase admin client using a non-public secret environment variable.
+- A private username-to-Supabase-Auth identity resolver exposed only through service-role-only database RPCs.
+- A username login endpoint supporting optional branch-code disambiguation.
+- Atomic five-failure / 15-minute lockout updates, matching the legacy account lockout threshold.
+- Secure Supabase Auth cookie sign-in, plus a separate HTTP-only application-session cookie.
+- Database-backed application sessions enforcing the 30-minute idle timeout and 8-hour absolute lifetime.
+- Session status and logout endpoints, with role/branch context loaded server-side.
+- A development login page and protected dashboard placeholder.
+
+The authentication SQL migrations have been applied to the isolated PTG Supabase project. Database checks confirmed the resolver/lockout RPCs are executable by service_role and not by anon or authenticated. private.login_identities remains RLS-enabled with no client policies.
+
+## Remaining authentication work before acceptance
+
+- Run a full Next.js typecheck, lint, and production build in a connected build environment.
+- Add account provisioning and password enrollment/reset workflows; no legacy password hashes will be migrated.
+- Implement and test force logout, role/permission gates, account disable, branch disable, and session-version invalidation.
+- Add a branch-aware authentication test matrix, including duplicate usernames across branches.
+- Add CSRF/origin protections and operational rate limiting to auth mutation routes.
+
+No production user accounts, passwords, sessions, memos, product data, or logos have been migrated. The existing Apps Script deployment remains untouched and in production use.
