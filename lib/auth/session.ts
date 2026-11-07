@@ -9,6 +9,7 @@ export type ActiveAppSession = {
   id: string;
   userId: string;
   role: string;
+  legacyRole: string;
   branchId: string | null;
   branchCode: string | null;
   username: string;
@@ -47,7 +48,7 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("role_key,display_name,is_active,session_version,must_change_password")
+    .select("role_key,legacy_role,display_name,is_active,session_version,must_change_password")
     .eq("id", authData.user.id)
     .maybeSingle();
 
@@ -99,6 +100,7 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
     id: session.id,
     userId: authData.user.id,
     role: profile.role_key,
+    legacyRole: profile.legacy_role ?? "",
     branchId: session.branch_id,
     branchCode,
     username: typeof username === "string" ? username : "",
