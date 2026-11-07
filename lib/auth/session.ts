@@ -13,6 +13,7 @@ export type ActiveAppSession = {
   branchCode: string | null;
   username: string;
   displayName: string;
+  mustChangePassword: boolean;
 };
 
 /**
@@ -46,7 +47,7 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("role_key,display_name,is_active,session_version")
+    .select("role_key,display_name,is_active,session_version,must_change_password")
     .eq("id", authData.user.id)
     .maybeSingle();
 
@@ -102,5 +103,6 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
     branchCode,
     username: typeof username === "string" ? username : "",
     displayName: profile.display_name ?? "",
+    mustChangePassword: profile.must_change_password === true,
   };
 }
