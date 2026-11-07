@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "First Megasaver Price Tag Generator",
+  "short_name": "First Megasaver PTG",
+  "description": "First Megasaver Price Tag Generator",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7fb",
+  "theme_color": "#123b6b",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/ptg-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
