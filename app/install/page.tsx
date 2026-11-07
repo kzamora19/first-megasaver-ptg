@@ -1,17 +1,17 @@
 import InstallApp from "@/components/install-app";
 
 export const metadata = {
-  title: "Install First Megasaver PTG",
-  description: "Installation instructions for First Megasaver Price Tag Generator.",
+  title: "Install Branchline PTG",
+  description: "Installation instructions for Branchline Price Tag Generator.",
 };
 
 export default function InstallPage() {
   return (
     <main className="shell">
       <section className="hero">
-        <p className="eyebrow">FIRST MEGASAVER · APP INSTALLATION</p>
+        <p className="eyebrow">BRANCHLINE · APP INSTALLATION</p>
         <h1>Install PTG</h1>
-        <p className="intro">Add First Megasaver Price Tag Generator to your device for quick access. Installation does not create a separate account; sign in using your assigned PTG credentials.</p>
+        <p className="intro">Add Branchline Price Tag Generator to your device for quick access. Installation does not create a separate account; sign in using your assigned PTG credentials.</p>
       </section>
       <section className="panel install-panel">
         <h2>Install on this device</h2>
@@ -23,7 +23,7 @@ export default function InstallPage() {
           <li>Open the PTG website in Google Chrome or Microsoft Edge.</li>
           <li>Select the install icon in the address bar, or open the browser menu.</li>
           <li>Choose <strong>Install app</strong> and confirm.</li>
-          <li>Launch First Megasaver PTG from your desktop or application launcher.</li>
+          <li>Launch Branchline PTG from your desktop or application launcher.</li>
         </ol>
       </section>
       <section className="panel install-panel">
