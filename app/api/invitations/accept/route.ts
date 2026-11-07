@@ -14,6 +14,6 @@ export async function POST(request:Request){
  if(consumeError||!consumed)return NextResponse.json({ok:false,message:"This invitation has already been used or expired."},{status:409});
  const {data:profile,error:profileError}=await admin.from("user_profiles").update({is_active:true,invitation_status:"ACCEPTED",invitation_accepted_at:now,updated_at:now}).eq("id",invite.user_id).eq("invitation_status","SENT").select("id").maybeSingle();
  if(profileError||!profile)return NextResponse.json({ok:false,message:"The invitation could not be activated. Contact your System Admin."},{status:503});
- await admin.from("security_audit_logs").insert({actor_user_id:invite.user_id,event_category:"ACCOUNT_SECURITY",action:"ACCEPT_ACCOUNT_INVITATION",target_identifier:invite.user_id,outcome:"SUCCESS",message:"Employee accepted account invitation. Initial password change remains required."});
+ await admin.from("security_audit_logs").insert({actor_user_id:null,event_category:"ACCOUNT_SECURITY",action:"ACCEPT_ACCOUNT_INVITATION",target_identifier:invite.user_id,outcome:"SUCCESS",message:"Employee accepted account invitation. Initial password change remains required."});
  return NextResponse.json({ok:true},{headers:{"Cache-Control":"no-store"}});
 }
