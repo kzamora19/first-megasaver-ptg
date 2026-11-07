@@ -9,6 +9,7 @@ export default async function DashboardPage() {
   const session = await getActiveAppSession();
   if (!session) redirect("/login");
   if (session.mustChangePassword) redirect("/change-password");
+  if (session.role === "BRANCH_USER" && session.legacyRole !== "TEAM LEADER") redirect("/no-access");
 
   return (
     <main className="shell">
