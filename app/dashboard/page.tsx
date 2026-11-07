@@ -25,6 +25,7 @@ export default async function DashboardPage() {
           <div><dt>Role</dt><dd>{session.role}</dd></div>
           <div><dt>Branch</dt><dd>{session.branchCode ?? "SYSTEM"}</dd></div>
         </dl>
+        {["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role) && <p><a className="admin-link" href="/price-memos/import">Open Price Memo Importer →</a></p>}
         {session.role === "SYSTEM_ADMIN" && <p><a className="admin-link" href="/product-master">Open Product Master import →</a></p>}
         {["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role) && <p><a className="admin-link" href="/admin/accounts">Open account administration →</a></p>}
         <p className="intro">The PTG modules and print layouts will be migrated and tested in separate phases before this workspace is used operationally.</p>
