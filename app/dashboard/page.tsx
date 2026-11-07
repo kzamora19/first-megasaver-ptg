@@ -41,7 +41,7 @@ export default async function DashboardPage() {
     },
     {
       title: "Product Search & Tag Queue",
-      description: "Search shared price references, select products, and open the first 1 WHOLE print preview.",
+      description: "Search shared price references and select products for the print workflow.",
       href: canUsePTG ? "/products" : undefined,
       action: canUsePTG ? "Open product search" : "PTG access required",
       available: canUsePTG,
@@ -56,9 +56,10 @@ export default async function DashboardPage() {
     },
     {
       title: "Print Preview & PDF",
-      description: "The initial 1 WHOLE preview is available from the product queue; additional print layouts are being ported.",
-      action: "Open Product Search & Tag Queue",
-      available: false,
+      description: "Open the first 1 WHOLE print preview from the selected product queue.",
+      href: canUsePTG ? "/products" : undefined,
+      action: canUsePTG ? "Open print workflow" : "PTG access required",
+      available: canUsePTG,
       eyebrow: "OUTPUT",
     },
     {
