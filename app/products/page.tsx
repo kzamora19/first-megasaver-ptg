@@ -8,8 +8,7 @@ export default async function ProductsPage() {
   const session = await getActiveAppSession();
   if (!session) redirect("/login");
   if (session.mustChangePassword) redirect("/change-password");
-  const allowed = ["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role) ||
-    (session.role === "BRANCH_USER" && session.legacyRole.trim().toUpperCase() === "TEAM LEADER");
+  const allowed = ["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role);
   if (!allowed) redirect("/no-access");
   return <ProductSearch branchCode={session.branchCode ?? "ALL BRANCHES"} />;
 }
