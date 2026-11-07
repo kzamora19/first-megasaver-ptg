@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -11,6 +11,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [appHeaderLogo, setAppHeaderLogo] = useState("/legacy-ptg/app-header.png");
+
+  useEffect(() => {
+    fetch("/api/logos", { cache: "no-store" }).then(response => response.json()).then(result => {
+      if (result.ok && result.logos?.appHeader?.url) setAppHeaderLogo(result.logos.appHeader.url);
+    }).catch(() => {});
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +51,7 @@ export default function LoginPage() {
     <main className="auth-shell legacy-login-shell">
       <section className="auth-card legacy-login-card">
         <div className="legacy-login-header">
-          <img src="/legacy-ptg/app-header.png" alt="1st Megasaver · Appliance · Gadgets · Furniture" />
+          <img src={appHeaderLogo} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
         </div>
         <div className="legacy-login-body">
           <form onSubmit={submit} className="legacy-login-form">
