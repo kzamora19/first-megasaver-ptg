@@ -18,6 +18,11 @@ const genericFailure = () =>
   );
 
 export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  if (!origin || origin !== new URL(request.url).origin) {
+    return NextResponse.json({ ok: false, message: "Request origin is not allowed." }, { status: 403 });
+  }
+
   let body: { username?: string; password?: string; branchCode?: string };
   try {
     body = await request.json();
