@@ -23,13 +23,10 @@ const money = (v: unknown): number => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 function classify(remarks: string) {
-  const s = norm(remarks);
-  if (!s) return { eligible: false, status: "NO REMARKS" };
-  if (s.includes("FREE") && s.includes("FIRST") && (s.includes("10FT") || s.includes("10 FT")) && s.includes("INSTALLATION")) {
-    return { eligible: true, status: "ELIGIBLE" };
-  }
-  if (s.includes("UNIT ONLY")) return { eligible: false, status: "UNIT ONLY" };
-  return { eligible: false, status: "OTHER PROMO" };
+  // Remarks are descriptive metadata (including aircon installation identification),
+  // never a gate for price-tag eligibility. Every imported product is eligible.
+  void remarks;
+  return { eligible: true, status: "ELIGIBLE" };
 }
 function findHeaderColumn(rows: unknown[][], headerRow: number, name: string) {
   // Some Head Office memos split labels across multiple header rows
@@ -90,16 +87,13 @@ export async function parsePriceMemo(file: File): Promise<ParsedMemo> {
   };
   const meta = memoInfo(rows,file.name);
   const products: MemoProduct[] = [];
-  let eligible=0, unitOnly=0, otherPromo=0, noRemarks=0;
+  let eligible=0;
   for (const row of rows.slice(headerRow+1)) {
     const brand=clean(row[c.brand]), category=clean(row[c.category]), barcode=clean(row[c.barcode]), model=clean(row[c.model]);
     if (!brand && !category && !barcode && !model) continue;
     if (!brand || !barcode || !model) continue;
     const remarks=clean(row[c.remarks]), status=classify(remarks);
-    if (status.status==="ELIGIBLE") eligible++;
-    else if (status.status==="UNIT ONLY") unitOnly++;
-    else if (status.status==="OTHER PROMO") otherPromo++;
-    else noRemarks++;
+    eligible++;
     products.push({
       period:meta.period, source_file:file.name, brand, category, barcode, model,
       srp:money(row[c.srp]), cash_payment:c.cash<0?0:money(row[c.cash]), tag_this:c.tag<0?0:money(row[c.tag]),
@@ -111,5 +105,5 @@ export async function parsePriceMemo(file: File): Promise<ParsedMemo> {
   }
   if (!products.length) throw new Error("No valid product rows found. Each row needs Brand, Barcode and Model.");
   if (products.length > 10000) throw new Error("This memo exceeds 10,000 product rows. Split the file before importing.");
-  return { memoId:meta.memoId, period:meta.period, memoType:c.cash < 0 ? "KIOSK_MEMO_LIST" : "MEMO_LIST", products, eligible, unitOnly, otherPromo, noRemarks };
+  return { memoId:meta.memoId, period:meta.period, memoType:c.cash < 0 ? "KIOSK_MEMO_LIST" : "MEMO_LIST", products, eligible };
 }
