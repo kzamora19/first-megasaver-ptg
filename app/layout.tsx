@@ -3,14 +3,14 @@ import PwaRegister from "@/components/pwa-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "First Megasaver PTG",
-  description: "First Megasaver Price Tag Generator",
-  applicationName: "First Megasaver PTG",
+  title: "Branchline · Price Tag Generator",
+  description: "Branchline Price Tag Generator",
+  applicationName: "Branchline · Price Tag Generator",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Megasaver PTG",
+    title: "Branchline PTG",
   },
   icons: {
     icon: [{ url: "/icons/ptg-icon.svg", type: "image/svg+xml" }],
