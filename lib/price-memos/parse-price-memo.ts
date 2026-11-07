@@ -32,11 +32,13 @@ function classify(remarks: string) {
 }
 function findCol(headers: string[], name: string) { return headers.findIndex(h => h === name); }
 function findHeaderAbove(rows: unknown[][], headerRow: number, name: string) {
-  for (let r = Math.max(0, headerRow - 3); r < headerRow; r++) {
+  // Head Office memos can have merged/grouped header rows several lines above
+  // the product headings. Search the entire preceding header area.
+  for (let r = headerRow - 1; r >= 0; r--) {
     const i = rows[r].findIndex(v => norm(v).includes(name));
     if (i >= 0) return i;
   }
-  return -1;
+  throw new Error(`Could not locate the ${name} installment column above the product headers.`);
 }
 function memoInfo(rows: unknown[][], fileName: string) {
   let memoId = "", period = "";
@@ -46,8 +48,8 @@ function memoInfo(rows: unknown[][], fileName: string) {
     if (upper.includes("MEMO NUMBER")) memoId = value.replace(/.*MEMO NUMBER\s*:?\s*/i, "").trim();
     if (upper.includes("PERIOD COVERED")) period = value.replace(/.*PERIOD COVERED\s*:?\s*/i, "").trim();
   }
-  if (!memoId) memoId = `NO-MEMO-NUMBER-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0,14)}`;
-  return { memoId: memoId || fileName, period };
+  if (!memoId) memoId = `NO-MEMO-NUMBER-${fileName.replace(/[^a-z0-9]+/gi,"-").slice(0,80)}`;
+  return { memoId, period };
 }
 export async function parsePriceMemo(file: File): Promise<ParsedMemo> {
   if (!/\.(xlsx|xls|csv)$/i.test(file.name)) throw new Error("Use an Excel (.xlsx/.xls) or CSV Head Office price memo.");
