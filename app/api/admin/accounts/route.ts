@@ -29,7 +29,7 @@ export async function GET(request:Request){
   let branches:{id:string;branch_code:string;branch_name:string;status:string;operational_status:string}[]=[];
   if(current.role==="SYSTEM_ADMIN"){const {data:rows}=await admin.from("branches").select("id,branch_code,branch_name,status,operational_status").order("branch_code");branches=rows??[];}
   else if(current.role==="BRANCH_ADMIN"&&current.branchId){const {data:rows}=await admin.from("branches").select("id,branch_code,branch_name,status,operational_status").eq("id",current.branchId);branches=rows??[];}
-  return NextResponse.json({ok:true,accounts:data??[],branches},{headers:{"Cache-Control":"no-store"}});
+  const accounts=(data??[]).map(account=>account.invitation_status==="SENT"&&account.invitation_expires_at&&new Date(account.invitation_expires_at).getTime()<=Date.now()?{...account,invitation_status:"EXPIRED"}:account);\n  return NextResponse.json({ok:true,accounts,branches},{headers:{"Cache-Control":"no-store"}});
  }catch(error){return failure(error);}
 }
 export async function POST(request:Request){
