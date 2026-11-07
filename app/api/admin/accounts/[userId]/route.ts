@@ -20,7 +20,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
   const body=await request.json() as {action?:string;enabled?:boolean};
   const action=String(body.action??"").toUpperCase();
   const admin=createAdminClient();
-  const {data:target,error:targetError}=await admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,email,is_active").eq("id",userId).maybeSingle();
+  const {data:target,error:targetError}=await admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,email,is_active,invitation_status").eq("id",userId).maybeSingle();
   if(targetError||!target)return NextResponse.json({ok:false,message:"Account not found."},{status:404});
   if(action==="RESET_PASSWORD"){
    if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
@@ -44,6 +44,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
   }
   if(action==="SET_STATUS"){
    if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
+   if(body.enabled===true&&["PENDING","SENT"].includes(String(target.invitation_status??"")))throw new Error("PERMISSION_DENIED");
    if(typeof body.enabled!=="boolean")return NextResponse.json({ok:false,message:"enabled must be true or false."},{status:400});
    const {session}=await requireAdminPermission("USER_STATUS_CONTROL","EXECUTE",target.branch_id);
    const {error}=await admin.rpc("set_ptg_user_status",{p_user_id:userId,p_enabled:body.enabled});
