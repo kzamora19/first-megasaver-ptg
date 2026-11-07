@@ -6,10 +6,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const MAX_IMPORT_ROWS = 5000;
 type ProductRow = { barcode?: unknown; description?: unknown; brand?: unknown; category?: unknown; sub_category?: unknown };
-function canUsePTG(session: { role: string; legacyRole: string }) {
-  return session.role === "SYSTEM_ADMIN" || session.role === "BRANCH_ADMIN" ||
-    (session.role === "BRANCH_USER" && session.legacyRole === "TEAM LEADER");
-}
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().slice(0, max);
 }
@@ -17,7 +13,6 @@ export async function GET(request: Request) {
   const session = await getActiveAppSession();
   if (!session) return NextResponse.json({ ok: false }, { status: 401 });
   if (session.mustChangePassword) return NextResponse.json({ ok: false, message: "Password change required." }, { status: 403 });
-  if (!canUsePTG(session)) return NextResponse.json({ ok: false, message: "PTG access is restricted to Team Leaders and above." }, { status: 403 });
   const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) return NextResponse.json({ ok: true, products: [] }, { headers: { "Cache-Control": "no-store" } });
   const admin = createAdminClient();
