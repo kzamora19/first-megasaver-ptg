@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const session = await getActiveAppSession();
   if (!session) redirect("/login");
+  if (session.mustChangePassword) redirect("/change-password");
 
   return (
     <main className="shell">
