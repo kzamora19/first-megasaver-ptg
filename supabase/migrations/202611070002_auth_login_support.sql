@@ -67,7 +67,7 @@ declare
   v_attempts integer;
   v_locked_until timestamptz;
 begin
-  update public.user_profiles
+  update public.user_profiles as p
      set failed_login_attempts = case
            when locked_until is not null and locked_until <= now() then 1
            else failed_login_attempts + 1
@@ -81,9 +81,8 @@ begin
            else null
          end,
          updated_at = now()
-   where id = p_user_id
-   returning public.user_profiles.failed_login_attempts,
-             public.user_profiles.locked_until
+   where p.id = p_user_id
+   returning p.failed_login_attempts, p.locked_until
         into v_attempts, v_locked_until;
 
   return query select v_attempts, v_locked_until;
@@ -96,12 +95,12 @@ language sql
 security definer
 set search_path = ''
 as $$
-  update public.user_profiles
+  update public.user_profiles as p
      set failed_login_attempts = 0,
          locked_until = null,
          updated_at = now()
-   where id = p_user_id
-$$;
+   where p.id = p_user_id
+$;
 
 revoke all on function public.resolve_ptg_login_identity(text,text) from public, anon, authenticated;
 revoke all on function public.record_ptg_login_failure(uuid) from public, anon, authenticated;
