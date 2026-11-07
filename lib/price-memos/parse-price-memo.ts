@@ -8,8 +8,9 @@ export type MemoProduct = {
   months_6: number; months_9: number; months_12: number; months_18: number;
   months_24: number; remarks: string; eligible_for_price_tag: boolean; price_tag_status: string;
 };
+export type MemoType = "MEMO_LIST" | "KIOSK_MEMO_LIST";
 export type ParsedMemo = {
-  memoId: string; period: string; products: MemoProduct[];
+  memoId: string; period: string; memoType: MemoType; products: MemoProduct[];
   eligible: number; unitOnly: number; otherPromo: number; noRemarks: number;
 };
 const norm = (v: unknown) => String(v ?? "").normalize("NFKC").trim().toUpperCase().replace(/[\s_\-]+/g, " ");
@@ -110,5 +111,5 @@ export async function parsePriceMemo(file: File): Promise<ParsedMemo> {
   }
   if (!products.length) throw new Error("No valid product rows found. Each row needs Brand, Barcode and Model.");
   if (products.length > 10000) throw new Error("This memo exceeds 10,000 product rows. Split the file before importing.");
-  return { memoId:meta.memoId, period:meta.period, products, eligible, unitOnly, otherPromo, noRemarks };
+  return { memoId:meta.memoId, period:meta.period, memoType:c.cash < 0 ? "KIOSK_MEMO_LIST" : "MEMO_LIST", products, eligible, unitOnly, otherPromo, noRemarks };
 }
