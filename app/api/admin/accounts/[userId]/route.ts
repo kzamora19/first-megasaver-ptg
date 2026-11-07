@@ -20,7 +20,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
   const body=await request.json() as {action?:string;enabled?:boolean};
   const action=String(body.action??"").toUpperCase();
   const admin=createAdminClient();
-  const {data:target,error:targetError}=await admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,is_active").eq("id",userId).maybeSingle();
+  const {data:target,error:targetError}=await admin.from("user_profiles").select("id,display_name,role_key,legacy_role,branch_id,email,is_active").eq("id",userId).maybeSingle();
   if(targetError||!target)return NextResponse.json({ok:false,message:"Account not found."},{status:404});
   if(action==="RESET_PASSWORD"){
    if(current.role==="BRANCH_ADMIN"&&target.role_key!=="BRANCH_USER")throw new Error("PERMISSION_DENIED");
@@ -34,7 +34,7 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
    if(stateError)throw new Error("PASSWORD_STATE_UPDATE_FAILED");
    let emailId:string;
    try{
-    emailId=await sendPasswordResetEmail({email:target.email,displayName:target.display_name,username:target.display_name?String((await admin.schema("private").from("login_identities").select("username").eq("auth_user_id",userId).single()).data?.username??""): "",temporaryPassword,loginUrl:new URL("/login",request.url).toString()});
+    const {data:identity}=await admin.schema("private").from("login_identities").select("username").eq("auth_user_id",userId).single();\n    emailId=await sendPasswordResetEmail({email:target.email,displayName:target.display_name,username:String(identity?.username??""),temporaryPassword,loginUrl:new URL("/login",request.url).toString()});
    }catch{
     await admin.auth.admin.updateUserById(userId,{password:makeTemporaryPassword()});
     throw new Error("EMAIL_DELIVERY_FAILED");
