@@ -18,6 +18,7 @@ export async function requireAdminPermission(
 ) {
   const session = await getActiveAppSession();
   if (!session) throw new Error("AUTH_REQUIRED");
+  if (session.mustChangePassword) throw new Error("PASSWORD_CHANGE_REQUIRED");
 
   const admin = createAdminClient();
   const { data: permission, error } = await admin
