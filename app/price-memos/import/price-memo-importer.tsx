@@ -68,6 +68,11 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
 
   const readyCount=entries.filter(e=>e.parsed&&(e.status==="READY"||e.status==="FAILED")).length;
   const totalProducts=entries.reduce((n,e)=>n+(e.parsed?.products.length??0),0);
+  const importedCount=entries.filter(e=>e.status==="IMPORTED").length;
+  const skippedCount=entries.filter(e=>e.status==="SKIPPED").length;
+  const failedCount=entries.filter(e=>e.status==="FAILED"||e.status==="ERROR").length;
+  const isFinished=entries.length>0&&entries.every(e=>["IMPORTED","SKIPPED","FAILED","ERROR"].includes(e.status));
+
   return <section className="admin-layout"><div className="admin-card">
     <h3>Head Office memo files</h3>
     <p className="admin-muted">Select one or more Excel (.xlsx, .xls) or CSV files. The first worksheet of each workbook is read. Required columns: BRAND, CATEGORY, BARCODE, MODEL, SRP and REMARKS. Installment headings may be on the row above the product headers. Each file may contain up to 10,000 valid product rows and must be 20 MB or smaller.</p>
@@ -75,29 +80,25 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
       <label className="admin-field"><span>Destination branch</span><select value={branchId} onChange={e=>setBranchId(e.target.value)}><option value="">Select branch</option>{branchOptions.map(b=><option key={b.id} value={b.id}>{b.label}</option>)}</select></label>}
     <label className="upload-drop"><input type="file" accept=".xlsx,.xls,.csv" multiple disabled={busy} onChange={e=>void chooseFiles(e.target.files)}/><strong>Choose multiple Head Office price memos</strong><span>Multiple files supported · Maximum 20 MB per file · Up to 10,000 valid product rows per file</span></label>
     {!!entries.length&&<>
-      <div className="import-summary"><strong>Batch overview</strong><div className="import-summary-grid"><span>Files selected <b>{entries.length}</b></span><span>Ready to import <b>{readyCount}</b></span><span>Total product rows <b>{totalProducts.toLocaleString()}</b></span></div></div>
-      {entries.map(entry=><div className="import-summary" key={entry.id}>
-        <strong>{entry.fileName}</strong>
-        {entry.error&&<p className="admin-alert error">{entry.error}</p>}
-        {entry.parsed&&<>
-          <div className="import-summary-grid">
-            <span>Memo Type <b>{entry.parsed.memoType==="MEMO_LIST"?"MEMO LIST":"KIOSK MEMO LIST"}</b></span>
-            <span>Memo No. <b>{entry.parsed.memoId}</b></span>
-            <span>Period <b>{entry.parsed.period||"—"}</b></span>
-            <span>Total products <b>{entry.parsed.products.length.toLocaleString()}</b></span>
-            <span>Eligible <b>{entry.parsed.eligible.toLocaleString()}</b></span>
-            <span>Unit only <b>{entry.parsed.unitOnly.toLocaleString()}</b></span>
-            <span>Other promo <b>{entry.parsed.otherPromo.toLocaleString()}</b></span>
-            <span>No remarks <b>{entry.parsed.noRemarks.toLocaleString()}</b></span>
-            <span>Import status <b>{entry.status==="READY"?"Ready":entry.status==="IMPORTED"?"Imported":entry.status==="SKIPPED"?"Skipped":entry.status==="FAILED"?"Failed":"—"}</b></span>
-          </div>
-          {entry.summary&&<p className="admin-muted">{entry.summary.totalProducts.toLocaleString()} product row(s) {entry.summary.skipped?"skipped because this memo already exists.":"processed successfully."}</p>}
-          {entry.status==="READY"&&<><h4>Product preview (first 5 rows)</h4><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Brand</th><th>Barcode</th><th>Model</th><th>SRP</th><th>Cash Price</th><th>Tag This</th><th>Remarks / Eligibility</th></tr></thead><tbody>
-            {entry.parsed.products.slice(0,5).map((p,i)=><tr key={i}><td>{p.brand}</td><td>{p.barcode}</td><td>{p.model}</td><td>{p.srp.toLocaleString("en-PH",{minimumFractionDigits:2})}</td><td>{entry.parsed!.memoType==="KIOSK_MEMO_LIST"?"—":p.cash_payment.toLocaleString("en-PH",{minimumFractionDigits:2})}</td><td>{p.tag_this.toLocaleString("en-PH",{minimumFractionDigits:2})}</td><td>{p.remarks||"—"} · {p.price_tag_status}</td></tr>)}
-          </tbody></table></div></>}
-          <p className="admin-footnote">{entry.parsed.memoType==="KIOSK_MEMO_LIST"?"Kiosk Memo List detected: Cash Price is intentionally absent. ":"Memo List detected: Cash Price column is present. "}Only rows marked ELIGIBLE by the exact FREE FIRST 10FT INSTALLATION rule can be used for price tags. UNIT ONLY, other promotions and blank remarks remain stored but are not eligible.</p>
-        </>}
-      </div>)}
+      <div className="import-summary"><strong>{isFinished?"Batch import summary":"Selected memo summary"}</strong><div className="import-summary-grid">
+        <span>Files selected <b>{entries.length}</b></span>
+        <span>{isFinished?"Imported":"Ready to import"} <b>{isFinished?importedCount:readyCount}</b></span>
+        <span>Skipped <b>{skippedCount}</b></span>
+        <span>Failed <b>{failedCount}</b></span>
+        <span>Total product rows <b>{totalProducts.toLocaleString()}</b></span>
+      </div></div>
+      <h3>Memo summary</h3>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Memo No.</th><th>Period</th><th>Source file</th><th>Memo type</th><th>Products</th><th>Eligible</th><th>Status</th></tr></thead><tbody>
+        {entries.map(entry=><tr key={entry.id}>
+          <td>{entry.parsed?.memoId??"—"}</td>
+          <td>{entry.parsed?.period||"—"}</td>
+          <td title={entry.fileName}>{entry.fileName}</td>
+          <td>{entry.parsed?.memoType==="MEMO_LIST"?"MEMO LIST":entry.parsed?.memoType==="KIOSK_MEMO_LIST"?"KIOSK MEMO LIST":"—"}</td>
+          <td>{entry.parsed?.products.length.toLocaleString()??"—"}</td>
+          <td>{entry.parsed?.eligible.toLocaleString()??"—"}</td>
+          <td>{entry.status==="READY"?"Ready":entry.status==="IMPORTED"?"Imported":entry.status==="SKIPPED"?"Skipped":entry.status==="FAILED"||entry.status==="ERROR"?"Failed":"—"}{entry.error&&<span title={entry.error}> · Error</span>}</td>
+        </tr>)}
+      </tbody></table></div>
       <label className="admin-field"><span>If a memo number already exists in this branch</span><select value={duplicateAction} disabled={busy} onChange={e=>setDuplicateAction(e.target.value as "SKIP"|"REPLACE")}><option value="SKIP">Skip existing memo (recommended)</option><option value="REPLACE">Replace existing memo and its products</option></select></label>
       <button className="admin-button" disabled={busy||!branchId||readyCount===0} onClick={()=>void importMemos()}>{busy?"PROCESSING BATCH…":`IMPORT ${readyCount} READY MEMO(S)`}</button>
     </>}
