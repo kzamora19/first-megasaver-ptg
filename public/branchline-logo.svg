@@ -1,7 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="230" height="46" viewBox="0 0 230 46" role="img" aria-labelledby="title">
-  <title id="title">Branchline</title>
-  <rect x="1" y="3" width="40" height="40" rx="10" fill="#385ff0"/>
-  <path d="M11 32V23.5c0-1.7 1.3-3 3-3h3V32h-6zm10 0V14h3c1.7 0 3 1.3 3 3v15h-6zm10 0v-7c0-1.7 1.3-3 3-3h3v10h-6z" fill="#fff"/>
-  <text x="49" y="31" fill="#172033" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="800" letter-spacing="-0.7">BRANCHLINE</text>
-  <rect x="220" y="28" width="5" height="5" rx="1" fill="#385ff0"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="62" viewBox="0 0 640 124" role="img" aria-labelledby="title">
+<title id="title">Branchline</title>
+<path fill="#385ff0" fill-rule="evenodd" d="M619 76h13v12h-13z M22 22l-7 8-1 4-2 3v5l-1 1v41l1 1v5l5 10 8 7 4 2h2l1 1h4l1 1h47l1-1h3l1-1 5-1 5-4 1-2 4-4 3-6v-4l1-1V40l-1-1v-4l-3-6-4-4-7-5h-2l-4-2h-3l-1-1H37l-1 1h-4l-1 1h-2z M82 69h4l5 4v19l-4 4h-5l-2-1-3-4V74z M34 63h5l4 4v25l-4 4h-5l-2-1-3-4V68l1-2z M57 44h7l4 4 1 2v40l-1 2-5 4h-6l-2-2h-1l-3-3V49l1-2z"/>
+<path fill="#172033" d="M574 41h38v10h-24l-1 1v4l1 2h23v10h-23l-1 1v8l2 2h24v9h-39z M521 41h13l5 7v1l3 3 1 3 8 10V41h13v47h-13l-7-8v-1l-3-3-2-3-2-2-2-2-2-3-2-2-2-3-1 1v25h-12z M498 41h14v47h-14z M455 41h14v36l1 1h22v10h-37z M403 41h13v16l1 1h16l1-1V41h13v47h-13V69l-1-1h-16l-1 1v19h-13z M299 41h13l16 23v1l2 2h1V41h12v47h-13l-7-10v-1l-2-2-2-2-2-2-2-3-2-2-2-3-1 1v25h-13z M200 41h31l4 1 4 2 4 8-1 7-5 5-3 1 2 2 2 1 5 5 4 8 3 7h-14l-3-6-2-2-2-4-2-3-5-5h-3v20h-14z M270 53l-2 3v2l-1 1v2l-2 4v3l-1 1v2h12l1-1-1-1v-2l-1-1v-2l-2-4v-2l-2-2z M214 50v10h11l4-3v-5l-4-3h-10z M151 41h30l4 1 3 1 3 4 1 1 1 5-1 5-4 5-2 1 2 1 3 1 4 4 1 8-1 1v2l-3 4-1 1-3 3h-2l-1 1h-34z M164 69v10h11l1-1h2l2-3v-4l-3-3h-12z M164 50v9h11l3-4-1-3-2-2h-11z M361 43l-6 6-3 6v3l-1 1v11l1 1v3l3 6 2 2v1l5 4h2l1 1h4l1 1h11l1-1h3l4-2 6-7 1-2v-3l-1-1h-2l-4-2h-3l-1-1-1 4-5 5h-9l-4-4-1-2v-4l-1-1v-7l1-1v-3l1-2 4-4 2-1h6l2 1 4 4v2l2-1h3l1-1h3l1-1-1-3-7-8-4-1-1-1h-3l-1-1h-8l-1 1h-3l-1 1z M214 50h11l4 2v5l-4 3h-11z"/>
 </svg>
