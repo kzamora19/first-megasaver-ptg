@@ -38,8 +38,8 @@ export async function POST(request: Request) {
     srp:Number(p.srp)||0, cash_payment:Number(p.cash_payment)||0, tag_this:Number(p.tag_this)||0,
     months_6:Number(p.months_6)||0, months_9:Number(p.months_9)||0, months_12:Number(p.months_12)||0,
     months_18:Number(p.months_18)||0, months_24:Number(p.months_24)||0,
-    remarks:clean(p.remarks,500), eligible_for_price_tag:p.eligible_for_price_tag===true,
-    price_tag_status:clean(p.price_tag_status,40)
+    remarks:clean(p.remarks,500), eligible_for_price_tag:true,
+    price_tag_status:"ELIGIBLE"
   }));
   if (products.some(p => !p.brand || !p.barcode || !p.model || [p.srp,p.cash_payment,p.tag_this,p.months_6,p.months_9,p.months_12,p.months_18,p.months_24].some(n => !Number.isFinite(n) || n < 0))) {
     return NextResponse.json({ok:false,message:"One or more product rows contain missing identifiers or invalid prices."},{status:400});
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     await admin.from("security_audit_logs").insert({
       actor_user_id:session.userId,branch_id:branchId,event_category:"PRICE_MEMO",action:result.duplicate?"REPLACE":"IMPORT",
       target_identifier:memoId,outcome:"SUCCESS",message:"Price memo import completed.",
-      metadata:{source_file:sourceFile,period,memo_type:memoType,total_products:result.totalProducts,eligible_products:products.filter(p=>p.eligible_for_price_tag).length}
+      metadata:{source_file:sourceFile,period,memo_type:memoType,total_products:result.totalProducts}
     });
   }
   return NextResponse.json({ok:true,summary:{skipped:result.skipped===true,duplicate:result.duplicate===true,totalProducts:result.totalProducts??0}});
