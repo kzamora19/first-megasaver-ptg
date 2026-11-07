@@ -1,4 +1,6 @@
-export const metadata = { title: "Branchline · Price Tag Generator", description: "Branchline Price Tag Generator" };\n\nconst migrationAreas = [
+export const metadata = { title: "Branchline · Price Tag Generator", description: "Branchline Price Tag Generator" };
+
+const migrationAreas = [
   "Universal Login and account authentication",
   "System Admin, Branch Admin, and Branch User permissions",
   "Branch session validation and force logout",
