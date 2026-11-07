@@ -1,4 +1,4 @@
-const migrationAreas = [
+export const metadata = { title: "Branchline · Price Tag Generator", description: "Branchline Price Tag Generator" };\n\nconst migrationAreas = [
   "Universal Login and account authentication",
   "System Admin, Branch Admin, and Branch User permissions",
   "Branch session validation and force logout",
@@ -12,7 +12,7 @@ export default function Home() {
   return (
     <main className="shell">
       <section className="hero">
-        <p className="eyebrow">FIRST MEGASAVER · PLATFORM MIGRATION</p>
+        <p className="eyebrow">BRANCHLINE · PLATFORM MIGRATION</p>
         <h1>Price Tag Generator</h1>
         <p className="intro">
           The new platform is being prepared. The existing Apps Script PTG
@@ -36,7 +36,7 @@ export default function Home() {
       </section>
 
       <footer>
-        <strong>FIRST MEGASAVER</strong>
+        <strong>BRANCHLINE</strong>
         <span>Independent development environment · No production data loaded</span>
       </footer>
     </main>
