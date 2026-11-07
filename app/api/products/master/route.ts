@@ -28,6 +28,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const requestOrigin = request.headers.get("origin");
+  const requestHost = request.headers.get("host");
+  if (!requestOrigin || !requestHost || new URL(requestOrigin).host !== requestHost) {
+    return NextResponse.json({ ok: false, message: "Cross-origin requests are not allowed." }, { status: 403 });
+  }
   const session = await getActiveAppSession();
   if (!session) return NextResponse.json({ ok: false }, { status: 401 });
   if (session.mustChangePassword) return NextResponse.json({ ok: false, message: "Password change required." }, { status: 403 });
