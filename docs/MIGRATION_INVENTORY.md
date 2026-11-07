@@ -90,3 +90,21 @@ The authentication SQL migrations have been applied to the isolated PTG Supabase
 - Add CSRF/origin protections and operational rate limiting to auth mutation routes.
 
 No production user accounts, passwords, sessions, memos, product data, or logos have been migrated. The existing Apps Script deployment remains untouched and in production use.
+
+
+## Account provisioning and administrative controls
+
+The development branch now includes a server-only account provisioning API and administrative account actions.
+
+- Auth users are created through the Supabase Auth Admin API from trusted server code only.
+- A database RPC atomically creates the application profile and private username mapping. If provisioning fails, the Auth user is deleted to avoid an orphan.
+- New accounts are marked `must_change_password=true`; the dashboard redirects them to a required password-change page.
+- Initial and reset passwords require at least 12 characters in the new application.
+- The legacy Team Leader title is stored in `user_profiles.legacy_role` and mapped to the technical `BRANCH_USER` permission role. It does not inherit Branch Admin permissions.
+- Account listing and create/reset/enable/disable/force-logout actions check the role permission matrix on the server.
+- Disabling an account increments its session version and revokes active application sessions. The last active SYSTEM_ADMIN cannot be disabled.
+- Password reset revokes active application sessions and requires a new password at next sign-in.
+- Force logout revokes all application sessions and increments the session version.
+- Administrative actions write to `security_audit_logs`.
+
+No actual user accounts were provisioned as part of this development work. The APIs are not accepted for production until CI/build and end-to-end tests pass.
