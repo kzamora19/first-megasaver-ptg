@@ -64,9 +64,10 @@ export default async function DashboardPage() {
     },
     {
       title: "Logo & Promotion Manager",
-      description: "Manage approved header, footer, installment, and promotional logo artwork.",
-      action: "In development",
-      available: false,
+      description: "Manage the interface header, price tag header and footer, and promotional artwork.",
+      href: isSystemAdmin ? "/admin/logos" : undefined,
+      action: isSystemAdmin ? "Manage logos" : "System Admin only",
+      available: isSystemAdmin,
       eyebrow: "ASSETS",
     },
   ];
@@ -84,6 +85,7 @@ export default async function DashboardPage() {
         <a className="ptg-nav-item active" href="/dashboard"><span>▦</span> Dashboard</a>
         {canManageMemos && <a className="ptg-nav-item" href="/price-memos/import"><span>▤</span> Price Memo Import</a>}
         {canUsePTG && <a className="ptg-nav-item" href="/products"><span>⌕</span> Product Search &amp; Queue</a>}
+        {isSystemAdmin && <a className="ptg-nav-item" href="/admin/logos"><span>✧</span> Logo Manager</a>}
         {isSystemAdmin && <a className="ptg-nav-item" href="/product-master"><span>▧</span> Product Master</a>}
         {canManageMemos && <a className="ptg-nav-item" href="/admin/accounts"><span>♙</span> Account Administration</a>}
         <div className="ptg-sidebar-bottom">
