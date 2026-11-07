@@ -3,13 +3,10 @@
 import { useState } from "react";
 import { parsePriceMemo, type ParsedMemo } from "@/lib/price-memos/parse-price-memo";
 
-type BranchOption={id:string;label:string};
-type Props={branchOptions:BranchOption[];fixedBranchId:string|null};
 type Summary={skipped:boolean;duplicate:boolean;totalProducts:number};
 type MemoEntry={id:number;fileName:string;parsed?:ParsedMemo;error?:string;summary?:Summary;status:"READY"|"ERROR"|"IMPORTED"|"SKIPPED"|"FAILED"};
 
-export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
-  const [branchId,setBranchId]=useState(fixedBranchId??"");
+export default function PriceMemoImporter() {
   const [entries,setEntries]=useState<MemoEntry[]>([]);
   const [duplicateAction,setDuplicateAction]=useState<"SKIP"|"REPLACE">("SKIP");
   const [busy,setBusy]=useState(false);
@@ -41,7 +38,7 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
 
   async function importMemos() {
     const ready=entries.filter(e=>e.parsed&&(e.status==="READY"||e.status==="FAILED"));
-    if(!ready.length||!branchId||busy)return;
+    if(!ready.length||busy)return;
     setBusy(true);setMessage("");setIsError(false);
     let imported=0,skipped=0,failed=0;
     for(const entry of ready) {
@@ -49,7 +46,7 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
         const parsed=entry.parsed!;
         const response=await fetch("/api/price-memos/import",{
           method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({branchId,memoId:parsed.memoId,period:parsed.period,memoType:parsed.memoType,sourceFile:entry.fileName,duplicateAction,products:parsed.products})
+          body:JSON.stringify({memoId:parsed.memoId,period:parsed.period,memoType:parsed.memoType,sourceFile:entry.fileName,duplicateAction,products:parsed.products})
         });
         const result=await response.json();
         if(!response.ok||!result.ok)throw new Error(result.message||"Import failed.");
@@ -76,8 +73,7 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
   return <section className="admin-layout"><div className="admin-card">
     <h3>Head Office memo files</h3>
     <p className="admin-muted">Select one or more Excel (.xlsx, .xls) or CSV files. The first worksheet of each workbook is read. Required columns: BRAND, CATEGORY, BARCODE, MODEL, SRP and REMARKS. Installment headings may be on the row above the product headers. Each file may contain up to 10,000 valid product rows and must be 20 MB or smaller.</p>
-    {fixedBranchId? <p className="admin-muted">Destination branch is locked to your assigned branch.</p>:
-      <label className="admin-field"><span>Destination branch</span><select value={branchId} onChange={e=>setBranchId(e.target.value)}><option value="">Select branch</option>{branchOptions.map(b=><option key={b.id} value={b.id}>{b.label}</option>)}</select></label>}
+    <p className="admin-muted">Imported memos and products are shared across Cauayan (CAU), Ilagan (ILA), Santiago (STG), and Tuguegarao (TUG).</p>
     <label className="upload-drop"><input type="file" accept=".xlsx,.xls,.csv" multiple disabled={busy} onChange={e=>void chooseFiles(e.target.files)}/><strong>Choose multiple Head Office price memos</strong><span>Multiple files supported · Maximum 20 MB per file · Up to 10,000 valid product rows per file</span></label>
     {!!entries.length&&<>
       <div className="import-summary"><strong>{isFinished?"Batch import summary":"Selected memo summary"}</strong><div className="import-summary-grid">
@@ -98,8 +94,8 @@ export default function PriceMemoImporter({branchOptions,fixedBranchId}:Props) {
           <td>{entry.status==="READY"?"Ready":entry.status==="IMPORTED"?"Imported":entry.status==="SKIPPED"?"Skipped":entry.status==="FAILED"||entry.status==="ERROR"?"Failed":"—"}{entry.error&&<span title={entry.error}> · Error</span>}</td>
         </tr>)}
       </tbody></table></div>
-      <label className="admin-field"><span>If a memo number already exists in this branch</span><select value={duplicateAction} disabled={busy} onChange={e=>setDuplicateAction(e.target.value as "SKIP"|"REPLACE")}><option value="SKIP">Skip existing memo (recommended)</option><option value="REPLACE">Replace existing memo and its products</option></select></label>
-      <button className="admin-button" disabled={busy||!branchId||readyCount===0} onClick={()=>void importMemos()}>{busy?"PROCESSING BATCH…":`IMPORT ${readyCount} READY MEMO(S)`}</button>
+      <label className="admin-field"><span>If a memo number already exists in shared PTG data</span><select value={duplicateAction} disabled={busy} onChange={e=>setDuplicateAction(e.target.value as "SKIP"|"REPLACE")}><option value="SKIP">Skip existing memo (recommended)</option><option value="REPLACE">Replace existing memo and its products</option></select></label>
+      <button className="admin-button" disabled={busy||readyCount===0} onClick={()=>void importMemos()}>{busy?"PROCESSING BATCH…":`IMPORT ${readyCount} READY MEMO(S)`}</button>
     </>}
     {message&&<p className={isError?"admin-alert error":"admin-alert success"} role="status">{message}</p>}
   </div></section>;

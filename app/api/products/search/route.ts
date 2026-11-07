@@ -22,7 +22,11 @@ export async function GET(request: Request) {
     .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,price_memos!inner(branch_id,memo_id,period,memo_type)")
     .or(`barcode.ilike.%${q.replace(/[,%()]/g, "")}%,model.ilike.%${q.replace(/[,%()]/g, "")}%,brand.ilike.%${q.replace(/[,%()]/g, "")}%`)
     .limit(100);
-  if (session.role !== "SYSTEM_ADMIN" && session.branchId) query = query.eq("price_memos.branch_id", session.branchId);
+  if (session.role !== "SYSTEM_ADMIN") {
+    query = session.branchId
+      ? query.or(`branch_id.is.null,branch_id.eq.${session.branchId}`, { referencedTable: "price_memos" })
+      : query.is("price_memos.branch_id", null);
+  }
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, message: "Could not search imported memo products." }, { status: 500 });
 
