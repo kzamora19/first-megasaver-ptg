@@ -1,128 +1,437 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Product = {
-  id: string; brand: string; category: string; barcode: string; model: string;
-  description: string; sub_category: string; srp: number; cash_payment: number;
-  tag_this: number; months_6: number; months_9: number; months_12: number;
-  months_18: number; months_24: number; remarks: string;
-  price_memos: { memo_id: string; period: string; memo_type: string };
+type MemoInfo = {
+  memo_id: string;
+  period: string;
+  memo_type: string;
+  created_at?: string;
 };
+type Product = {
+  id: string;
+  memo_id: string;
+  brand: string;
+  category: string;
+  barcode: string;
+  model: string;
+  description: string;
+  sub_category: string;
+  srp: number;
+  cash_payment: number;
+  tag_this: number;
+  months_6: number;
+  months_9: number;
+  months_12: number;
+  months_18: number;
+  months_24: number;
+  remarks: string;
+  eligible_for_price_tag?: boolean;
+  price_tag_status?: string;
+  price_memos: MemoInfo | MemoInfo[];
+};
+type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
 
-const money = (value: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 2 }).format(Number(value || 0));
+const formats: { key: FormatKey; label: string }[] = [
+  { key: "ONE", label: "1 WHOLE" },
+  { key: "TWO", label: "1/2" },
+  { key: "FOUR", label: "2 X 2" },
+  { key: "SIX", label: "2 X 3" },
+  { key: "AIRCON", label: "AIRCON" },
+  { key: "SMALL_APPS", label: "SMALL APPS" },
+  { key: "CARAVAN", label: "CARAVAN" },
+];
+const pageSize = 5;
 const amount = (value: number | null | undefined) => Number(value || 0);
-const payNow = (product: Product) => amount(product.tag_this ?? product.cash_payment ?? product.srp);
-const installment = (total: number, months: number) => total > 0 ? money(total / months) : "—";
+const peso = (value: number | null | undefined) => "₱ " + amount(value).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const priceNow = (product: Product) => amount(product.tag_this);
+const memoInfo = (product: Product | null): MemoInfo | null => {
+  if (!product) return null;
+  return Array.isArray(product.price_memos) ? product.price_memos[0] ?? null : product.price_memos;
+};
+const endDate = (period: string) => {
+  const raw = String(period || "").trim();
+  let match = raw.match(/^([A-Za-z]+)\s+\d{1,2}\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})$/i);
+  if (match) {
+    const date = new Date(Number(match[3]), new Date(match[1] + " 1, " + match[3]).getMonth(), Number(match[2]));
+    return isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  match = raw.match(/([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?\s*,?\s*\d{4})\s*(?:to|[-–—])\s*([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?\s*,?\s*\d{4})/i);
+  if (match) {
+    const date = new Date(match[2].replace(/(st|nd|rd|th)/gi, ""));
+    return isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  match = raw.match(/(\d{4}-\d{2}-\d{2})\s*(?:to|[-–—])\s*(\d{4}-\d{2}-\d{2})/i);
+  if (match) {
+    const date = new Date(match[2] + "T00:00:00");
+    return isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  const dates = raw.match(/[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:\s*,?\s*\d{4})?/g) || [];
+  if (dates.length) {
+    const date = new Date(dates[dates.length - 1].replace(/(st|nd|rd|th)/gi, ""));
+    return isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  return "";
+};
+const displayStatus = (product: Product) => {
+  if (product.eligible_for_price_tag === true || String(product.price_tag_status || "").toUpperCase().includes("ELIGIBLE")) return "YES";
+  if (product.eligible_for_price_tag === false || product.price_tag_status) return "NO";
+  return "NO";
+};
+const shortText = (value: string, max = 40) => value.length > max ? value.slice(0, max - 1) + "…" : value;
 
-export default function ProductSearch({ branchCode }: { branchCode: string }) {
+export default function ProductSearch({
+  branchCode,
+  branchName = "",
+  username = "",
+  legacyRole = "",
+  systemRole = "",
+}: {
+  branchCode: string;
+  branchName?: string;
+  username?: string;
+  legacyRole?: string;
+  systemRole?: string;
+}) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
+  const [format, setFormat] = useState<FormatKey>("ONE");
+  const [logoVersion, setLogoVersion] = useState(0);
 
-  async function search(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (term.trim().length < 2) { setMessage("Enter at least 2 characters."); return; }
-    setLoading(true); setMessage("");
+  const loadProducts = useCallback(async (query: string, requestedPage: number) => {
+    setLoading(true);
     try {
-      const response = await fetch(`/api/products/search?q=${encodeURIComponent(term.trim())}`, { cache: "no-store" });
+      const params = new URLSearchParams({ page: String(requestedPage) });
+      if (query.trim()) params.set("q", query.trim());
+      const response = await fetch("/api/products/search?" + params.toString(), { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.message || "Search failed.");
       setResults(payload.products as Product[]);
-      setMessage(payload.products.length ? `${payload.products.length} matching memo product(s).` : "No matching products found in imported price memos.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Search failed."); }
-    finally { setLoading(false); }
+      setTotal(Number(payload.total || 0));
+      setPage(Number(payload.page || requestedPage));
+      setMessage(query.trim()
+        ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
+        : (payload.total ? "Imported price memo products." : "No imported price memo products found."));
+    } catch (error) {
+      setResults([]);
+      setTotal(0);
+      setMessage(error instanceof Error ? error.message : "Search failed.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadProducts("", 1); }, [loadProducts]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const firstResult = total ? (page - 1) * pageSize + 1 : 0;
+  const lastResult = Math.min(page * pageSize, total);
+  const currentMemo = memoInfo(activeProduct);
+  const canImport = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
+  const canManageUsers = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
+  const isBranchToolsUser = ["BRANCH ADMIN", "TEAM LEADER"].includes(legacyRole.trim().toUpperCase());
+
+  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void loadProducts(term, 1);
   }
 
-  function add(product: Product) {
-    setQueue(current => current.some(item => item.id === product.id) ? current : [...current, product]);
+  function toggleProduct(product: Product, checked: boolean) {
+    const next = checked
+      ? (queue.some(item => item.id === product.id) ? queue : [...queue, product])
+      : queue.filter(item => item.id !== product.id);
+    setQueue(next);
+    setActiveProduct(checked ? product : (activeProduct?.id === product.id ? next[next.length - 1] ?? null : activeProduct));
   }
-  function remove(id: string) { setQueue(current => current.filter(item => item.id !== id)); }
+
+  function toggleVisible(checked: boolean) {
+    const next = checked
+      ? [...queue, ...results.filter(product => !queue.some(item => item.id === product.id))]
+      : queue.filter(item => !results.some(product => product.id === item.id));
+    setQueue(next);
+    setActiveProduct(checked ? results[0] ?? activeProduct : (next[next.length - 1] ?? null));
+  }
+
+  function setPrintFormat(next: FormatKey) {
+    setFormat(next);
+    if (next !== "ONE") setMessage(next + " template is coming from the current PTG migration.");
+    else if (queue.length) setMessage(queue.length + " selected product(s) ready for 1 WHOLE preview.");
+  }
+
   function printTags() {
-    if (!queue.length) return;
-    document.title = "FIRST_MEGASAVER_PRICE_TAGS";
+    if (!queue.length) {
+      setMessage("Select at least one product before printing.");
+      return;
+    }
+    if (format !== "ONE") {
+      setMessage(format + " is not ready to print yet. The 1 WHOLE template is available first.");
+      return;
+    }
+    const date = new Date();
+    document.title = "FIRST_MEGASAVER_PRICE_TAGS_" + date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
     window.print();
   }
 
+  const currentBranchLabel = branchName || ({ CAU: "Cauayan", ILA: "Ilagan", STG: "Santiago", TUG: "Tuguegarao" } as Record<string, string>)[branchCode.toUpperCase()] || branchCode;
+
   return (
-    <main className="ptg-main ptg-product-page">
-      <header className="ptg-topbar ptg-print-hide">
-        <div><span className="ptg-breadcrumb">FIRST MEGASAVER / PRICE TAG WORKFLOW</span><h1>Product Search &amp; Tag Queue</h1></div>
-        <a className="ptg-module-link" href="/dashboard">← Dashboard</a>
+    <main className="ptg-main legacy-ptg-main">
+      <header className="legacy-ptg-banner ptg-print-hide">
+        <img src="/legacy-ptg/app-header.png" alt="1st Megasaver · Appliance · Gadgets · Furniture" />
+        <span>{username}{username && " · "}{branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</span>
       </header>
-      <section className="ptg-product-intro ptg-print-hide">
-        <div><p className="ptg-kicker">PRODUCT SELECTION</p><h2>Find products. Build your tag queue.</h2><p>Search imported price memo records by barcode, model, or brand. Select products to prepare for tag generation.</p></div>
-        <span className="ptg-branch-pill">{branchCode}</span>
-      </section>
-      <section className="ptg-product-layout ptg-print-hide">
-        <div className="ptg-product-panel">
-          <div className="ptg-panel-heading"><div><h2>Search price references</h2><p>Results are limited to the signed-in branch, except System Admin.</p></div></div>
-          <form className="ptg-search-form" onSubmit={search}>
-            <input value={term} onChange={event => setTerm(event.target.value)} placeholder="Search barcode, model, or brand…" aria-label="Search products" />
-            <button disabled={loading}>{loading ? "Searching…" : "Search"}</button>
-          </form>
-          {message && <p className="ptg-search-message" role="status">{message}</p>}
-          <div className="ptg-results-list">
-            {results.map(product => <article className="ptg-product-result" key={product.id}>
-              <div className="ptg-result-main"><strong>{product.brand || "UNBRANDED"} · {product.model}</strong><span>{product.description}</span><small>{product.barcode} · {product.category || "Uncategorized"} {product.sub_category ? `/ ${product.sub_category}` : ""}</small><small>Memo {product.price_memos.memo_id} · {product.price_memos.period} · {product.price_memos.memo_type.replaceAll("_", " ")}</small></div>
-              <div className="ptg-result-price"><strong>{money(payNow(product))}</strong><small>Tag / Pay Now</small><button type="button" onClick={() => add(product)} disabled={queue.some(item => item.id === product.id)}>{queue.some(item => item.id === product.id) ? "Added" : "＋ Add"}</button></div>
-            </article>)}
-            {!results.length && <div className="ptg-empty-state">Search imported memo products to see matching items here.</div>}
+
+      {isBranchToolsUser && <section className="legacy-branch-tools ptg-print-hide">
+        <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><small>{username} · {branchCode} — {legacyRole}</small></div>
+        <nav>
+          {canManageUsers && <a href="/admin/accounts">CHANGE BRANCH USER PASSWORD</a>}
+          <a href="/change-password">CHANGE MY PASSWORD</a>
+          {canImport && <a href="/price-memos/import">IMPORT PRICE MEMOS</a>}
+          <button type="button" disabled title="Memo cleanup tools are being migrated">DELETE OLD MEMO</button>
+        </nav>
+      </section>}
+
+      <section className="legacy-search-workflow ptg-print-hide">
+        <div className="legacy-search-card">
+          <h2>1. Select Product</h2>
+          <div className="legacy-search-fields">
+            <form onSubmit={submitSearch} className="legacy-search-form">
+              <label htmlFor="legacy-product-search">SEARCH PRODUCT</label>
+              <div><input id="legacy-product-search" value={term} onChange={event => setTerm(event.target.value)} placeholder="Search brand, model, barcode, description..." aria-label="Search brand, model, barcode, description" /><button type="submit" disabled={loading}>{loading ? "SEARCHING…" : "SEARCH"}</button></div>
+            </form>
+            <div className="legacy-format-controls">
+              <strong>PRINT FORMAT</strong>
+              <div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div>
+            </div>
+            <div className="legacy-memo-info">
+              <label>MEMO_ID<input readOnly value={currentMemo?.memo_id || ""} /></label>
+              <label>PERIOD<input readOnly value={currentMemo?.period || ""} /></label>
+              <label>IMPORT_DATE<input readOnly value={currentMemo?.created_at ? new Date(currentMemo.created_at).toLocaleDateString("en-US") : ""} /></label>
+            </div>
           </div>
         </div>
-        <aside className="ptg-queue-panel">
-          <div className="ptg-panel-heading"><div><h2>Tag queue</h2><p>Selected items for the next workflow step.</p></div><span className="ptg-queue-count">{queue.length}</span></div>
-          {queue.length ? <div className="ptg-queue-list">{queue.map(item => <div className="ptg-queue-item" key={item.id}><div><strong>{item.brand} {item.model}</strong><small>{item.barcode}</small><b>{money(payNow(item))}</b></div><button type="button" onClick={() => remove(item.id)} aria-label={`Remove ${item.model}`}>×</button></div>)}</div> : <div className="ptg-queue-empty">Your queue is empty.<br/>Add products from the search results.</div>}
-          <div className="ptg-queue-footer"><span>Selected products</span><strong>{queue.length}</strong><button type="button" disabled={!queue.length} onClick={() => setShowPreview(true)}>Preview 1 WHOLE tags</button><small>This first print preview uses one product per Letter portrait page. More current PTG formats will be ported separately.</small></div>
+
+        <aside className="legacy-installment-panel">
+          <h3>INSTALLMENT PRICE</h3>
+          <p>{activeProduct ? (activeProduct.brand + " " + activeProduct.model) : "Select a product to view installment prices."}</p>
+          <table>
+            <thead><tr><th>TERM</th><th>TOTAL INSTALLMENT</th><th>MONTHLY PAYMENT</th></tr></thead>
+            <tbody>
+              {activeProduct ? ([6, 9, 12, 18, 24] as const).map(months => {
+                const totalInstallment = amount(activeProduct["months_" + months as "months_6"]);
+                return <tr key={months}><td>{months} MONTHS</td><td>{totalInstallment ? peso(totalInstallment) : "—"}</td><td>{totalInstallment ? peso(totalInstallment / months) : "—"}</td></tr>;
+              }) : <tr><td colSpan={3}>Select a product.</td></tr>}
+            </tbody>
+          </table>
         </aside>
       </section>
 
-      {showPreview && <section className="ptg-print-preview">
-        <div className="ptg-preview-toolbar ptg-print-hide">
-          <div><p className="ptg-kicker">PRINT PREVIEW · 1 WHOLE</p><h2>{queue.length} price tag{queue.length === 1 ? "" : "s"}</h2><p>Choose Print or Save as PDF in the browser print dialog.</p></div>
-          <div className="ptg-preview-actions"><button type="button" className="ptg-preview-secondary" onClick={() => setShowPreview(false)}>Back to queue</button><button type="button" className="ptg-preview-primary" onClick={printTags}>Print / Save PDF</button></div>
+      <section className="legacy-results-panel ptg-print-hide">
+        {message && <p className="legacy-status-message" role="status">{message}</p>}
+        <div className="legacy-table-scroll">
+          <table className="legacy-products-table">
+            <thead><tr>
+              <th><input type="checkbox" aria-label="Select all visible products" checked={results.length > 0 && results.every(item => queue.some(queued => queued.id === item.id))} onChange={event => toggleVisible(event.target.checked)} /></th>
+              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
+            </tr></thead>
+            <tbody>
+              {loading ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => { if ((event.target as HTMLElement).tagName !== "INPUT") setActiveProduct(product); }}>
+                <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
+                <td><strong>{product.brand || "—"}</strong></td><td title={product.model}>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+              </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
+              {!loading && Array.from({ length: Math.max(0, pageSize - results.length) }).map((_, index) => <tr className="legacy-blank-row" aria-hidden="true" key={"blank-" + index}><td colSpan={8}> </td></tr>)}
+            </tbody>
+          </table>
         </div>
-        {queue.map(product => {
-          const price = payNow(product);
-          const savings = amount(product.srp) - price;
-          return <article className="ptg-one-tag" key={product.id}>
-            <header className="ptg-one-tag-header"><span>FIRST MEGASAVER</span><small>PRICE TAG</small></header>
-            <div className="ptg-one-tag-id"><span>Barcode</span><strong>{product.barcode || "—"}</strong></div>
-            <div className="ptg-one-tag-brand"><span>Brand</span><strong>{product.brand || "—"}</strong></div>
-            <div className="ptg-one-tag-model"><span>MODEL</span><strong>{product.description || product.model || "—"}</strong></div>
-            <div className="ptg-one-tag-price-row"><div><span>SRP</span><strong>{money(amount(product.srp))}</strong></div><div><span>CASH / STRAIGHT</span><b>PAY NOW</b><strong>{money(price)}</strong></div><div><span>SAVE</span><strong>{savings < 0 ? "−" : ""}{money(Math.abs(savings))}</strong></div></div>
-            <p className="ptg-one-tag-valid">{product.price_memos.period ? `Memo period: ${product.price_memos.period}` : ""}</p>
-            <section className="ptg-one-tag-installments"><h3>FOR INSTALLMENT: CREDIT CARD</h3><div><span>6 months</span><b>{installment(amount(product.months_6), 6)}</b></div><div><span>9 months</span><b>{installment(amount(product.months_9), 9)}</b></div><div><span>12 months</span><b>{installment(amount(product.months_12), 12)}</b></div><div><span>18 months</span><b>{installment(amount(product.months_18), 18)}</b></div><div><span>24 months</span><b>{installment(amount(product.months_24), 24)}</b></div></section>
-            <footer className="ptg-one-tag-footer">{product.remarks || ""}</footer>
-          </article>;
-        })}
-      </section>}
+        <div className="legacy-pagination">
+          <span>Search Results&nbsp; {firstResult}–{lastResult} of {total}</span>
+          <button type="button" aria-label="First page" disabled={page <= 1} onClick={() => void loadProducts(term, 1)}>«</button>
+          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => void loadProducts(term, page - 1)}>‹</button>
+          <label><input aria-label="Current page" value={page} readOnly /> of {totalPages}</label>
+          <button type="button" aria-label="Next page" disabled={page >= totalPages} onClick={() => void loadProducts(term, page + 1)}>›</button>
+          <button type="button" aria-label="Last page" disabled={page >= totalPages} onClick={() => void loadProducts(term, totalPages)}>»</button>
+        </div>
+      </section>
+
+      <section className="legacy-queue-panel ptg-print-hide">
+        <h2>2. Selected Products / Print Queue</h2>
+        <div className="legacy-table-scroll legacy-queue-scroll">
+          <table className="legacy-products-table">
+            <thead><tr>
+              <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setActiveProduct(null); } }} /></th>
+              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
+            </tr></thead>
+            <tbody>
+              {queue.length ? queue.map(product => <tr key={product.id}>
+                <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
+                <td><strong>{product.brand || "—"}</strong></td><td>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+              </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
+      </section>
+
+      <section className="legacy-preview-panel">
+        <div className="legacy-preview-heading">
+          <h2>3. Price Tag Preview</h2>
+          <div className="legacy-preview-controls">
+            <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
+            <div className="legacy-output-buttons ptg-print-hide">
+              <button type="button" className="refresh-logos" onClick={() => setLogoVersion(value => value + 1)}>↻ Refresh Logos</button>
+              <button type="button" className="save-pdf" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ SAVE AS PDF</button>
+              <button type="button" className="print-tags" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ Print Price Tags</button>
+            </div>
+          </div>
+        </div>
+        {format !== "ONE" && <div className="legacy-format-notice">The {formats.find(item => item.key === format)?.label} interface is ready; its print template is being migrated next.</div>}
+        {format === "ONE" && queue.length > 0 && <div className="ptg-print-preview" aria-label="Price tag print preview">
+          {queue.map(product => {
+            const memo = memoInfo(product);
+            const pay = priceNow(product);
+            const savings = amount(product.srp) - pay;
+            return <div className="legacy-print-sheet" key={product.id}>
+              <article className="legacy-price-tag">
+                <div className="legacy-tag-header"><img src={"/legacy-ptg/price-tag-header.png?v=" + logoVersion} alt="1st Megasaver header" /></div>
+                <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
+                <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
+                <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value">{product.description || product.model}</div>
+                <div className="legacy-srp-label">SRP:</div><div className="legacy-srp">{peso(product.srp)}</div>
+                <div className="legacy-cash">CASH / STRAIGHT</div>
+                <div className="legacy-pay-label">PAY NOW:</div><div className="legacy-pay-value">{peso(pay)}</div>
+                <div className="legacy-valid-until">{endDate(memo?.period || "") ? "Valid Until: " + endDate(memo?.period || "") : ""}</div>
+                <div className="legacy-save-label">SAVE:</div><div className="legacy-save-value">{savings < 0 ? "−" : ""}{peso(Math.abs(savings))}</div>
+                <div className="legacy-installment-logo"><span>FOR INSTALLMENT: CREDIT CARD</span></div>
+                <div className="legacy-installments">
+                  {[6, 9, 12, 18, 24].map(months => {
+                    const installmentTotal = amount(product["months_" + months as "months_6"]);
+                    return <div className="legacy-installment-row" key={months}><span>{months} months:</span><strong>{installmentTotal ? peso(installmentTotal / months) + " / month" : "—"}</strong></div>;
+                  })}
+                </div>
+                <img className="legacy-tag-footer" src={"/legacy-ptg/price-tag-footer.png?v=" + logoVersion} alt="Megasaver payment and social footer" />
+              </article>
+            </div>;
+          })}
+        </div>}
+        {format === "ONE" && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to preview price tags.</div>}
+      </section>
 
       <style jsx global>{`
-        .ptg-preview-toolbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 18px;padding:18px 20px;border:1px solid #dfe6ef;border-radius:12px;background:#fff}
-        .ptg-preview-toolbar h2{margin:0;color:#1b3554;font-size:18px}.ptg-preview-toolbar p:last-child{margin:7px 0 0;color:#78869a;font-size:11px}
-        .ptg-preview-actions{display:flex;gap:8px}.ptg-preview-actions button{min-height:39px;padding:0 14px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer}
-        .ptg-preview-secondary{border:1px solid #d5deea;background:#fff;color:#29415f}.ptg-preview-primary{border:0;background:#164a8a;color:#fff}
-        .ptg-one-tag{width:min(8.5in,100%);min-height:10.5in;margin:0 auto 18px;padding:.42in .48in;display:flex;flex-direction:column;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#15243a;box-shadow:0 8px 25px rgba(18,45,78,.10);font-family:Arial,Helvetica,sans-serif}
-        .ptg-one-tag-header{display:flex;justify-content:space-between;align-items:center;padding:0 0 12px;border-bottom:4px solid #164a8a;color:#164a8a}
-        .ptg-one-tag-header span{font-size:24px;font-weight:900;letter-spacing:.015em}.ptg-one-tag-header small{font-size:10px;font-weight:800;letter-spacing:.14em}
-        .ptg-one-tag-id,.ptg-one-tag-brand{display:flex;justify-content:space-between;gap:15px;padding:10px 2px 5px}.ptg-one-tag-id span,.ptg-one-tag-brand span,.ptg-one-tag-model span,.ptg-one-tag-price-row span{color:#52657c;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}.ptg-one-tag-id strong{font-size:16px;letter-spacing:.12em}
-        .ptg-one-tag-brand strong{font-size:23px;text-align:right}.ptg-one-tag-model{display:grid;gap:6px;margin:8px 0 12px;padding:11px 2px;border-top:1px solid #dbe3ed;border-bottom:1px solid #dbe3ed}.ptg-one-tag-model strong{font-size:24px;line-height:1.1}
-        .ptg-one-tag-price-row{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:8px;align-items:stretch}.ptg-one-tag-price-row>div{display:flex;flex-direction:column;justify-content:center;gap:7px;padding:12px;border:1px solid #d9e1eb;border-radius:8px}.ptg-one-tag-price-row>div:nth-child(2){border-color:#164a8a;background:#164a8a;color:#fff;text-align:center}.ptg-one-tag-price-row>div:nth-child(2) span,.ptg-one-tag-price-row>div:nth-child(2) b{color:#dce9f8}.ptg-one-tag-price-row strong{font-size:17px}.ptg-one-tag-price-row>div:nth-child(2) strong{font-size:30px}.ptg-one-tag-price-row>div:nth-child(2) b{font-size:11px;letter-spacing:.08em}.ptg-one-tag-valid{min-height:16px;margin:8px 0;color:#52657c;font-size:10px}
-        .ptg-one-tag-installments{margin-top:8px;border-top:2px solid #15243a}.ptg-one-tag-installments h3{margin:8px 0;font-size:12px;letter-spacing:.04em}.ptg-one-tag-installments div{display:flex;justify-content:space-between;padding:5px 3px;border-top:1px solid #e1e7ef;font-size:12px}
-        .ptg-one-tag-footer{margin-top:auto;padding-top:9px;border-top:1px solid #dbe3ed;color:#52657c;font-size:10px}
+        .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
+        .legacy-ptg-banner{position:relative;display:flex;align-items:center;justify-content:center;min-height:76px;margin-bottom:9px;padding:5px 10px;border-radius:5px;background:#075fc6;overflow:hidden}
+        .legacy-ptg-banner img{display:block;width:100%;height:68px;object-fit:cover;object-position:left center}
+        .legacy-ptg-banner>span{position:absolute;right:14px;top:8px;color:#fff;font-size:9px;text-shadow:0 1px 2px #003b84}
+        .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
+        .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
+        .legacy-tools-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#123b72;font-size:10px}
+        .legacy-tools-heading small{color:#71839a;font-size:9px}
+        .legacy-branch-tools nav{display:flex;gap:6px;flex-wrap:wrap}
+        .legacy-branch-tools a,.legacy-branch-tools button{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:700;text-decoration:none}
+        .legacy-branch-tools button:disabled{border-color:#d5dae2;color:#999;background:#f6f7f9}
+        .legacy-search-workflow{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr);gap:10px;margin-bottom:10px}
+        .legacy-search-card{padding:8px}
+        .legacy-search-card h2,.legacy-queue-panel h2,.legacy-preview-heading h2{margin:0 0 6px;color:#0647a7;font-size:14px;font-weight:800}
+        .legacy-search-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
+        .legacy-search-form>label,.legacy-format-controls>strong{display:block;margin-bottom:4px;color:#1d3e67;font-size:9px;font-weight:800}
+        .legacy-search-form>div{display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:5px}
+        .legacy-search-form input{min-width:0;height:25px;padding:0 8px;border:1px solid #d3d8e0;border-radius:4px;font:inherit;font-size:10px}
+        .legacy-search-form button{height:27px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:800}
+        .legacy-format-controls>div{display:flex;gap:4px;flex-wrap:wrap}
+        .legacy-format-controls button{min-width:62px;height:23px;padding:0 9px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:800;cursor:pointer}
+        .legacy-format-controls button.active{background:#0647a7;color:#fff}
+        .legacy-format-controls button:hover:not(.active){background:#edf4ff}
+        .legacy-memo-info{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:6px;border:1px solid #dbe3ed;border-radius:4px;background:#fbfcfe}
+        .legacy-memo-info label{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;color:#164a8a;font-size:9px;font-weight:800}
+        .legacy-memo-info label:first-child{grid-column:1/-1}
+        .legacy-memo-info input{min-width:0;width:100%;height:24px;padding:0 5px;border:1px solid #d8e0eb;border-radius:3px;background:#fff;color:#3e4c5d;font:inherit;font-size:9px}
+        .legacy-installment-panel{min-height:176px;overflow:hidden}
+        .legacy-installment-panel h3{margin:0;padding:7px 9px;background:#0647a7;color:#fff;font-size:11px}
+        .legacy-installment-panel p{min-height:24px;margin:0;padding:6px 9px;color:#6e7887;font-size:9px}
+        .legacy-installment-panel table,.legacy-products-table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .legacy-installment-panel th{padding:5px 3px;border-top:1px solid #d8e0eb;border-bottom:1px solid #d8e0eb;background:#f4f7fb;color:#0647a7;font-size:8px;text-align:center}
+        .legacy-installment-panel td{padding:5px 3px;border-bottom:1px solid #e6e9ee;color:#32445c;font-size:9px;text-align:center}
+        .legacy-results-panel{margin-bottom:10px;padding:8px}
+        .legacy-status-message{min-height:0;margin:0;padding:0 2px 5px;color:#536781;font-size:9px}
+        .legacy-table-scroll{max-height:211px;overflow:auto;border:1px solid #d6d6d6}
+        .legacy-products-table{font-size:9px}
+        .legacy-products-table thead{position:sticky;top:0;z-index:1;background:#0647a7;color:#fff}
+        .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
+        .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
+        .legacy-products-table th:nth-child(2){width:17%}.legacy-products-table th:nth-child(3){width:18%}.legacy-products-table th:nth-child(4){width:11%}.legacy-products-table th:nth-child(5){width:30%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:9%}.legacy-products-table th:nth-child(8){width:7%}
+        .legacy-products-table td{height:38px;padding:4px 6px;border-bottom:1px solid #d6d6d6;color:#143d75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .legacy-products-table tbody tr:not(.legacy-blank-row){cursor:pointer}
+        .legacy-products-table tbody tr:hover:not(.legacy-blank-row){background:#f5f8fc}
+        .legacy-products-table td strong{font-weight:800}
+        .legacy-products-table input{width:13px;height:13px;margin:0;accent-color:#0647a7}
+        .legacy-empty-row,.legacy-queue-empty{text-align:center!important;color:#245291!important}
+        .legacy-blank-row td{color:transparent!important}
+        .legacy-status-pill{display:inline-block;min-width:28px;padding:3px 6px;border-radius:999px;background:#eee;color:#5a5a5a;font-size:8px;font-weight:800;text-align:center}
+        .legacy-status-pill.eligible{background:#e7f6ec;color:#207345}
+        .legacy-pagination{display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 0 0;color:#3e526d;font-size:9px}
+        .legacy-pagination button{width:30px;height:26px;border:1px solid #6ba9ff;border-radius:5px;background:#fff;color:#165aaa;font-size:15px}
+        .legacy-pagination button:disabled{opacity:.4}
+        .legacy-pagination label{display:flex;align-items:center;gap:4px}
+        .legacy-pagination label input{width:42px;height:26px;border:1px solid #333;border-radius:4px;text-align:center;font-size:10px}
+        .legacy-queue-panel{display:flex;flex-direction:column;min-height:285px;margin-bottom:9px;padding:8px}
+        .legacy-queue-panel h2{margin-bottom:7px}
+        .legacy-queue-scroll{flex:1;max-height:250px}
+        .legacy-queue-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:auto;padding-top:7px;color:#143d75;font-size:9px}
+        .legacy-queue-footer button{height:24px;padding:0 9px;border:0;border-radius:4px;background:#dedede;color:#425064;font-size:9px;font-weight:700}
+        .legacy-preview-panel{padding:8px}
+        .legacy-preview-heading h2{margin-bottom:5px}
+        .legacy-preview-controls{display:flex;align-items:end;justify-content:space-between;gap:10px}
+        .preview-format-controls{min-width:0;flex:1}
+        .legacy-output-buttons{display:flex;gap:4px;flex:0 0 auto}
+        .legacy-output-buttons button{height:24px;padding:0 8px;border:0;border-radius:4px;color:#fff;font-size:8px;font-weight:800;white-space:nowrap}
+        .legacy-output-buttons .refresh-logos{background:#d8d8d8;color:#425064}
+        .legacy-output-buttons .save-pdf,.legacy-output-buttons .print-tags{background:#0647a7}
+        .legacy-output-buttons button:disabled{opacity:.48;cursor:not-allowed}
+        .legacy-format-notice,.legacy-preview-empty{margin-top:8px;padding:11px;border:1px solid #dbe3ed;border-radius:4px;background:#fbfcfe;color:#546981;font-size:10px}
+        .ptg-print-preview{margin-top:10px}
+        .legacy-print-sheet{box-sizing:border-box;display:grid;place-items:start center;width:8.5in;height:11in;margin:0 auto 16px;padding-top:.3in;background:#fff;page-break-after:always;break-after:page}
+        .legacy-print-sheet:last-child{page-break-after:auto;break-after:auto}
+        .legacy-price-tag{box-sizing:border-box;position:relative;display:grid;grid-template-columns:20fr 51fr 26fr 46fr 70fr 60fr 74fr 101fr 21fr;grid-template-rows:17fr 19fr 19fr 19fr 19fr 19fr 19fr 33fr 33fr 33fr 19fr 12fr 19fr 23fr 21fr 19fr 19fr 19fr 19fr 19fr 22fr 19fr 19fr 19fr 19fr 19fr 7fr 19fr 19fr 19fr 19fr 19fr 19fr 19fr;width:7.8in;height:10.4in;overflow:hidden;border:1px solid #003da5;background:#fff;color:#003da5;font-family:Arial,Helvetica,sans-serif}
+        .legacy-tag-header{grid-column:1/10;grid-row:1/6;overflow:hidden}
+        .legacy-tag-header img{display:block;width:100%;height:100%;object-fit:contain}
+        .legacy-barcode-label{grid-column:7/8;grid-row:6;align-self:center;text-align:right;padding-right:5px;font-size:24px;font-weight:bold}
+        .legacy-barcode{grid-column:8/9;grid-row:6;display:flex;align-items:center;justify-content:center;align-self:stretch;padding:0 4px;background:#d9d9d9;color:#555;font-size:24px;font-weight:bold}
+        .legacy-brand-label{grid-column:1/3;grid-row:7;align-self:center;padding-left:6%;font-size:30px;font-weight:bold}
+        .legacy-brand-value{grid-column:3/6;grid-row:7;align-self:center;font-size:34px;font-weight:bold}
+        .legacy-model-label{grid-column:1/3;grid-row:8/10;align-self:start;padding:3px 0 0 6%;font-size:32px;font-weight:bold}
+        .legacy-model-value{grid-column:3/10;grid-row:8/11;align-self:center;padding:0 4%;font-size:38px;line-height:1.15;font-weight:bold;text-align:center}
+        .legacy-srp-label{grid-column:1/3;grid-row:11;align-self:center;padding-left:6%;font-size:24px;font-weight:bold}
+        .legacy-srp{grid-column:3/6;grid-row:11;align-self:center;font-size:26px;font-weight:bold;text-decoration:line-through}
+        .legacy-cash{grid-column:1/5;grid-row:13;align-self:center;padding-left:6%;font-size:24px;font-weight:bold}
+        .legacy-pay-label{grid-column:2/5;grid-row:14/16;align-self:center;padding-left:6%;font-size:42px;font-weight:bold}
+        .legacy-pay-value{grid-column:5/9;grid-row:14/16;display:flex;align-items:center;justify-content:center;background:#fff500;color:#003da5;font-size:68px;font-weight:900;white-space:nowrap}
+        .legacy-valid-until{grid-column:2/9;grid-row:16;align-self:center;justify-self:stretch;overflow:visible;color:#003da5;font-size:20px;font-weight:700;text-align:center;white-space:nowrap}
+        .legacy-save-label{grid-column:2/4;grid-row:17/19;align-self:center;padding-right:10px;font-size:24px;font-weight:bold;text-align:right}
+        .legacy-save-value{grid-column:4/7;grid-row:17/19;align-self:center;font-size:44px;font-weight:bold;white-space:nowrap}
+        .legacy-installment-logo{position:relative;grid-column:1/10;grid-row:19/22;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;width:100%;height:100%}
+        .legacy-installment-logo:before{content:"";position:absolute;top:10px;left:2%;right:2%;height:3px;background:#003da5}
+        .legacy-installment-logo span{position:relative;z-index:1;padding:3px 16px 4px;border-radius:0 0 5px 5px;background:#003da5;color:white;font-size:18px;font-weight:bold}
+        .legacy-installments{grid-column:2/9;grid-row:22/27;display:grid;grid-template-rows:repeat(5,1fr);align-items:center;padding:0 3%}
+        .legacy-installment-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;color:#003da5;font-size:22px;font-weight:bold;white-space:nowrap}
+        .legacy-installment-row span{text-align:right}
+        .legacy-installment-row strong{font-weight:bold}
+        .legacy-tag-footer{grid-column:1/10;grid-row:28/34;width:100%;height:100%;object-fit:contain;object-position:center}
+        @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}.legacy-ptg-banner>span{display:none}}
         @media print{
-          @page{size:Letter portrait;margin:0}
+          @page{size:letter portrait;margin:0}
           html,body{margin:0!important;padding:0!important;background:#fff!important}
           body *{visibility:hidden!important}
           .ptg-print-preview,.ptg-print-preview *{visibility:visible!important}
           .ptg-print-preview{position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important}
-          .ptg-print-hide{display:none!important}
-          .ptg-one-tag{width:8.5in!important;height:11in!important;min-height:11in!important;margin:0!important;padding:.42in .48in!important;border:0!important;border-radius:0!important;box-shadow:none!important;page-break-after:always;break-after:page}
-          .ptg-one-tag:last-child{page-break-after:auto;break-after:auto}
+          .ptg-print-hide,.legacy-preview-heading,.legacy-format-notice,.legacy-preview-empty{display:none!important}
+          .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding-top:.3in!important;box-shadow:none!important}
+          .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}
+          .legacy-tag-header img,.legacy-tag-footer{print-color-adjust:exact;-webkit-print-color-adjust:exact}
         }
       `}</style>
     </main>
