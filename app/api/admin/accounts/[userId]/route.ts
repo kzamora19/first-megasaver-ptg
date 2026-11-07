@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";\nimport { makeTemporaryPassword, sendPasswordResetEmail } from "@/lib/email/send-account-invitation";
+import { NextResponse } from "next/server";
+import { makeTemporaryPassword, sendPasswordResetEmail } from "@/lib/email/send-account-invitation";
 import { requireAdminPermission, writeAdminAudit } from "@/lib/auth/authorization";
 import { getActiveAppSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,7 +8,9 @@ export const dynamic="force-dynamic";
 function fail(error:unknown){
  const code=error instanceof Error?error.message:"INTERNAL_ERROR";
  if(code==="AUTH_REQUIRED")return NextResponse.json({ok:false},{status:401});
- if(code==="PERMISSION_DENIED")return NextResponse.json({ok:false,message:"You are not authorized to perform this action."},{status:403});\n if(code==="EMAIL_PROVIDER_NOT_CONFIGURED")return NextResponse.json({ok:false,message:"Email delivery is not configured."},{status:503});\n if(code==="EMAIL_DELIVERY_FAILED")return NextResponse.json({ok:false,message:"Password reset could not be delivered. Ask the employee not to use the old password and retry the reset."},{status:502});
+ if(code==="PERMISSION_DENIED")return NextResponse.json({ok:false,message:"You are not authorized to perform this action."},{status:403});
+ if(code==="EMAIL_PROVIDER_NOT_CONFIGURED")return NextResponse.json({ok:false,message:"Email delivery is not configured."},{status:503});
+ if(code==="EMAIL_DELIVERY_FAILED")return NextResponse.json({ok:false,message:"Password reset could not be delivered. Ask the employee not to use the old password and retry the reset."},{status:502});
  return NextResponse.json({ok:false,message:code==="LAST_ADMIN"? "The last active System Admin cannot be disabled.":"The account operation could not be completed."},{status:400});
 }
 export async function PATCH(request:Request,context:{params:Promise<{userId:string}>}){
@@ -34,7 +37,8 @@ export async function PATCH(request:Request,context:{params:Promise<{userId:stri
    if(stateError)throw new Error("PASSWORD_STATE_UPDATE_FAILED");
    let emailId:string;
    try{
-    const {data:identity}=await admin.schema("private").from("login_identities").select("username").eq("auth_user_id",userId).single();\n    emailId=await sendPasswordResetEmail({email:target.email,displayName:target.display_name,username:String(identity?.username??""),temporaryPassword,loginUrl:new URL("/login",request.url).toString()});
+    const {data:identity}=await admin.schema("private").from("login_identities").select("username").eq("auth_user_id",userId).single();
+    emailId=await sendPasswordResetEmail({email:target.email,displayName:target.display_name,username:String(identity?.username??""),temporaryPassword,loginUrl:new URL("/login",request.url).toString()});
    }catch{
     await admin.auth.admin.updateUserById(userId,{password:makeTemporaryPassword()});
     throw new Error("EMAIL_DELIVERY_FAILED");
