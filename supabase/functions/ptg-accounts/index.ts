@@ -189,7 +189,7 @@ async function listAccounts(request: Request, session: Session, origin: string) 
     branches = result.data ?? [];
   }
   const accounts = (data ?? []).map(a => a.invitation_status === "SENT" && a.invitation_expires_at && new Date(a.invitation_expires_at).getTime() <= Date.now() ? { ...a, invitation_status: "EXPIRED" } : a);
-  return json(origin, { ok: true, accounts, branches });
+  return json(origin, { ok: true, accounts, branches, viewerId: session.userId });
 }
 
 async function createAccount(request: Request, session: Session, origin: string, body: Record<string, unknown>) {
@@ -250,7 +250,7 @@ async function updateAccount(request: Request, session: Session, origin: string,
   if (!userId || userId.length > 100) return json(origin, { ok: false, message: "Account not found." }, 404);
   const target = await getTarget(userId);
   const action = clean(body.action, 40).toUpperCase();
-  if (session.role === "BRANCH_ADMIN" && target.role_key !== "BRANCH_USER") throw new Error("PERMISSION_DENIED");
+  if (session.role === "BRANCH_ADMIN" && (target.role_key !== "BRANCH_USER" || action !== "RESET_PASSWORD")) throw new Error("PERMISSION_DENIED");
   if (action === "DELETE_USER") {
     if (session.role !== "SYSTEM_ADMIN" || target.role_key === "SYSTEM_ADMIN" || !target.branch_id || userId === session.userId) {
       throw new Error("PERMISSION_DENIED");
@@ -298,7 +298,7 @@ async function updateAccount(request: Request, session: Session, origin: string,
 
 async function resendInvitation(userId: string, session: Session, origin: string) {
   const target = await getTarget(userId);
-  if (!target.email || target.role_key === "SYSTEM_ADMIN" || (session.role === "BRANCH_ADMIN" && target.role_key !== "BRANCH_USER")) throw new Error("PERMISSION_DENIED");
+  if (!target.email || target.role_key === "SYSTEM_ADMIN" || session.role === "BRANCH_ADMIN") throw new Error("PERMISSION_DENIED");
   const permission = target.role_key === "BRANCH_USER" || target.role_key === "BRANCH_ADMIN" ? "BRANCH_USER_ACCOUNT_MANAGEMENT" : "SYSTEM_ADMIN_ACCOUNT_MANAGEMENT";
   await requirePermission(session, permission, "EXECUTE", target.branch_id);
   const username = await usernameFor(userId);
@@ -519,7 +519,7 @@ async function forgotPassword(body: Record<string, unknown>, origin: string) {
     const { data } = await admin.from("user_profiles").select("email")
       .eq("branch_id", identity.branch_id).eq("role_key", "BRANCH_ADMIN").eq("is_active", true);
     recipients = [...new Set((data ?? []).map(row => row.email?.trim().toLowerCase()).filter((email): email is string => !!email))];
-  } else if (["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(identity.role_key)) {
+  } else if (identity.role_key === "BRANCH_ADMIN") {
     const { data } = await admin.from("user_profiles").select("email").eq("id", identity.auth_user_id).maybeSingle();
     if (data?.email) recipients = [data.email];
   }
@@ -555,6 +555,12 @@ async function finishPasswordRecovery(body: Record<string, unknown>, origin: str
   const { data: userId, error } = await admin.rpc("ptg_claim_password_recovery", { p_hash: await sha256(token) });
   if (error) return json(origin, { ok: false, message: "Password recovery is temporarily unavailable." }, 503);
   if (!userId) return json(origin, { ok: false, message: "This recovery link is invalid, expired, or already used." }, 400);
+  const { data: recoveryProfile, error: recoveryProfileError } = await admin.from("user_profiles")
+    .select("role_key,is_active").eq("id", userId).maybeSingle();
+  if (recoveryProfileError) return json(origin, { ok: false, message: "Password recovery is temporarily unavailable." }, 503);
+  if (recoveryProfile?.role_key !== "BRANCH_ADMIN" || !recoveryProfile.is_active) {
+    return json(origin, { ok: false, message: "This recovery link is invalid, expired, or already used." }, 400);
+  }
   const { error: passwordError } = await admin.auth.admin.updateUserById(userId, { password });
   if (passwordError) return json(origin, { ok: false, message: "Unable to save the new password. Request a new recovery link and try again." }, 400);
   const { error: revokeError } = await admin.rpc("bump_ptg_user_session_version", { p_user_id: userId });
