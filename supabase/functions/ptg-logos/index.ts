@@ -147,7 +147,7 @@ async function uploadLogo(request: Request, origin: string) {
   const path = key + "/" + crypto.randomUUID() + "." + allowedTypes[file.type];
   const upload = await admin.storage.from(bucketName).upload(path, buffer, { contentType: file.type, cacheControl: "3600", upsert: false });
   if (upload.error) return respond(origin, { ok: false, message: "Logo upload failed." }, 500);
-  const { error: saveError } = await adminCheck.from("logo_assets").upsert({
+  const { error: saveError } = await admin.from("logo_assets").upsert({
     logo_key: key,
     storage_path: path,
     mime_type: file.type,
@@ -156,10 +156,10 @@ async function uploadLogo(request: Request, origin: string) {
     updated_at: new Date().toISOString(),
   }, { onConflict: "logo_key" });
   if (saveError) {
-    await adminCheck.storage.from(bucketName).remove([path]);
+    await admin.storage.from(bucketName).remove([path]);
     return respond(origin, { ok: false, message: "Could not save the logo settings." }, 500);
   }
-  if (previous?.storage_path && previous.storage_path !== path) await adminCheck.storage.from(bucketName).remove([previous.storage_path]);
+  if (previous?.storage_path && previous.storage_path !== path) await admin.storage.from(bucketName).remove([previous.storage_path]);
   await audit(actor.userId, "LOGO_UPLOAD", key, "Logo replacement uploaded.");
   return respond(origin, { ok: true, message: "Logo uploaded. Refresh the PTG preview to use it." });
 }
