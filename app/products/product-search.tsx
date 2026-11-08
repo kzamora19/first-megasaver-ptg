@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
+import { withBasePath } from "@/lib/base-path";
 
 type MemoInfo = {
   memo_id: string;
@@ -213,17 +214,17 @@ export default function ProductSearch({
   return (
     <main className="ptg-main legacy-ptg-main">
       <header className="legacy-ptg-banner ptg-print-hide">
-        <img src={(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
+        <img src={withBasePath(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
         <span>{username}{username && " · "}{branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</span>
       </header>
 
       {isBranchToolsUser && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><small>{username} · {branchCode} — {legacyRole}</small></div>
         <nav>
-          {canManageUsers && <a href="/admin/accounts">CHANGE BRANCH USER PASSWORD</a>}
-          <a href="/change-password">CHANGE MY PASSWORD</a>
-          {canImport && <a href="/price-memos/import">IMPORT PRICE MEMOS</a>}
-          {systemRole === "SYSTEM_ADMIN" && <a href="/admin/logos">LOGO MANAGER</a>}
+          {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
+          <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>
+          {canImport && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
+          {systemRole === "SYSTEM_ADMIN" && <a href={withBasePath("/admin/logos")}>LOGO MANAGER</a>}
           <button type="button" disabled title="Memo cleanup tools are being migrated">DELETE OLD MEMO</button>
         </nav>
       </section>}
@@ -329,7 +330,7 @@ export default function ProductSearch({
             const savings = amount(product.srp) - pay;
             return <div className="legacy-print-sheet" key={product.id}>
               <article className="legacy-price-tag">
-                <div className="legacy-tag-header"><img src={(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
+                <div className="legacy-tag-header"><img src={withBasePath(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
                 <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value">{product.description || product.model}</div>
@@ -345,7 +346,7 @@ export default function ProductSearch({
                     return <div className="legacy-installment-row" key={months}><span>{months} months:</span><strong>{installmentTotal ? peso(installmentTotal / months) + " / month" : "—"}</strong></div>;
                   })}
                 </div>
-                <img className="legacy-tag-footer" src={(logos.social?.url || "/legacy-ptg/price-tag-footer.png") + (logos.social?.url ? "&" : "?") + "refresh=" + logoVersion} alt="Megasaver payment and social footer" />
+                <img className="legacy-tag-footer" src={withBasePath(logos.social?.url || "/legacy-ptg/price-tag-footer.png") + (logos.social?.url ? "&" : "?") + "refresh=" + logoVersion} alt="Megasaver payment and social footer" />
               </article>
             </div>;
           })}
