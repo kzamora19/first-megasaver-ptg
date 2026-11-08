@@ -1,0 +1,84 @@
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+
+export const usesEdgeAuth = process.env.NEXT_PUBLIC_PTG_USE_EDGE_AUTH === "true";
+const sessionStorageKey = "ptg_app_session_id";
+
+type EdgeAuthResponse = {
+  ok?: boolean;
+  message?: string;
+  account?: {
+    username: string;
+    displayName: string;
+    role: string;
+    legacyRole: string;
+    branchCode: string | null;
+    branchName: string | null;
+    mustChangePassword: boolean;
+  };
+  appSessionId?: string;
+  authSession?: {
+    accessToken: string;
+    refreshToken: string;
+  };
+};
+
+export function getPtgAppSessionId() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(sessionStorageKey) ?? "";
+}
+
+export function setPtgAppSessionId(value: string) {
+  window.localStorage.setItem(sessionStorageKey, value);
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `ptg_app_session=${encodeURIComponent(value)}; Path=/; Max-Age=28800; SameSite=Strict${secure}`;
+}
+
+export function clearPtgAppSessionId() {
+  window.localStorage.removeItem(sessionStorageKey);
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `ptg_app_session=; Path=/; Max-Age=0; SameSite=Strict${secure}`;
+}
+
+export async function invokePtgAuth(action: string, fields: Record<string, unknown> = {}) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !publicKey) throw new Error("Supabase public environment variables are not configured.");
+
+  const client = createClient();
+  const { data: authData } = await client.auth.getSession();
+  const appSessionId = getPtgAppSessionId();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    apikey: publicKey,
+  };
+  if (authData.session?.access_token) headers.Authorization = `Bearer ${authData.session.access_token}`;
+  if (appSessionId) headers["x-ptg-session-id"] = appSessionId;
+
+  const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/ptg-auth`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...fields, action }),
+  });
+  const result = await response.json().catch(() => ({})) as EdgeAuthResponse;
+  if (!response.ok || result.ok !== true) {
+    const error = new Error(result.message ?? "Authentication request failed.") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  return result;
+}
+
+export async function establishPtgAuthSession(result: EdgeAuthResponse) {
+  if (!result.appSessionId || !result.authSession?.accessToken || !result.authSession.refreshToken) {
+    throw new Error("Authentication response did not include a complete PTG session.");
+  }
+  const client = createClient();
+  const { error } = await client.auth.setSession({
+    access_token: result.authSession.accessToken,
+    refresh_token: result.authSession.refreshToken,
+  });
+  if (error) throw new Error("Could not establish the Supabase sign-in session.");
+  setPtgAppSessionId(result.appSessionId);
+}
