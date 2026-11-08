@@ -20,9 +20,11 @@ export default function LoginPage() {
     setMessage("");
 
     try {
+      let destination = "/dashboard";
       if (usesEdgeAuth) {
         const result = await invokePtgAuth("login", { username, password, branchCode });
         await establishPtgAuthSession(result);
+        destination = result.account?.mustChangePassword ? "/change-password" : result.account?.role === "SYSTEM_ADMIN" ? "/dashboard" : "/products";
       } else {
         const response = await fetch("/api/auth/login", {
           method: "POST",
@@ -37,7 +39,7 @@ export default function LoginPage() {
         }
       }
       setPassword("");
-      router.replace("/dashboard");
+      router.replace(destination);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to connect to the authentication service. Please try again.");

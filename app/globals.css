@@ -286,3 +286,7 @@ footer {
 .slot-actions button:disabled{opacity:.45;cursor:not-allowed}
 .loading-status{margin-top:18px;color:#75839a;font-size:12px}
 @media(max-width:760px){.logo-manager{padding:20px 15px 36px}.slot-grid{grid-template-columns:1fr}.slot-actions{grid-template-columns:auto minmax(0,1fr)}.slot-actions button{grid-row:2}.slot-actions .remove-button{grid-column:2}}
+
+.ptg-workspace-menu{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;padding:6px;background:#edf4fc;border-radius:5px}
+.ptg-workspace-menu a{padding:5px 8px;color:#124a9c;font-size:12px;font-weight:700;text-decoration:none}
+.ptg-workspace-menu a[aria-current="page"]{background:#124a9c;color:#fff;border-radius:4px}

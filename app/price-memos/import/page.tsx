@@ -1,13 +1,15 @@
 "use client";
 
+import WorkspaceNav from "@/components/workspace-nav";
+
+
 import ClientSessionGate from "@/components/client-session-gate";
-import { withBasePath } from "@/lib/base-path";
 import PriceMemoImporter from "./price-memo-importer";
 
 export default function PriceMemoImportPage() {
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN", "BRANCH_ADMIN"]}>
     {session => <main className="shell admin-shell">
-      <a className="admin-back" href={withBasePath("/dashboard")}>← Back to PTG dashboard</a>
+      <WorkspaceNav role={session.role} active="/price-memos/import" />
       <section className="hero admin-hero">
         <p className="eyebrow">PRICE MEMO MANAGEMENT</p>
         <h1>Import Price Memo</h1>

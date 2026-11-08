@@ -1,5 +1,8 @@
 "use client";
 
+import WorkspaceNav from "@/components/workspace-nav";
+
+
 import ClientSessionGate from "@/components/client-session-gate";
 import LogoutButton from "./logout-button";
 import { withBasePath } from "@/lib/base-path";
@@ -77,12 +80,7 @@ function DashboardContent({session}:{session:import("@/components/client-session
           </span>
         </a>
         <div className="ptg-nav-label">WORKSPACE</div>
-        <a className="ptg-nav-item active" href="/dashboard"><span>▦</span> Dashboard</a>
-        {canManageMemos && <a className="ptg-nav-item" href={withBasePath("/price-memos/import")}><span>▤</span> Price Memo Import</a>}
-        {canUsePTG && <a className="ptg-nav-item" href={withBasePath("/products")}><span>⌕</span> Product Search &amp; Queue</a>}
-        {isSystemAdmin && <a className="ptg-nav-item" href={withBasePath("/admin/logos")}><span>✧</span> Logo Manager</a>}
-        {isSystemAdmin && <a className="ptg-nav-item" href={withBasePath("/product-master")}><span>▧</span> Product Master</a>}
-        {canManageMemos && <a className="ptg-nav-item" href={withBasePath("/admin/accounts")}><span>♙</span> Account Administration</a>}
+        <WorkspaceNav role={session.role} active="/dashboard" sidebar />
         <div className="ptg-sidebar-bottom">
           <div className="ptg-user-chip">
             <span className="ptg-avatar">{session.username.slice(0, 1).toUpperCase()}</span>
@@ -131,5 +129,5 @@ function DashboardContent({session}:{session:import("@/components/client-session
 }
 
 export default function DashboardPage() {
-  return <ClientSessionGate>{session => <DashboardContent session={session} />}</ClientSessionGate>;
+  return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]} deniedTo="/products">{session => <DashboardContent session={session} />}</ClientSessionGate>;
 }

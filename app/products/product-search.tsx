@@ -1,5 +1,8 @@
 "use client";
 
+import WorkspaceNav from "@/components/workspace-nav";
+import LogoutButton from "@/app/dashboard/logout-button";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
@@ -199,7 +202,6 @@ export default function ProductSearch({
   const currentMemo = memoInfo(activeProduct);
   const canImport = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
   const canManageUsers = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
-  const isBranchToolsUser = systemRole === "SYSTEM_ADMIN" || ["BRANCH ADMIN", "TEAM LEADER"].includes(legacyRole.trim().toUpperCase());
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,13 +232,17 @@ export default function ProductSearch({
     else if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
   }
 
+  const printable = format === "ONE" || format === "TWO";
+  const tagsPerSheet = format === "TWO" ? 2 : 1;
+  const sheets = Array.from({ length: Math.ceil(queue.length / tagsPerSheet) }, (_, index) => queue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
+
   function printTags() {
     if (!queue.length) {
       setMessage("Select at least one product before printing.");
       return;
     }
-    if (format !== "ONE") {
-      setMessage(format + " is not ready to print yet. The 1 WHOLE template is available first.");
+    if (!printable) {
+      setMessage(format + " is not ready to print yet. Use 1 WHOLE or 1/2.");
       return;
     }
     const date = new Date();
@@ -250,8 +256,9 @@ export default function ProductSearch({
     <main className="ptg-main legacy-ptg-main">
       <img src={withBasePath(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" className="ptg-print-hide" style={{ display: "block", width: "100%", height: "auto", margin: "0 0 9px", padding: 0, border: 0, borderRadius: 5 }} />
 
-      {isBranchToolsUser && <section className="legacy-branch-tools ptg-print-hide">
-        <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><small>{username} · {branchCode} — {legacyRole}</small></div>
+      <section className="legacy-branch-tools ptg-print-hide">
+        <WorkspaceNav role={systemRole} active="/products" />
+        <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><small>{username} · {branchCode} — {legacyRole}</small><LogoutButton /></div>
         <nav>
           {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
           <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>
@@ -259,7 +266,7 @@ export default function ProductSearch({
           {systemRole === "SYSTEM_ADMIN" && <a href={withBasePath("/admin/logos")}>LOGO MANAGER</a>}
           <button type="button" disabled title="Memo cleanup tools are being migrated">DELETE OLD MEMO</button>
         </nav>
-      </section>}
+      </section>
 
       <section className="legacy-search-workflow ptg-print-hide">
         <div className="legacy-search-card">
@@ -345,20 +352,20 @@ export default function ProductSearch({
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
             <div className="legacy-output-buttons ptg-print-hide">
               <button type="button" className="refresh-logos" onClick={() => { setLogoVersion(value => value + 1); void refreshLogos(); }}>↻ Refresh Logos</button>
-              <button type="button" className="save-pdf" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ SAVE AS PDF</button>
-              <button type="button" className="print-tags" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ Print Price Tags</button>
+              <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
+              <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print Price Tags</button>
             </div>
           </div>
         </div>
-        {format !== "ONE" && <div className="legacy-format-notice">The {formats.find(item => item.key === format)?.label} interface is ready; its print template is being migrated next.</div>}
-        {format === "ONE" && queue.length > 0 && <div className="ptg-print-preview">
-          {queue.map(product => {
+        {!printable && <div className="legacy-format-notice">The {formats.find(item => item.key === format)?.label} interface is ready; its print template is being migrated next.</div>}
+        {printable && queue.length > 0 && <div className="ptg-print-preview">
+          {sheets.map(sheet => <div className={"legacy-print-sheet" + (format === "TWO" ? " legacy-half-sheet" : "")} key={sheet[0].id}>
+          {sheet.map(product => {
             const modelDescription = product.description?.trim() || product.model;
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
-            return <div className="legacy-print-sheet" key={product.id}>
-              <article className="legacy-price-tag">
+            return <article className="legacy-price-tag" key={product.id}>
                 <div className="legacy-tag-header"><img src={withBasePath(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
@@ -376,11 +383,11 @@ export default function ProductSearch({
                   })}
                 </div>
                 <img className="legacy-tag-footer" src={withBasePath(logos.social?.url || "/legacy-ptg/price-tag-footer.png") + (logos.social?.url ? "&" : "?") + "refresh=" + logoVersion} alt="Megasaver payment and social footer" />
-              </article>
-            </div>;
+              </article>;
           })}
+          </div>)}
         </div>}
-        {format === "ONE" && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
+        {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
       </section>
 
       <style jsx global>{`
@@ -471,23 +478,26 @@ export default function ProductSearch({
         .legacy-valid-until{grid-column:5/9;grid-row:17;align-self:center;justify-self:stretch;overflow:visible;color:#003da5;font-size:20px;font-weight:700;text-align:center;white-space:nowrap}
         .legacy-save-label{grid-column:2/4;grid-row:18/20;align-self:center;padding-right:10px;font-size:24px;font-weight:bold;text-align:right}
         .legacy-save-value{grid-column:4/7;grid-row:18/20;align-self:center;font-size:44px;font-weight:bold;white-space:nowrap}
-        .legacy-installment-logo{position:relative;grid-column:1/10;grid-row:20/23;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;width:100%;height:100%}
+        .legacy-installment-logo{position:relative;grid-column:1/10;grid-row:20/22;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;width:100%;height:100%}
         .legacy-installment-logo:before{content:"";position:absolute;top:10px;left:2%;right:2%;height:3px;background:#003da5}
         .legacy-installment-logo span{position:relative;z-index:1;padding:3px 16px 4px;border-radius:0 0 5px 5px;background:#003da5;color:white;font-size:18px;font-weight:bold}
-        .legacy-installments{grid-column:2/9;grid-row:23/28;display:grid;grid-template-rows:repeat(5,1fr);align-items:center;padding:0 3%}
-        .legacy-installment-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;color:#003da5;font-size:22px;font-weight:bold;white-space:nowrap}
+        .legacy-installments{grid-column:2/9;grid-row:22/28;display:grid;grid-template-rows:repeat(5,minmax(0,1fr));align-items:center;padding:4px 3% 6px}
+        .legacy-installment-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;color:#003da5;font-size:20px;font-weight:bold;white-space:nowrap}
         .legacy-installment-row span{text-align:right}
         .legacy-installment-row strong{font-weight:bold}
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34;width:100%;height:100%;object-fit:contain;object-position:center}
         @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}}
         @media print{
           @page{size:letter portrait;margin:0}
+          @page ptg-half{size:letter landscape;margin:0}
           html,body{margin:0!important;padding:0!important;background:#fff!important}
           body *{visibility:hidden!important}
           .ptg-print-preview,.ptg-print-preview *{visibility:visible!important}
           .ptg-print-preview{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important}
           .ptg-print-hide,.legacy-preview-heading,.legacy-format-notice,.legacy-preview-empty{display:none!important}
           .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding-top:.3in!important;box-shadow:none!important}
+          .legacy-half-sheet{page:ptg-half;grid-template-columns:1fr 1fr;width:11in!important;height:8.5in!important;padding-top:.4in!important}
+          .legacy-half-sheet .legacy-price-tag{zoom:.65}
           .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}
           .legacy-tag-header img,.legacy-tag-footer{print-color-adjust:exact;-webkit-print-color-adjust:exact}
         }

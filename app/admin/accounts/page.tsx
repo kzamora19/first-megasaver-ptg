@@ -1,13 +1,15 @@
 "use client";
 
+import WorkspaceNav from "@/components/workspace-nav";
+
+
 import ClientSessionGate from "@/components/client-session-gate";
-import { withBasePath } from "@/lib/base-path";
 import AccountAdministration from "./account-administration";
 
 export default function AdminAccountsPage() {
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN", "BRANCH_ADMIN"]} deniedTo="/dashboard">
     {session => <main className="shell admin-shell">
-      <a className="admin-back" href={withBasePath("/dashboard")}>← Back to dashboard</a>
+      <WorkspaceNav role={session.role} active="/admin/accounts" />
       <section className="hero admin-hero">
         <p className="eyebrow">FIRST MEGASAVER · SYSTEM SECURITY</p>
         <h1>Administration</h1>
