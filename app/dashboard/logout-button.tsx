@@ -13,7 +13,7 @@ export default function LogoutButton() {
     setBusy(true);
     try {
       if (usesEdgeAuth) {
-        try { await invokePtgAuth("logout"); } finally { await clearPtgAuthSession(); }
+        try { await invokePtgAuth("logout"); } catch { /* Local sign-out still clears this device session. */ } finally { await clearPtgAuthSession(); }
       } else {
         await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
       }
