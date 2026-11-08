@@ -248,10 +248,7 @@ export default function ProductSearch({
 
   return (
     <main className="ptg-main legacy-ptg-main">
-      <header className="legacy-ptg-banner ptg-print-hide">
-        <img src={withBasePath(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
-        <span>{username}{username && " · "}{branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</span>
-      </header>
+      <img src={withBasePath(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" className="ptg-print-hide" style={{ display: "block", width: "100%", height: "auto", margin: "0 0 9px", padding: 0, border: 0, borderRadius: 5 }} />
 
       {isBranchToolsUser && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><small>{username} · {branchCode} — {legacyRole}</small></div>
@@ -388,9 +385,6 @@ export default function ProductSearch({
 
       <style jsx global>{`
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
-        .legacy-ptg-banner{position:relative;margin-bottom:9px;border-radius:5px;overflow:hidden}
-        .legacy-ptg-banner img{display:block;width:100%;height:auto}
-        .legacy-ptg-banner>span{position:absolute;right:14px;top:8px;padding:3px 6px;border-radius:3px;background:rgba(0,35,86,.35);color:#fff;font-size:9px}
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
         .legacy-tools-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#123b72;font-size:10px}
@@ -485,7 +479,7 @@ export default function ProductSearch({
         .legacy-installment-row span{text-align:right}
         .legacy-installment-row strong{font-weight:bold}
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34;width:100%;height:100%;object-fit:contain;object-position:center}
-        @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}.legacy-ptg-banner>span{display:none}}
+        @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}}
         @media print{
           @page{size:letter portrait;margin:0}
           html,body{margin:0!important;padding:0!important;background:#fff!important}
