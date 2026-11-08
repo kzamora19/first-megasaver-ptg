@@ -12,6 +12,7 @@ export type ActiveAppSession = {
   legacyRole: string;
   branchId: string | null;
   branchCode: string | null;
+  branchName: string | null;
   username: string;
   displayName: string;
   mustChangePassword: boolean;
@@ -75,10 +76,11 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
     .is("revoked_at", null);
 
   let branchCode: string | null = null;
+  let branchName: string | null = null;
   if (session.branch_id) {
     const { data: branch } = await admin
       .from("branches")
-      .select("branch_code,status,operational_status")
+      .select("branch_code,branch_name,status,operational_status")
       .eq("id", session.branch_id)
       .maybeSingle();
     if (!branch || branch.status !== "ACTIVE" || branch.operational_status !== "ON") {
@@ -90,6 +92,7 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
       return null;
     }
     branchCode = branch.branch_code;
+    branchName = branch.branch_name;
   }
 
   const { data: username } = await admin.rpc("get_ptg_login_username", {
@@ -103,6 +106,7 @@ export async function getActiveAppSession(): Promise<ActiveAppSession | null> {
     legacyRole: profile.legacy_role ?? "",
     branchId: session.branch_id,
     branchCode,
+    branchName,
     username: typeof username === "string" ? username : "",
     displayName: profile.display_name ?? "",
     mustChangePassword: profile.must_change_password === true,
