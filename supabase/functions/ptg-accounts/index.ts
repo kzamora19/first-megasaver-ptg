@@ -110,7 +110,7 @@ async function sendEmail(input: { to: string; subject: string; text: string; htm
   });
   try {
     const result = await transport.sendMail({
-      from: "First Megasaver PTG <" + gmailUser + ">",
+      from: gmailUser,
       to: input.to,
       subject: input.subject,
       text: input.text,
