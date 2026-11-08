@@ -154,7 +154,7 @@ async function searchProductMaster(origin: string, session: ActiveSession, body:
 async function importProductMaster(origin: string, session: ActiveSession, body: Record<string, unknown>) {
   if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
   if (session.role !== "SYSTEM_ADMIN") return respond(origin, fail("Only the System Admin can import the product master."), 403);
-  const maxRows = 5000;
+  const maxRows = 10000;
   const sourceFile = clean(body.sourceFile, 240);
   const input = body.rows;
   if (!sourceFile || !Array.isArray(input) || input.length === 0 || input.length > maxRows) {
@@ -175,9 +175,22 @@ async function importProductMaster(origin: string, session: ActiveSession, body:
   }
   if (!deduped.size) return respond(origin, fail("No valid rows found. Barcode and description are required."), 400);
   const rows = [...deduped.values()];
-  const { data: before, error: readError } = await admin.from("product_master").select("barcode").in("barcode", rows.map(row => row.barcode));
-  if (readError) return respond(origin, fail("Could not validate existing product records."), 500);
-  const existing = new Set((before ?? []).map(row => row.barcode));
+  // Keep lookup URLs short and each result below the Data API row limit.
+  const barcodes = rows.map(row => row.barcode);
+  const lookupSize = 100;
+  const batches = Array.from({ length: Math.ceil(barcodes.length / lookupSize) }, (_, index) =>
+    barcodes.slice(index * lookupSize, (index + 1) * lookupSize),
+  );
+  const existing = new Set<string>();
+  for (let index = 0; index < batches.length; index += 8) {
+    const results = await Promise.all(batches.slice(index, index + 8).map(batch =>
+      admin.from("product_master").select("barcode").in("barcode", batch),
+    ));
+    for (const result of results) {
+      if (result.error) return respond(origin, fail("Could not validate existing product records."), 500);
+      for (const row of result.data ?? []) existing.add(row.barcode);
+    }
+  }
   const { error } = await admin.from("product_master").upsert(rows, { onConflict: "barcode" });
   if (error) return respond(origin, fail("Product import failed; no success was recorded."), 500);
   const inserted = rows.filter(row => !existing.has(row.barcode)).length;
