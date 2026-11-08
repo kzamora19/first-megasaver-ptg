@@ -90,7 +90,7 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   const page = Math.max(1, Math.trunc(Number(body.page || 1)) || 1);
   const pageSize = 5;
   let query = admin.from("memo_products")
-    .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,eligible_for_price_tag,price_tag_status,price_memos!inner(branch_id,memo_id,period,memo_type,created_at)", { count: "exact" })
+    .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,eligible_for_price_tag,price_tag_status,price_memos!inner(branch_id,memo_id,period,memo_type,created_at:imported_at)", { count: "exact" })
     .order("brand", { ascending: true })
     .order("model", { ascending: true });
   if (q.length >= 2) {
