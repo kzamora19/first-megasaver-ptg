@@ -124,12 +124,31 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
     return json(origin, { ok: false, message: "Username and password are required." }, 400);
   }
 
+  async function recordLogin(outcome: "SUCCESS" | "DENIED", message: string, identity?: {
+    auth_user_id: string; branch_id: string | null; role_key: string;
+  }) {
+    const { error } = await admin.from("security_audit_logs").insert({
+      actor_user_id: identity?.auth_user_id ?? null,
+      branch_id: identity?.branch_id ?? null,
+      event_category: "AUTHENTICATION",
+      action: "LOGIN",
+      target_identifier: username,
+      outcome,
+      message,
+      metadata: { username, role: identity?.role_key ?? "SYSTEM" },
+    });
+    if (error) console.error("Unable to record PTG login audit event.", error.code);
+  }
+
   const { data: identities, error: identityError } = await admin.rpc("resolve_ptg_login_identity", {
     p_username: username,
     p_branch_code: branchCode ?? null,
   });
   if (identityError) return json(origin, { ok: false, message: "Authentication service is temporarily unavailable." }, 503);
-  if (!Array.isArray(identities) || identities.length !== 1) return json(origin, genericLoginFailure, 401);
+  if (!Array.isArray(identities) || identities.length !== 1) {
+    await recordLogin("DENIED", "Username did not resolve to one account.");
+    return json(origin, genericLoginFailure, 401);
+  }
 
   const identity = identities[0];
   const { data: profile, error: profileError } = await admin.from("user_profiles")
@@ -139,12 +158,19 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
   if (profileError || !profile) {
     return json(origin, { ok: false, message: "Authentication service is temporarily unavailable." }, 503);
   }
-  if (!identity.is_active) return json(origin, genericLoginFailure, 401);
+  if (!identity.is_active) {
+    await recordLogin("DENIED", "Account disabled.", identity);
+    return json(origin, genericLoginFailure, 401);
+  }
   if (
     identity.account_scope === "BRANCH" &&
     (identity.branch_status !== "ACTIVE" || identity.operational_status !== "ON" || !identity.branch_id)
-  ) return json(origin, genericLoginFailure, 401);
+  ) {
+    await recordLogin("DENIED", "Branch unavailable.", identity);
+    return json(origin, genericLoginFailure, 401);
+  }
   if (identity.locked_until && new Date(identity.locked_until).getTime() > Date.now()) {
+    await recordLogin("DENIED", "Account temporarily locked.", identity);
     return json(origin, genericLoginFailure, 401);
   }
 
@@ -157,6 +183,7 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
   });
   if (error || !data.user || !data.session) {
     await admin.rpc("record_ptg_login_failure", { p_user_id: identity.auth_user_id });
+    await recordLogin("DENIED", "Invalid credentials.", identity);
     return json(origin, genericLoginFailure, 401);
   }
 
@@ -178,9 +205,11 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
       PTG_BRANCH_OFF: "Your branch is currently offline.",
     };
     const availabilityMessage = availabilityMessages[sessionError?.message ?? ""];
+    await recordLogin("DENIED", availabilityMessage ?? "Unable to establish application session.", identity);
     return json(origin, { ok: false, message: availabilityMessage ?? "Unable to establish a secure application session." }, 503);
   }
 
+  await recordLogin("SUCCESS", "Sign-in successful.", identity);
   return json(origin, {
     ok: true,
     account: {

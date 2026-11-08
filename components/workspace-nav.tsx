@@ -8,9 +8,7 @@ function SecurityLinks({ onNavigate }: { onNavigate: () => void }) {
   return <div className="ptg-security-nav" aria-label="System Security">
     {securitySections.map(([key, label]) => <Link key={key} href={"/admin/accounts/?section=" + key}
       onClick={onNavigate} className={"ptg-nav-item" + (key === selected ? " active" : "")}
-      aria-current={key === selected ? "page" : undefined}>{label}</Link>
-      {system && active === path && path === "/admin/accounts" && <Suspense><SecurityLinks onNavigate={onNavigate} /></Suspense>}
-    </Fragment>)}
+      aria-current={key === selected ? "page" : undefined}>{label}</Link>)}
   </div>;
 }
 
@@ -26,6 +24,8 @@ export default function WorkspaceNav({ role, active, onNavigate }: { role: strin
   return <nav aria-label="Workspace">
     {items.map(([path, label]) => <Fragment key={path}><Link href={path + "/"} onClick={onNavigate}
       className={"ptg-nav-item" + (active === path ? " active" : "")}
-      aria-current={active === path ? "page" : undefined}>{label}</Link>)}
+      aria-current={active === path ? "page" : undefined}>{label}</Link>
+      {system && active === path && path === "/admin/accounts" && <Suspense><SecurityLinks onNavigate={onNavigate} /></Suspense>}
+    </Fragment>)}
   </nav>;
 }

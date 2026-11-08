@@ -400,16 +400,16 @@ async function securityAction(session: Session, origin: string, body: Record<str
   if (action === "securityAudit") {
     await require("SECURITY_LOG_VIEW");
     const { data, error } = await admin.from("security_audit_logs")
-      .select("id,created_at,actor_user_id,event_category,action,target_identifier,outcome,message")
+      .select("id,created_at,actor_user_id,event_category,action,target_identifier,outcome,message,metadata")
       .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(200);
     if (error) throw new Error("SECURITY_READ_FAILED");
     const ids = [...new Set(data.flatMap(row => row.actor_user_id ? [row.actor_user_id] : []))];
     const profiles = ids.length ? await admin.from("user_profiles").select("id,display_name,role_key").in("id", ids) : null;
     if (profiles?.error) throw new Error("SECURITY_READ_FAILED");
     const actors = new Map(profiles?.data?.map(profile => [profile.id, profile]));
-    return json(origin, { ok: true, events: data.map(({ actor_user_id, ...event }) => ({
-      ...event, actor: actors.get(actor_user_id)?.display_name ?? "—",
-      current_role: actors.get(actor_user_id)?.role_key ?? "—",
+    return json(origin, { ok: true, events: data.map(({ actor_user_id, metadata, ...event }) => ({
+      ...event, actor: typeof metadata?.username === "string" ? metadata.username : actors.get(actor_user_id)?.display_name ?? "—",
+      current_role: typeof metadata?.role === "string" ? metadata.role : actors.get(actor_user_id)?.role_key ?? "—",
     })) });
   }
   if (action === "securitySessions") {
