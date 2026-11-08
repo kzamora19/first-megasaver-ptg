@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
   clearPtgAuthSession,
@@ -14,10 +15,12 @@ export type PtgClientSession = NonNullable<EdgeAuthResponse["account"]>;
 export default function ClientSessionGate({
   children,
   allowRoles,
+  watchAvailability = false,
   deniedTo = "/no-access",
 }: {
   children: (session: PtgClientSession) => ReactNode;
   allowRoles?: string[];
+  watchAvailability?: boolean;
   deniedTo?: string;
 }) {
   const router = useRouter();
@@ -79,6 +82,64 @@ export default function ClientSessionGate({
       controller.abort();
     };
   }, [allowedRoles, deniedTo, router]);
+
+  const role = session?.role;
+  useEffect(() => {
+    if (!usesEdgeAuth || !watchAvailability || !role || role === "SYSTEM_ADMIN") return;
+    const client = createClient();
+    const channel = client.channel("ptg-availability");
+    let stopped = false;
+    let checking = false;
+    let recheckPending = false;
+
+    async function verifyAvailability() {
+      if (stopped) return;
+      if (checking) {
+        recheckPending = true;
+        return;
+      }
+      checking = true;
+      try {
+        await invokePtgAuth("session-status");
+      } catch (error) {
+        if (!stopped && typeof error === "object" && error !== null && "status" in error && error.status === 401) {
+          stopped = true;
+          setSession(null);
+          try {
+            await clearPtgAuthSession();
+          } finally {
+            router.replace("/login");
+          }
+        }
+      } finally {
+        checking = false;
+        if (recheckPending) {
+          recheckPending = false;
+          void verifyAvailability();
+        }
+      }
+    }
+
+    channel.on("postgres_changes", { event: "UPDATE", schema: "public", table: "ptg_availability_signal" }, () => void verifyAvailability());
+    void client.realtime.setAuth().then(() => {
+      if (!stopped) channel.subscribe(status => {
+        if (status === "SUBSCRIBED") void verifyAvailability();
+      });
+    }).catch(() => { /* The fallback check covers connection failures. */ });
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void verifyAvailability();
+    }, 15_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void verifyAvailability();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      void client.removeChannel(channel);
+    };
+  }, [role, router, watchAvailability]);
 
   if (status === "loading") {
     return <main className="shell"><section className="panel" role="status">Checking your PTG session…</section></main>;

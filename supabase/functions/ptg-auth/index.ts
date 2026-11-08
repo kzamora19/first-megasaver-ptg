@@ -39,7 +39,7 @@ const json = (origin: string, body: unknown, status = 200) => new Response(JSON.
 
 const genericLoginFailure = { ok: false, message: "Invalid username or password, or account unavailable." };
 
-async function activeSession(request: Request): Promise<Session | null> {
+async function activeSession(request: Request, touchActivity: boolean): Promise<Session | null> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return null;
   const userClient = createClient(projectUrl, publicKey, {
@@ -96,8 +96,10 @@ async function activeSession(request: Request): Promise<Session | null> {
     branchName = branch.branch_name;
   }
 
-  await admin.from("app_sessions").update({ last_activity_at: new Date().toISOString() })
-    .eq("id", appSessionId).is("revoked_at", null);
+  if (touchActivity) {
+    await admin.from("app_sessions").update({ last_activity_at: new Date().toISOString() })
+      .eq("id", appSessionId).is("revoked_at", null);
+  }
   const { data: username } = await admin.rpc("get_ptg_login_username", { p_user_id: authData.user.id });
   return {
     id: row.id,
@@ -250,9 +252,10 @@ Deno.serve(async request => {
     const action = String(body.action ?? "");
     if (action === "login") return await login(body, request, origin);
 
-    const session = await activeSession(request);
+    const session = await activeSession(request, action !== "session-status");
     if (!session) return json(origin, { ok: false, message: "Please sign in again." }, 401);
 
+    if (action === "session-status") return json(origin, { ok: true });
     if (action === "session") {
       return json(origin, { ok: true, account: {
         username: session.username,

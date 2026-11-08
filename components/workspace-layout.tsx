@@ -49,7 +49,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const path = (usePathname() ?? "").replace(/\/$/, "");
   if (!workspacePaths.has(path)) return children;
 
-  return <ClientSessionGate>
+  return <ClientSessionGate watchAvailability>
     {session => session.role === "SYSTEM_ADMIN"
       ? <WorkspaceFrame session={session} path={path}>{children}</WorkspaceFrame>
       : children}
