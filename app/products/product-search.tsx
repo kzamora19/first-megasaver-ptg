@@ -1,6 +1,7 @@
 "use client";
 
 import LogoutButton from "@/app/dashboard/logout-button";
+import AppDialog from "@/components/app-dialog";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
@@ -167,6 +168,7 @@ export default function ProductSearch({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,6 +257,12 @@ export default function ProductSearch({
   const firstResult = total ? (page - 1) * pageSize + 1 : 0;
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
+  const detailMemo = memoInfo(detailProduct);
+
+  function openProductDetails(product: Product) {
+    setActiveProduct(product);
+    setDetailProduct(product);
+  }
   const canImport = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
   const canManageUsers = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
 
@@ -387,9 +395,15 @@ export default function ProductSearch({
               <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => { if ((event.target as HTMLElement).tagName !== "INPUT") setActiveProduct(product); }}>
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} className="legacy-product-detail-row" onClick={event => {
+                if ((event.target as HTMLElement).closest("input, button")) return;
+                event.currentTarget.querySelector("button")?.focus();
+                openProductDetails(product);
+              }}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
-                <td><strong>{product.brand || "—"}</strong></td><td title={product.model}>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
+                  aria-label={"View product details for " + (product.model || product.barcode)}
+                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               <BlankRows used={Math.max(1, results.length)} />
             </tbody>
@@ -408,9 +422,15 @@ export default function ProductSearch({
               <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {queueRows.length ? queueRows.map(product => <tr key={product.id}>
+              {queueRows.length ? queueRows.map(product => <tr key={product.id} className="legacy-product-detail-row" onClick={event => {
+                if ((event.target as HTMLElement).closest("input, button")) return;
+                event.currentTarget.querySelector("button")?.focus();
+                openProductDetails(product);
+              }}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
-                <td><strong>{product.brand || "—"}</strong></td><td>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
+                  aria-label={"View product details for " + (product.model || product.barcode)}
+                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
               <BlankRows used={Math.max(1, queueRows.length)} />
             </tbody>
@@ -525,7 +545,42 @@ export default function ProductSearch({
         {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
       </section>
 
+      {detailProduct && <AppDialog title="Product details" busy={false} onClose={() => setDetailProduct(null)}>
+        <dl className="legacy-product-details">
+          <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
+          <dt>Model</dt><dd>{detailProduct.model || "—"}</dd>
+          {detailProduct.description && detailProduct.description !== detailProduct.model && <>
+            <dt>Full description</dt><dd>{detailProduct.description}</dd>
+          </>}
+          <dt>Barcode</dt><dd>{detailProduct.barcode}</dd>
+          {detailProduct.category && <><dt>Category</dt><dd>{detailProduct.category}</dd></>}
+          {detailProduct.sub_category && <><dt>Subcategory</dt><dd>{detailProduct.sub_category}</dd></>}
+          <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
+          <dt>SRP</dt><dd>{peso(detailProduct.srp)}</dd>
+          <dt>Pay Now</dt><dd>{peso(priceNow(detailProduct))}</dd>
+          <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
+          {detailMemo && <>
+            <dt>Memo ID</dt><dd>{detailMemo.memo_id || "—"}</dd>
+            <dt>Period</dt><dd>{detailMemo.period || "—"}</dd>
+            <dt>Import date</dt><dd>{detailMemo.created_at ? new Date(detailMemo.created_at).toLocaleDateString("en-US") : "—"}</dd>
+          </>}
+          {([6, 9, 12, 18, 24] as const).map(months => {
+            const total = amount(detailProduct[`months_${months}`]);
+            return total > 0 ? <div className="legacy-product-detail-term" key={months}>
+              <dt>{months} months</dt><dd>{peso(total)} total · {peso(total / months)} per month</dd>
+            </div> : null;
+          })}
+        </dl>
+      </AppDialog>}
       <style jsx global>{`
+        .legacy-product-detail-row{cursor:pointer}
+        .legacy-product-detail-row:hover td,.legacy-product-detail-row:focus-within td{background:#eff6ff}
+        .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+        .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
+        .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}
+        .legacy-product-details dt{font-weight:700}
+        .legacy-product-details dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
+        .legacy-product-detail-term{display:contents}
         .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
