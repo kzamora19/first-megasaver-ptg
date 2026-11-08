@@ -149,7 +149,7 @@ export default function ProductSearch({
       const payload = await response.json();
       if (response.ok && payload.ok) setLogos(payload.logos || {});
     } catch {
-      // Keep the built-in artwork if managed logos cannot be loaded.
+      // Keep any artwork already loaded if a refresh fails.
     }
   }, []);
 
@@ -249,18 +249,17 @@ export default function ProductSearch({
     window.print();
   }
 
-  const managedBanner = logos.appHeader;
-  const useOriginalBanner = !managedBanner || /^(app_header_logo_exact_header_size|app header logo)\.png$/i.test(managedBanner.originalFileName);
-  const bannerSrc = useOriginalBanner
-    ? withBasePath("/legacy-ptg/app-header-original.png")
-    : managedBanner.url + (managedBanner.url.includes("?") ? "&" : "?") + "refresh=" + logoVersion;
+  function artworkUrl(key: LogoKey) {
+    const url = logos[key]?.url;
+    return url ? url + (url.includes("?") ? "&" : "?") + "refresh=" + logoVersion : undefined;
+  }
 
   const currentBranchLabel = branchName || ({ CAU: "Cauayan", ILA: "Ilagan", STG: "Santiago", TUG: "Tuguegarao" } as Record<string, string>)[branchCode.toUpperCase()] || branchCode;
 
   return (
     <main className="ptg-main legacy-ptg-main">
-      <img src={bannerSrc} alt="1st Megasaver · Appliance · Gadgets · Furniture"
-        className={"ptg-print-hide legacy-products-banner" + (useOriginalBanner ? " legacy-products-banner-original" : "")} />
+      {logos.appHeader && <img src={artworkUrl("appHeader")} alt="Interface header artwork"
+        className="ptg-print-hide legacy-products-banner" />}
 
 {systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
@@ -369,7 +368,7 @@ export default function ProductSearch({
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
             return <article className="legacy-price-tag" key={product.id}>
-                <div className="legacy-tag-header"><img src={withBasePath(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
+                {logos.header && <div className="legacy-tag-header"><img src={artworkUrl("header")} alt="Price tag header artwork" /></div>}
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
                 <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value" style={{ fontSize: modelDescription.length > 90 ? 24 : modelDescription.length > 55 ? 30 : 38 }}>{modelDescription}</div>
@@ -385,7 +384,7 @@ export default function ProductSearch({
                     return <div className="legacy-installment-row" key={months}><span>{months} months:</span><strong>{installmentTotal ? peso(installmentTotal / months) + " / month" : "—"}</strong></div>;
                   })}
                 </div>
-                <img className="legacy-tag-footer" src={withBasePath(logos.social?.url || "/legacy-ptg/price-tag-footer.png") + (logos.social?.url ? "&" : "?") + "refresh=" + logoVersion} alt="Megasaver payment and social footer" />
+                {logos.social && <div className="legacy-tag-footer"><img src={artworkUrl("social")} alt="Price tag footer artwork" /></div>}
               </article>;
           })}
           </div>)}
@@ -395,7 +394,6 @@ export default function ProductSearch({
 
       <style jsx global>{`
         .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
-        .legacy-products-banner-original{aspect-ratio:8.5;object-fit:cover;object-position:center}
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
@@ -469,8 +467,9 @@ export default function ProductSearch({
         .legacy-print-sheet{box-sizing:border-box;display:grid;place-items:start center;width:8.5in;height:11in;margin:0 auto 16px;padding-top:.3in;background:#fff;page-break-after:always;break-after:page}
         .legacy-print-sheet:last-child{page-break-after:auto;break-after:auto}
         .legacy-price-tag{box-sizing:border-box;position:relative;display:grid;grid-template-columns:20fr 51fr 26fr 46fr 70fr 60fr 74fr 101fr 21fr;grid-template-rows:17fr 19fr 19fr 19fr 19fr 19fr 19fr 33fr 33fr 33fr 19fr 12fr 19fr 23fr 21fr 19fr 19fr 19fr 19fr 19fr 22fr 19fr 19fr 19fr 19fr 19fr 7fr 19fr 19fr 19fr 19fr 19fr 19fr 19fr;width:7.8in;height:10.4in;overflow:hidden;border:1px solid #003da5;background:#fff;color:#003da5;font-family:Arial,Helvetica,sans-serif}
-        .legacy-tag-header{grid-column:1/10;grid-row:1/6;overflow:hidden}
-        .legacy-tag-header img{display:block;width:100%;height:100%;object-fit:contain}
+        .legacy-tag-header{grid-column:1/10;grid-row:1/6}
+        .legacy-tag-header,.legacy-tag-footer{position:relative;min-width:0;min-height:0;margin:4px;overflow:hidden}
+        .legacy-tag-header img,.legacy-tag-footer img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
         .legacy-barcode-label{grid-column:7/8;grid-row:6;align-self:center;text-align:right;padding-right:5px;font-size:24px;font-weight:bold}
         .legacy-barcode{grid-column:8/9;grid-row:6;display:flex;align-items:center;justify-content:center;align-self:stretch;padding:0 4px;background:#d9d9d9;color:#555;font-size:24px;font-weight:bold}
         .legacy-brand-label{grid-column:1/3;grid-row:7;align-self:center;padding-left:6%;font-size:30px;font-weight:bold}
@@ -492,7 +491,7 @@ export default function ProductSearch({
         .legacy-installment-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;color:#003da5;font-size:20px;font-weight:bold;white-space:nowrap}
         .legacy-installment-row span{text-align:right}
         .legacy-installment-row strong{font-weight:bold}
-        .legacy-tag-footer{grid-column:1/10;grid-row:28/34;width:100%;height:100%;object-fit:contain;object-position:center}
+        .legacy-tag-footer{grid-column:1/10;grid-row:28/34}
         @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}}
         @media print{
           @page{size:letter ${format === "TWO" || format === "AIRCON" ? "landscape" : "portrait"};margin:0}
@@ -506,7 +505,7 @@ export default function ProductSearch({
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
           .legacy-half-sheet .legacy-price-tag:first-child:not(:only-child){border-right:0!important}
           .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}
-          .legacy-tag-header img,.legacy-tag-footer{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+          .legacy-tag-header img,.legacy-tag-footer img{print-color-adjust:exact;-webkit-print-color-adjust:exact}
         }
       `}</style>
     </main>

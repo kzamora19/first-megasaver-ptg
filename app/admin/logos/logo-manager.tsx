@@ -8,11 +8,11 @@ import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 type LogoKey = "header" | "promo" | "social" | "appHeader";
 type LogoAsset = { url: string; originalFileName: string; updatedAt: string };
 type LogoMap = Partial<Record<LogoKey, LogoAsset>>;
-const slots: { key: LogoKey; name: string; detail: string; fallback?: string }[] = [
-  { key: "header", name: "1st Megasaver Header Logo", detail: "Used at the top of price tags.", fallback: "/legacy-ptg/price-tag-header.png" },
+const slots: { key: LogoKey; name: string; detail: string }[] = [
+  { key: "header", name: "1st Megasaver Header Logo", detail: "Used at the top of price tags." },
   { key: "promo", name: "Promo / Anniversary Logo", detail: "Optional campaign artwork on supported tag layouts." },
-  { key: "social", name: "Price Tag Footer (Single Image)", detail: "Used as the footer artwork on price tags.", fallback: "/legacy-ptg/price-tag-footer.png" },
-  { key: "appHeader", name: "Interface Header Logo", detail: "Shown on the login and product screens.", fallback: "/legacy-ptg/app-header.png" },
+  { key: "social", name: "Price Tag Footer (Single Image)", detail: "Used as the footer artwork on price tags." },
+  { key: "appHeader", name: "Interface Header Logo", detail: "Shown on the Products screen." },
 ];
 
 export default function LogoManager() {
@@ -74,7 +74,7 @@ export default function LogoManager() {
 
   async function remove(key: LogoKey) {
     if (!logos[key]) return;
-    if (!window.confirm("Remove the uploaded replacement for this logo? The generator will return to its built-in default asset.")) return;
+    if (!window.confirm("Remove this uploaded logo? Its slot will be left empty.")) return;
     setBusyKey(key);
     setMessage("");
     try {
@@ -87,7 +87,7 @@ export default function LogoManager() {
           });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || "Logo removal failed.");
-      setMessage(result.message || "Logo replacement removed.");
+      setMessage("Logo removed. Its slot is now empty.");
       await loadLogos();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Logo removal failed.");
@@ -105,20 +105,20 @@ export default function LogoManager() {
       <section className="manager-intro">
         <p className="eyebrow">FIRST MEGASAVER LOGO MANAGER</p>
         <h1>Branding assets</h1>
-        <p>Replace a logo without changing price memo or product data. When a replacement is removed, the PTG uses its built-in artwork.</p>
+        <p>Upload the artwork you want PTG to use. Empty slots display no artwork.</p>
       </section>
 
       {message && <p className="manager-message" role="status">{message}</p>}
       <section className="slot-grid" aria-label="Logo slots">
         {slots.map(slot => {
           const saved = logos[slot.key];
-          const preview = saved?.url || slot.fallback;
+          const preview = saved?.url;
           return (
             <article className="slot-card" key={slot.key}>
-              <div className="slot-heading"><div><span>LOGO SLOT</span><h2>{slot.name}</h2></div><span className={saved ? "slot-status active" : "slot-status"}>{saved ? "REPLACEMENT SAVED" : "BUILT-IN DEFAULT"}</span></div>
+              <div className="slot-heading"><div><span>LOGO SLOT</span><h2>{slot.name}</h2></div><span className={saved ? "slot-status active" : "slot-status"}>{saved ? "ARTWORK SAVED" : "EMPTY"}</span></div>
               <p className="slot-detail">{slot.detail}</p>
               <div className={"slot-preview " + (slot.key === "appHeader" ? "wide-preview" : "")}>
-                {preview ? <img src={preview} alt={slot.name + (saved ? " replacement" : " default")} /> : <span>No replacement uploaded</span>}
+                {preview ? <img src={preview} alt={slot.name} /> : <span>No artwork uploaded</span>}
               </div>
               {saved && <p className="saved-name">{saved.originalFileName}{saved.updatedAt ? " · Updated " + new Date(saved.updatedAt).toLocaleDateString() : ""}</p>}
               <div className="slot-actions">
