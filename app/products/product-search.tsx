@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 
 type MemoInfo = {
@@ -110,7 +111,9 @@ export default function ProductSearch({
 
   const refreshLogos = useCallback(async () => {
     try {
-      const response = await fetch("/api/logos", { cache: "no-store" });
+      const response = usesEdgeAssets
+        ? await requestPtgLogos("GET")
+        : await fetch("/api/logos", { cache: "no-store" });
       const payload = await response.json();
       if (response.ok && payload.ok) setLogos(payload.logos || {});
     } catch {
