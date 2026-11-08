@@ -41,5 +41,5 @@
 - Do not change or deploy the production Apps Script.
 - Do not make the GitHub repository public.
 - GitHub documents Pages for private repositories on GitHub Pro, Team, or Enterprise; GitHub Free requires a public repository for Pages. Confirm the account plan before enabling Pages.
-- A private source repository does not automatically mean the published website is private. Confirm site visibility/access requirements before publishing any PTG data or login surface.
+- GitHub Pages sites are public on the internet by default, even when the source repository is private. GitHub Enterprise Cloud can support private publication restricted to organization members; confirm the account and site visibility requirements before publishing the PTG login surface.
 - No user accounts, passwords, production data, sessions, or logos are copied by this planning step.
