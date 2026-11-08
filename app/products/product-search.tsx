@@ -174,6 +174,8 @@ export default function ProductSearch({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [format, setFormat] = useState<FormatKey>("ONE");
+  const [refreshingLogos, setRefreshingLogos] = useState(false);
+  const [logoMessage, setLogoMessage] = useState("");
   const [logoVersion, setLogoVersion] = useState(0);
   const [logos, setLogos] = useState<LogoMap>({});
 
@@ -183,13 +185,30 @@ export default function ProductSearch({
         ? await requestPtgLogos("GET")
         : await fetch("/api/logos", { cache: "no-store" });
       const payload = await response.json();
-      if (response.ok && payload.ok) setLogos(payload.logos || {});
+      if (!response.ok || !payload.ok) return false;
+      setLogos(payload.logos || {});
+      return true;
     } catch {
-      // Keep any artwork already loaded if a refresh fails.
+      return false;
     }
   }, []);
 
   useEffect(() => { void refreshLogos(); }, [refreshLogos]);
+
+  async function refreshArtwork() {
+    setRefreshingLogos(true);
+    setLogoMessage("");
+    try {
+      if (await refreshLogos()) {
+        setLogoVersion(value => value + 1);
+        setLogoMessage("Logos refreshed.");
+      } else {
+        setLogoMessage("Could not refresh logos. Try again.");
+      }
+    } finally {
+      setRefreshingLogos(false);
+    }
+  }
 
   const loadProducts = useCallback(async (query: string, requestedPage: number) => {
     setLoading(true);
@@ -406,12 +425,13 @@ export default function ProductSearch({
           <div className="legacy-preview-controls">
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
             <div className="legacy-output-buttons ptg-print-hide">
-              <button type="button" className="refresh-logos" onClick={() => { setLogoVersion(value => value + 1); void refreshLogos(); }}>↻ Refresh Logos</button>
+              <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>
               <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
               <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print Price Tags</button>
             </div>
           </div>
         </div>
+        {logoMessage && <p className="legacy-status-message ptg-print-hide" role="status">{logoMessage}</p>}
         {!printable && <div className="legacy-format-notice" role="alert">
           Aircon requires a capacity of 1.0, 1.5, 2.0, 2.5, or 3.0 HP in the product description or model.
           Check or remove: {invalidAircon.map(product => product.model || product.barcode).join(", ")}.
@@ -474,7 +494,10 @@ export default function ProductSearch({
               {logos.social && <div className="ptg-compact-footer"><img src={artworkUrl("social")} alt="Price tag footer artwork" /></div>}
             </article>;
             return <article className="legacy-price-tag" key={product.id}>
-                {logos.header && <div className="legacy-tag-header"><img src={artworkUrl("header")} alt="Price tag header artwork" /></div>}
+                {(logos.header || logos.promo) && <div className={"legacy-tag-header" + (logos.promo ? " legacy-tag-header-with-promo" : "")}>
+                  {logos.header && <img src={artworkUrl("header")} alt="Price tag header artwork" />}
+                  {logos.promo && <img className="legacy-tag-promo" src={artworkUrl("promo")} alt="Promo artwork" />}
+                </div>}
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
                 <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value" style={{ fontSize: modelDescription.length > 90 ? 24 : modelDescription.length > 55 ? 30 : 38 }}>{modelDescription}</div>
@@ -567,7 +590,7 @@ export default function ProductSearch({
         .preview-format-controls{min-width:0;flex:1}
         .legacy-output-buttons{display:flex;gap:4px;flex:0 0 auto}
         .legacy-output-buttons button{height:24px;padding:0 8px;border:0;border-radius:4px;color:#fff;font-size:8px;font-weight:800;white-space:nowrap}
-        .legacy-output-buttons .refresh-logos{background:#d8d8d8;color:#425064}
+        .legacy-output-buttons .refresh-logos{background:#e4effd;color:#124a9c;border:1px solid #8eb6e9}
         .legacy-output-buttons .save-pdf,.legacy-output-buttons .print-tags{background:#0647a7}
         .legacy-output-buttons button:disabled{opacity:.48;cursor:not-allowed}
         .legacy-format-notice,.legacy-preview-empty{margin-top:8px;padding:11px;border:1px solid #dbe3ed;border-radius:4px;background:#fbfcfe;color:#546981;font-size:10px}
@@ -600,6 +623,8 @@ export default function ProductSearch({
         .legacy-installment-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;color:#003da5;font-size:20px;font-weight:bold;white-space:nowrap}
         .legacy-installment-row span{text-align:right}
         .legacy-installment-row strong{font-weight:bold}
+        .legacy-tag-header-with-promo img{width:78%;object-position:left center}
+        .legacy-tag-header-with-promo img.legacy-tag-promo{inset:0 0 0 auto;width:20%;object-position:right center}
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34}
         @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}}
         @media print{
