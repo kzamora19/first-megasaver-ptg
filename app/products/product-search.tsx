@@ -48,6 +48,42 @@ const formats: { key: FormatKey; label: string }[] = [
   { key: "SMALL_APPS", label: "SMALL APPS" },
   { key: "CARAVAN", label: "CARAVAN" },
 ];
+const airconSizes = [
+  { hp: 1, area: "14–17 SQM" }, { hp: 1.5, area: "18–22 SQM" },
+  { hp: 2, area: "23–35 SQM" }, { hp: 2.5, area: "36–41 SQM" },
+  { hp: 3, area: "42–47 SQM" },
+];
+const sheetSizes = { ONE: 1, TWO: 2, FOUR: 4, SIX: 6, SMALL_APPS: 6, CARAVAN: 6, AIRCON: 5 };
+
+function airconSlot(product: Product) {
+  for (const value of [product.description, product.model]) {
+    const capacity = value?.match(/(\d+(?:\.\d+)?)\s*HP\b/i);
+    const slot = airconSizes.findIndex(size => size.hp === Number(capacity?.[1]));
+    if (slot >= 0) return slot;
+  }
+  return -1;
+}
+
+function airconSheets(queue: Product[]) {
+  const brands = new Map<string, (Product | null)[][]>();
+  for (const product of queue) {
+    const slot = airconSlot(product);
+    if (slot < 0) continue;
+    const brand = product.brand.trim().toUpperCase();
+    const sheets = brands.get(brand) ?? [];
+    let sheet = sheets.find(rows => !rows[slot]);
+    if (!sheet) {
+      sheet = airconSizes.map(() => null);
+      sheets.push(sheet);
+    }
+    sheet[slot] = product;
+    brands.set(brand, sheets);
+  }
+  return [...brands].sort(([a], [b]) => a.localeCompare(b)).flatMap(([brand, sheets]) =>
+    sheets.map((rows, index) => ({ brand, rows, key: brand + ":" + index })),
+  );
+}
+
 const pageSize = 5;
 
 function Pagination({ page, totalPages, label, busy = false, onPage }: {
@@ -227,12 +263,15 @@ export default function ProductSearch({
 
   function setPrintFormat(next: FormatKey) {
     setFormat(next);
-    if (next !== "ONE" && next !== "TWO") setMessage(next + " template is coming from the current PTG migration.");
-    else if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
+    if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
   }
 
-  const printable = format === "ONE" || format === "TWO";
-  const tagsPerSheet = format === "TWO" ? 2 : 1;
+  const compact = format === "SIX" || format === "SMALL_APPS" || format === "CARAVAN";
+  const srpOnly = format === "SMALL_APPS" || format === "CARAVAN";
+  const invalidAircon = format === "AIRCON" ? queue.filter(product => airconSlot(product) < 0) : [];
+  const printable = invalidAircon.length === 0;
+  const airconPages = format === "AIRCON" ? airconSheets(queue) : [];
+  const tagsPerSheet = sheetSizes[format];
   const sheets = Array.from({ length: Math.ceil(queue.length / tagsPerSheet) }, (_, index) => queue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
 
   function printTags() {
@@ -241,7 +280,7 @@ export default function ProductSearch({
       return;
     }
     if (!printable) {
-      setMessage(format + " is not ready to print yet. Use 1 WHOLE or 1/2.");
+      setMessage("Remove items without a supported Aircon capacity before printing.");
       return;
     }
     const date = new Date();
@@ -359,14 +398,65 @@ export default function ProductSearch({
             </div>
           </div>
         </div>
-        {!printable && <div className="legacy-format-notice">The {formats.find(item => item.key === format)?.label} interface is ready; its print template is being migrated next.</div>}
+        {!printable && <div className="legacy-format-notice" role="alert">
+          Aircon requires a capacity of 1.0, 1.5, 2.0, 2.5, or 3.0 HP in the product description or model.
+          Check or remove: {invalidAircon.map(product => product.model || product.barcode).join(", ")}.
+        </div>}
         {printable && queue.length > 0 && <div className="ptg-print-preview">
-          {sheets.map(sheet => <div className={"legacy-print-sheet" + (format === "TWO" ? " legacy-half-sheet" : "")} key={sheet[0].id}>
+          {format === "AIRCON" ? airconPages.map(({ brand, rows, key }) => <div className="legacy-print-sheet legacy-aircon-sheet" key={key}>
+            <article className="ptg-aircon">
+              <header className="ptg-aircon-header">
+                {logos.header && <img src={artworkUrl("header")} alt="Price tag header artwork" />}
+                <strong>{brand || "AIRCON"}</strong>
+              </header>
+              <table className="ptg-aircon-products">
+                <thead><tr>{["BC#", "CAPACITY", "RECOMMENDED FLOOR AREA", "MODEL", "SRP", "NOW PAY ONLY", "SAVE"].map(label => <th key={label}>{label}</th>)}</tr></thead>
+                <tbody>{rows.map((product, index) => <tr key={airconSizes[index].hp}>
+                  <td>{product?.barcode}</td><td>{airconSizes[index].hp.toFixed(1)} HP</td><td>{airconSizes[index].area}</td>
+                  <td>{product && (product.description?.trim() || product.model)}</td>
+                  <td>{product && peso(product.srp)}</td><td>{product && peso(priceNow(product))}</td>
+                  <td>{product && peso(amount(product.srp) - priceNow(product))}</td>
+                </tr>)}</tbody>
+              </table>
+              <div className="ptg-aircon-lower">
+                <table><thead><tr><th>CREDIT CARD</th><th>12 MONTHS</th></tr></thead>
+                  <tbody>{rows.map((product, index) => <tr key={airconSizes[index].hp}>
+                    <td>{product && airconSizes[index].hp.toFixed(1) + " HP"}</td>
+                    <td>{product && (amount(product.months_12) ? peso(amount(product.months_12) / 12) : "—")}</td>
+                  </tr>)}</tbody>
+                </table>
+                <div className="ptg-aircon-footer">
+                  {rows.filter(product => product !== null).every(product =>
+                    /free.*(?:10\s*(?:ft|feet)).*installation|free.*installation.*10\s*(?:ft|feet)/i.test(product.remarks ?? "") &&
+                    !/unit\s+only/i.test(product.remarks ?? ""),
+                  ) && <strong>FREE INSTALLATION 1ST 10 FEET</strong>}
+                  {logos.social && <img src={artworkUrl("social")} alt="Price tag footer artwork" />}
+                </div>
+              </div>
+            </article>
+          </div>) : sheets.map(sheet => <div className={"legacy-print-sheet" + (format === "TWO" ? " legacy-half-sheet" : format === "FOUR" ? " legacy-four-sheet" : compact ? " legacy-six-sheet" : "")} key={sheet[0].id}>
           {sheet.map(product => {
             const modelDescription = product.description?.trim() || product.model;
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
+            if (compact) return <article className="ptg-compact-tag" key={product.id}>
+              <header className="ptg-compact-header">
+                {logos.header && <img src={artworkUrl("header")} alt="Price tag header artwork" />}
+                {logos.promo && <img src={artworkUrl("promo")} alt="Promo artwork" />}
+              </header>
+              <div className="ptg-compact-barcode">Barcode: {product.barcode}</div>
+              <div>Brand: <strong>{product.brand}</strong></div>
+              <div className="ptg-compact-model">MODEL: <strong>{modelDescription}</strong></div>
+              {!srpOnly && <div>SRP: <strong>{peso(product.srp)}</strong></div>}
+              <div className="ptg-compact-cash">CASH / STRAIGHT</div>
+              <div className="ptg-compact-pay">PAY NOW: <strong>{peso(srpOnly ? product.srp : pay)}</strong></div>
+              {!srpOnly && <div className="ptg-compact-summary">
+                <span>{endDate(memo?.period || "") ? "Valid Until: " + endDate(memo?.period || "") : ""}</span>
+                <strong>SAVE: {peso(savings)}</strong>
+              </div>}
+              <footer>{logos.social && <img src={artworkUrl("social")} alt="Price tag footer artwork" />}</footer>
+            </article>;
             return <article className="legacy-price-tag" key={product.id}>
                 {logos.header && <div className="legacy-tag-header"><img src={artworkUrl("header")} alt="Price tag header artwork" /></div>}
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
@@ -506,6 +596,35 @@ export default function ProductSearch({
           .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding:0!important;box-shadow:none!important}
           .legacy-half-sheet{grid-template-columns:repeat(2,5.07in);grid-template-rows:6.76in;gap:0;width:11in!important;height:8.5in!important}
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
+          .legacy-four-sheet{grid-template-columns:repeat(2,3.822in);grid-template-rows:repeat(2,5.096in);gap:0}
+          .legacy-four-sheet .legacy-price-tag{zoom:.49}
+          .legacy-six-sheet{grid-template-columns:repeat(2,4.25in);grid-template-rows:repeat(3,calc(11in / 3));gap:0}
+          .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:4.25in;height:calc(11in / 3);padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
+          .ptg-compact-header{display:flex;align-items:center;justify-content:space-between;gap:8px;height:55px;border-bottom:2px solid #003da5}
+          .ptg-compact-header img{width:70%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+          .ptg-compact-header img[alt="Promo artwork"]{width:26%;margin-left:auto}
+          .ptg-compact-barcode{text-align:right;font-size:11px}
+          .ptg-compact-model{display:flex;gap:5px;min-height:42px;align-items:start}
+          .ptg-compact-model strong{flex:1;text-align:center;overflow-wrap:anywhere}
+          .ptg-compact-cash{font-size:10px}
+          .ptg-compact-pay{display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap}
+          .ptg-compact-pay strong{background:#fff500;padding:2px 6px;font-size:30px;print-color-adjust:exact}
+          .ptg-compact-summary{display:flex;justify-content:space-between;gap:6px;font-size:11px}
+          .ptg-compact-tag footer{margin-top:auto;height:53px}
+          .ptg-compact-tag footer img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+          .legacy-aircon-sheet{width:11in!important;height:8.5in!important}
+          .ptg-aircon{width:10.4in;color:#003da5;font:700 14px/1.2 Arial,sans-serif}
+          .ptg-aircon-header{height:1.15in;display:flex;align-items:center;justify-content:space-between;border:1px solid #003da5;padding:8px 16px}
+          .ptg-aircon-header img{width:76%;height:100%;object-fit:contain}
+          .ptg-aircon-header strong{margin-left:auto;font-size:25px}
+          .ptg-aircon table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center}
+          .ptg-aircon th,.ptg-aircon td{border:1px solid #003da5;padding:4px;overflow-wrap:anywhere}
+          .ptg-aircon th{background:#003da5;color:#fff;print-color-adjust:exact}
+          .ptg-aircon-products tbody tr{height:.68in}
+          .ptg-aircon-products :is(th,td):nth-child(4){width:29%}
+          .ptg-aircon-lower{display:grid;grid-template-columns:1fr 2fr;min-height:1.75in}
+          .ptg-aircon-footer{display:grid;grid-template-rows:auto 1fr;place-items:center;border:1px solid #003da5;padding:8px}
+          .ptg-aircon-footer img{max-width:100%;height:1.1in;object-fit:contain}
           .legacy-half-sheet .legacy-price-tag:first-child:has(+ .legacy-price-tag){border-right:0!important}
           .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}
           .legacy-tag-header img,.legacy-tag-footer img{print-color-adjust:exact;-webkit-print-color-adjust:exact}
