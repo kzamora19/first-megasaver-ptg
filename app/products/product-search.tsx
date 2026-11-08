@@ -228,7 +228,7 @@ export default function ProductSearch({
 
   function setPrintFormat(next: FormatKey) {
     setFormat(next);
-    if (next !== "ONE") setMessage(next + " template is coming from the current PTG migration.");
+    if (next !== "ONE" && next !== "TWO") setMessage(next + " template is coming from the current PTG migration.");
     else if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
   }
 
@@ -258,7 +258,7 @@ export default function ProductSearch({
 
       <section className="legacy-branch-tools ptg-print-hide">
         <WorkspaceNav role={systemRole} active="/products" />
-        <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><small>{username} · {branchCode} — {legacyRole}</small><LogoutButton /></div>
+        <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
           {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
           <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>
@@ -395,6 +395,7 @@ export default function ProductSearch({
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
         .legacy-tools-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#123b72;font-size:10px}
+        .legacy-tools-account{display:flex;align-items:center;gap:12px}
         .legacy-tools-heading small{color:#71839a;font-size:9px}
         .legacy-branch-tools nav{display:flex;gap:6px;flex-wrap:wrap}
         .legacy-branch-tools a,.legacy-branch-tools button{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:700;text-decoration:none}
