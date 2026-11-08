@@ -2,6 +2,7 @@
 
 
 
+import Link from "next/link";
 import ClientSessionGate from "@/components/client-session-gate";
 import AccountAdministration from "./account-administration";
 
@@ -14,6 +15,7 @@ export default function AdminAccountsPage() {
         <p className="intro">Manage user accounts and active access within your authorized scope.</p>
         <div className="status"><span className="status-dot"/>{session.role.replaceAll("_", " ")}</div>
       </section>
+      <p><Link className="admin-link" href="/change-password/">Change my password</Link></p>
       <AccountAdministration role={session.role}/>
     </main>}
   </ClientSessionGate>;

@@ -50,6 +50,8 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   if (!workspacePaths.has(path)) return children;
 
   return <ClientSessionGate>
-    {session => <WorkspaceFrame session={session} path={path}>{children}</WorkspaceFrame>}
+    {session => session.role === "SYSTEM_ADMIN"
+      ? <WorkspaceFrame session={session} path={path}>{children}</WorkspaceFrame>
+      : children}
   </ClientSessionGate>;
 }

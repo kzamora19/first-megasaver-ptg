@@ -249,22 +249,27 @@ export default function ProductSearch({
     window.print();
   }
 
+  const managedBanner = logos.appHeader;
+  const useOriginalBanner = !managedBanner || /^(app_header_logo_exact_header_size|app header logo)\.png$/i.test(managedBanner.originalFileName);
+  const bannerSrc = useOriginalBanner
+    ? withBasePath("/legacy-ptg/app-header-original.png")
+    : managedBanner.url + (managedBanner.url.includes("?") ? "&" : "?") + "refresh=" + logoVersion;
+
   const currentBranchLabel = branchName || ({ CAU: "Cauayan", ILA: "Ilagan", STG: "Santiago", TUG: "Tuguegarao" } as Record<string, string>)[branchCode.toUpperCase()] || branchCode;
 
   return (
     <main className="ptg-main legacy-ptg-main">
-      <img src={withBasePath(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" className="ptg-print-hide" style={{ display: "block", width: "100%", height: "auto", margin: "0 0 9px", padding: 0, border: 0, borderRadius: 5 }} />
+      <img src={bannerSrc} alt="1st Megasaver · Appliance · Gadgets · Furniture"
+        className={"ptg-print-hide legacy-products-banner" + (useOriginalBanner ? " legacy-products-banner-original" : "")} />
 
-      <section className="legacy-branch-tools ptg-print-hide">
+{systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
           {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
           <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>
           {canImport && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
-          {systemRole === "SYSTEM_ADMIN" && <a href={withBasePath("/admin/logos")}>LOGO MANAGER</a>}
-          <button type="button" disabled title="Memo cleanup tools are being migrated">DELETE OLD MEMO</button>
         </nav>
-      </section>
+      </section>}
 
       <section className="legacy-search-workflow ptg-print-hide">
         <div className="legacy-search-card">
@@ -389,6 +394,8 @@ export default function ProductSearch({
       </section>
 
       <style jsx global>{`
+        .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
+        .legacy-products-banner-original{aspect-ratio:8.5;object-fit:cover;object-position:center}
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
@@ -488,16 +495,16 @@ export default function ProductSearch({
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34;width:100%;height:100%;object-fit:contain;object-position:center}
         @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}}
         @media print{
-          @page{size:letter portrait;margin:0}
-          @page ptg-half{size:letter landscape;margin:0}
+          @page{size:letter ${format === "TWO" || format === "AIRCON" ? "landscape" : "portrait"};margin:0}
           html,body{margin:0!important;padding:0!important;background:#fff!important}
           body *{visibility:hidden!important}
           .ptg-print-preview,.ptg-print-preview *{visibility:visible!important}
           .ptg-print-preview{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important}
           .ptg-print-hide,.legacy-preview-heading,.legacy-format-notice,.legacy-preview-empty{display:none!important}
           .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding-top:.3in!important;box-shadow:none!important}
-          .legacy-half-sheet{page:ptg-half;grid-template-columns:1fr 1fr;width:11in!important;height:8.5in!important;padding-top:.4in!important}
+          .legacy-half-sheet{grid-template-columns:repeat(2,5.07in);justify-content:center;column-gap:0;width:11in!important;height:8.5in!important;padding-top:.4in!important}
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
+          .legacy-half-sheet .legacy-price-tag:first-child:not(:only-child){border-right:0!important}
           .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}
           .legacy-tag-header img,.legacy-tag-footer{print-color-adjust:exact;-webkit-print-color-adjust:exact}
         }
