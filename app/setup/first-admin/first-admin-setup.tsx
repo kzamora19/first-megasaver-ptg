@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { requestPtgAccounts, usesEdgeAccounts } from "@/lib/ptg/accounts-client";
 
 export default function FirstAdminSetup() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function FirstAdminSetup() {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/setup/first-admin/start", {
+      const response = usesEdgeAccounts ? await requestPtgAccounts("POST", { action: "bootstrapStart", setupSecret }) : await fetch("/api/setup/first-admin/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -55,7 +56,7 @@ export default function FirstAdminSetup() {
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/setup/first-admin", {
+      const response = usesEdgeAccounts ? await requestPtgAccounts("POST", { action: "bootstrapFinish", bootstrapCode, username, displayName, password }) : await fetch("/api/setup/first-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
