@@ -205,7 +205,7 @@ async function createAccount(request: Request, session: Session, origin: string,
     const { data: branch } = await admin.from("branches").select("id,status,operational_status").eq("id", branchId).maybeSingle();
     if (!branch || branch.status !== "ACTIVE" || branch.operational_status !== "ON") return json(origin, { ok: false, message: "The selected branch is not active." }, 400);
   }
-  if (!resendKey || !resendFrom) throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
+  if (!gmailUser || !gmailPassword) throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
   const authEmail = role === "SYSTEM_ADMIN"
     ? "ptg.system." + username.toLowerCase() + "@accounts.firstmegasaver.invalid"
     : "ptg." + String(branchId).replace(/-/g, "") + "." + username.toLowerCase() + "@accounts.firstmegasaver.invalid";
