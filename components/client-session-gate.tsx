@@ -30,6 +30,7 @@ export default function ClientSessionGate({
   const router = useRouter();
   const [session, setSession] = useState<PtgClientSession | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const allowedRoles = allowRoles?.join("|") ?? "";
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,7 +48,7 @@ export default function ClientSessionGate({
         router.replace("/change-password");
         return;
       }
-      if (allowRoles && !allowRoles.includes(result.account.role)) {
+      if (allowedRoles && !allowedRoles.split("|").includes(result.account.role)) {
         router.replace(deniedTo);
         return;
       }
@@ -58,7 +59,7 @@ export default function ClientSessionGate({
       setStatus("error");
     });
     return () => controller.abort();
-  }, [allowRoles, deniedTo, router]);
+  }, [allowedRoles, deniedTo, router]);
 
   if (status === "loading") {
     return <main className="shell"><section className="panel" role="status">Checking your PTG session…</section></main>;
