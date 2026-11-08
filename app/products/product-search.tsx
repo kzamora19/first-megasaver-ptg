@@ -598,8 +598,8 @@ export default function ProductSearch({
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
           .legacy-four-sheet{grid-template-columns:repeat(2,3.822in);grid-template-rows:repeat(2,5.096in);gap:0}
           .legacy-four-sheet .legacy-price-tag{zoom:.49}
-          .legacy-six-sheet{grid-template-columns:repeat(2,4.25in);grid-template-rows:repeat(3,calc(11in / 3));gap:0}
-          .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:4.25in;height:calc(11in / 3);padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
+          .legacy-six-sheet{grid-template-columns:repeat(2,4.05in);grid-template-rows:repeat(3,calc(10.6in / 3));gap:0}
+          .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:100%;height:100%;padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
           .ptg-compact-header{display:flex;align-items:center;justify-content:space-between;gap:8px;height:55px;border-bottom:2px solid #003da5}
           .ptg-compact-header img{width:70%;height:100%;object-fit:contain;mix-blend-mode:multiply}
           .ptg-compact-header img[alt="Promo artwork"]{width:26%;margin-left:auto}
@@ -610,8 +610,8 @@ export default function ProductSearch({
           .ptg-compact-pay{display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap}
           .ptg-compact-pay strong{background:#fff500;padding:2px 6px;font-size:30px;print-color-adjust:exact}
           .ptg-compact-summary{display:flex;justify-content:space-between;gap:6px;font-size:11px}
-          .ptg-compact-tag footer{margin-top:auto;height:53px}
-          .ptg-compact-tag footer img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+          .ptg-compact-tag footer{margin-top:auto;flex:1 1 88px;min-height:0;max-height:100px}
+          .ptg-compact-tag footer img{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;mix-blend-mode:multiply}
           .legacy-aircon-sheet{width:11in!important;height:8.5in!important}
           .ptg-aircon{width:10.4in;color:#003da5;font:700 14px/1.2 Arial,sans-serif}
           .ptg-aircon-header{height:1.15in;display:flex;align-items:center;justify-content:space-between;border:1px solid #003da5;padding:8px 16px}
