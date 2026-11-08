@@ -1,9 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { establishPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
-import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { withBasePath } from "@/lib/base-path";
 
 export default function LoginPage() {
@@ -14,21 +13,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [appHeaderLogo, setAppHeaderLogo] = useState(withBasePath("/legacy-ptg/app-header.png"));
-
-  useEffect(() => {
-    const loadLogo = async () => {
-      try {
-        const response = usesEdgeAssets
-          ? await requestPtgLogos("GET")
-          : await fetch("/api/logos", { cache: "no-store" });
-        const result = await response.json();
-        if (result.ok && result.logos?.appHeader?.url) setAppHeaderLogo(result.logos.appHeader.url);
-      } catch { /* Keep the built-in logo if branding cannot be loaded. */ }
-    };
-    void loadLogo();
-  }, []);
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -66,7 +50,7 @@ export default function LoginPage() {
     <main className="auth-shell legacy-login-shell">
       <section className="auth-card legacy-login-card">
         <div className="legacy-login-header">
-          <img src={appHeaderLogo} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
+          <img src={withBasePath("/legacy-ptg/login-logo.png")} alt="1st Megasaver · Appliance · Gadgets · Furniture" />
         </div>
         <div className="legacy-login-body">
           <form onSubmit={submit} className="legacy-login-form">
@@ -99,9 +83,8 @@ export default function LoginPage() {
       <style jsx global>{`
         .legacy-login-shell{background:radial-gradient(ellipse at 50% 0,#f7fbff 0,#eaf2fb 70%,#e5edf7 100%)!important}
         .legacy-login-card{width:min(510px,100%)!important;padding:0!important;overflow:hidden;border-radius:20px!important;box-shadow:0 22px 54px rgba(27,61,103,.16)!important}
-        .legacy-login-header{position:relative;display:flex;align-items:center;justify-content:center;min-height:138px;padding:18px 24px;background:linear-gradient(135deg,#075fc6 0%,#075fc6 35%,#123b7a 100%);overflow:hidden}
-        .legacy-login-header:after{content:"";position:absolute;right:-80px;top:-95px;width:235px;height:235px;border-radius:50%;background:rgba(255,255,255,.06)}
-        .legacy-login-header img{position:relative;z-index:1;display:block;width:min(100%,470px);max-height:105px;height:auto;object-fit:contain}
+        .legacy-login-header{position:relative;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#075fc6 0%,#075fc6 35%,#123b7a 100%);overflow:hidden}
+        .legacy-login-header img{position:relative;z-index:1;display:block;width:100%;height:auto;object-fit:contain}
         .legacy-login-body{padding:29px 32px 27px;background:#fff}
         .legacy-login-form{display:grid;gap:8px}
         .legacy-login-form>label:not(.legacy-show-password){margin-top:2px;color:#123b72;font-size:11px;font-weight:900;letter-spacing:.03em}
@@ -120,7 +103,7 @@ export default function LoginPage() {
         .legacy-login-security>div{display:flex;align-items:center;gap:9px;color:#123b72;font-size:11px;font-weight:700}
         .legacy-security-dot{width:9px;height:9px;border-radius:50%;background:#00c96b;box-shadow:0 0 9px rgba(0,201,107,.5)}
         .legacy-login-footnote{margin:17px 0 0;color:#8792a2;font-size:9px;text-align:center}
-        @media(max-width:520px){.legacy-login-card{border-radius:15px!important}.legacy-login-header{min-height:112px;padding:16px 18px}.legacy-login-body{padding:23px 20px 25px}}
+        @media(max-width:520px){.legacy-login-card{border-radius:15px!important}.legacy-login-body{padding:23px 20px 25px}}
       `}</style>
     </main>
   );

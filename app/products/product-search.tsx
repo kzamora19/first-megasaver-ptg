@@ -47,6 +47,33 @@ const formats: { key: FormatKey; label: string }[] = [
   { key: "CARAVAN", label: "CARAVAN" },
 ];
 const pageSize = 5;
+
+function Pagination({ page, totalPages, label, busy = false, onPage }: {
+  page: number;
+  totalPages: number;
+  label: string;
+  busy?: boolean;
+  onPage: (page: number) => void;
+}) {
+  return <form className="legacy-pagination" aria-label={label} onSubmit={event => {
+    event.preventDefault();
+    const value = Number(new FormData(event.currentTarget).get("page"));
+    if (!busy && Number.isSafeInteger(value) && value >= 1 && value <= totalPages) onPage(value);
+  }}>
+    <button type="button" aria-label="First page" disabled={busy || page <= 1} onClick={() => onPage(1)}>«</button>
+    <button type="button" aria-label="Previous page" disabled={busy || page <= 1} onClick={() => onPage(page - 1)}>‹</button>
+    <label><input key={page} name="page" type="number" min={1} max={totalPages} required aria-label={label + " page number"} defaultValue={page} disabled={busy} /> of {totalPages}</label>
+    <button type="button" aria-label="Next page" disabled={busy || page >= totalPages} onClick={() => onPage(page + 1)}>›</button>
+    <button type="button" aria-label="Last page" disabled={busy || page >= totalPages} onClick={() => onPage(totalPages)}>»</button>
+    <button type="submit" disabled={busy}>Go</button>
+  </form>;
+}
+
+function BlankRows({ used }: { used: number }) {
+  return Array.from({ length: pageSize - used }, (_, index) =>
+    <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={8}>&nbsp;</td></tr>
+  );
+}
 const amount = (value: number | null | undefined) => Number(value || 0);
 const peso = (value: number | null | undefined) => "₱ " + amount(value).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const priceNow = (product: Product) => amount(product.tag_this);
@@ -103,6 +130,8 @@ export default function ProductSearch({
   const [queue, setQueue] = useState<Product[]>([]);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [queuePage, setQueuePage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -143,6 +172,7 @@ export default function ProductSearch({
         payload = result;
       }
       if (!payload.ok) throw new Error("Search failed.");
+      setSearchQuery(query);
       setResults(payload.products as Product[]);
       setTotal(Number(payload.total || 0));
       setPage(Number(payload.page || requestedPage));
@@ -161,6 +191,9 @@ export default function ProductSearch({
   useEffect(() => { void loadProducts("", 1); }, [loadProducts]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const queueTotalPages = Math.max(1, Math.ceil(queue.length / pageSize));
+  const visibleQueuePage = Math.min(queuePage, queueTotalPages);
+  const queueRows = queue.slice((visibleQueuePage - 1) * pageSize, visibleQueuePage * pageSize);
   const firstResult = total ? (page - 1) * pageSize + 1 : 0;
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
@@ -178,6 +211,7 @@ export default function ProductSearch({
       ? (queue.some(item => item.id === product.id) ? queue : [...queue, product])
       : queue.filter(item => item.id !== product.id);
     setQueue(next);
+    setQueuePage(current => Math.min(current, Math.max(1, Math.ceil(next.length / pageSize))));
     setActiveProduct(checked ? product : (activeProduct?.id === product.id ? next[next.length - 1] ?? null : activeProduct));
   }
 
@@ -186,13 +220,14 @@ export default function ProductSearch({
       ? [...queue, ...results.filter(product => !queue.some(item => item.id === product.id))]
       : queue.filter(item => !results.some(product => product.id === item.id));
     setQueue(next);
+    setQueuePage(current => Math.min(current, Math.max(1, Math.ceil(next.length / pageSize))));
     setActiveProduct(checked ? results[0] ?? activeProduct : (next[next.length - 1] ?? null));
   }
 
   function setPrintFormat(next: FormatKey) {
     setFormat(next);
     if (next !== "ONE") setMessage(next + " template is coming from the current PTG migration.");
-    else if (queue.length) setMessage(queue.length + " selected product(s) ready for 1 WHOLE preview.");
+    else if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
   }
 
   function printTags() {
@@ -266,53 +301,49 @@ export default function ProductSearch({
 
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
-        <div className="legacy-table-scroll">
+        <div className="legacy-table-frame" aria-busy={loading}>
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all visible products" checked={results.length > 0 && results.every(item => queue.some(queued => queued.id === item.id))} onChange={event => toggleVisible(event.target.checked)} /></th>
               <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => { if ((event.target as HTMLElement).tagName !== "INPUT") setActiveProduct(product); }}>
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => { if ((event.target as HTMLElement).tagName !== "INPUT") setActiveProduct(product); }}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td><strong>{product.brand || "—"}</strong></td><td title={product.model}>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
-              {!loading && Array.from({ length: Math.max(0, pageSize - results.length) }).map((_, index) => <tr className="legacy-blank-row" aria-hidden="true" key={"blank-" + index}><td colSpan={8}> </td></tr>)}
+              <BlankRows used={Math.max(1, results.length)} />
             </tbody>
           </table>
         </div>
-        <div className="legacy-pagination">
-          <span>Search Results&nbsp; {firstResult}–{lastResult} of {total}</span>
-          <button type="button" aria-label="First page" disabled={page <= 1} onClick={() => void loadProducts(term, 1)}>«</button>
-          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => void loadProducts(term, page - 1)}>‹</button>
-          <label><input aria-label="Current page" value={page} readOnly /> of {totalPages}</label>
-          <button type="button" aria-label="Next page" disabled={page >= totalPages} onClick={() => void loadProducts(term, page + 1)}>›</button>
-          <button type="button" aria-label="Last page" disabled={page >= totalPages} onClick={() => void loadProducts(term, totalPages)}>»</button>
-        </div>
+        <p className="legacy-result-count" role="status">{loading ? "Loading products…" : `Search Results ${firstResult}–${lastResult} of ${total}`}</p>
+        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next)} />
       </section>
 
       <section className="legacy-queue-panel ptg-print-hide">
         <h2>2. Selected Products / Print Queue</h2>
-        <div className="legacy-table-scroll legacy-queue-scroll">
+        <div className="legacy-table-frame">
           <table className="legacy-products-table">
             <thead><tr>
-              <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setActiveProduct(null); } }} /></th>
+              <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setQueuePage(1); setActiveProduct(null); } }} /></th>
               <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {queue.length ? queue.map(product => <tr key={product.id}>
+              {queueRows.length ? queueRows.map(product => <tr key={product.id}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td><strong>{product.brand || "—"}</strong></td><td>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
+              <BlankRows used={Math.max(1, queueRows.length)} />
             </tbody>
           </table>
         </div>
-        <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
+        <Pagination page={visibleQueuePage} totalPages={queueTotalPages} label="Print queue" onPage={setQueuePage} />
+        <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setQueuePage(1); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
       </section>
 
       <section className="legacy-preview-panel">
         <div className="legacy-preview-heading">
-          <h2>3. Price Tag Preview</h2>
+          <h2>3. Print Price Tags</h2>
           <div className="legacy-preview-controls">
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
             <div className="legacy-output-buttons ptg-print-hide">
@@ -323,8 +354,9 @@ export default function ProductSearch({
           </div>
         </div>
         {format !== "ONE" && <div className="legacy-format-notice">The {formats.find(item => item.key === format)?.label} interface is ready; its print template is being migrated next.</div>}
-        {format === "ONE" && queue.length > 0 && <div className="ptg-print-preview" aria-label="Price tag print preview">
+        {format === "ONE" && queue.length > 0 && <div className="ptg-print-preview">
           {queue.map(product => {
+            const modelDescription = product.description?.trim() || product.model;
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
@@ -333,7 +365,7 @@ export default function ProductSearch({
                 <div className="legacy-tag-header"><img src={withBasePath(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
-                <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value">{product.description || product.model}</div>
+                <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value" style={{ fontSize: modelDescription.length > 90 ? 24 : modelDescription.length > 55 ? 30 : 38 }}>{modelDescription}</div>
                 <div className="legacy-srp-label">SRP:</div><div className="legacy-srp">{peso(product.srp)}</div>
                 <div className="legacy-cash">CASH / STRAIGHT</div>
                 <div className="legacy-pay-label">PAY NOW:</div><div className="legacy-pay-value">{peso(pay)}</div>
@@ -351,13 +383,13 @@ export default function ProductSearch({
             </div>;
           })}
         </div>}
-        {format === "ONE" && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to preview price tags.</div>}
+        {format === "ONE" && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
       </section>
 
       <style jsx global>{`
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
         .legacy-ptg-banner{position:relative;display:flex;align-items:center;justify-content:center;min-height:76px;margin-bottom:9px;padding:5px 10px;border-radius:5px;background:#075fc6;overflow:hidden}
-        .legacy-ptg-banner img{display:block;width:100%;height:68px;object-fit:cover;object-position:left center}
+        .legacy-ptg-banner img{display:block;width:100%;height:68px;object-fit:contain;object-position:left center}
         .legacy-ptg-banner>span{position:absolute;right:14px;top:8px;color:#fff;font-size:9px;text-shadow:0 1px 2px #003b84}
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
@@ -390,9 +422,9 @@ export default function ProductSearch({
         .legacy-installment-panel td{padding:5px 3px;border-bottom:1px solid #e6e9ee;color:#32445c;font-size:9px;text-align:center}
         .legacy-results-panel{margin-bottom:10px;padding:8px}
         .legacy-status-message{min-height:0;margin:0;padding:0 2px 5px;color:#536781;font-size:9px}
-        .legacy-table-scroll{max-height:211px;overflow:auto;border:1px solid #d6d6d6}
-        .legacy-products-table{font-size:9px}
-        .legacy-products-table thead{position:sticky;top:0;z-index:1;background:#0647a7;color:#fff}
+        .legacy-table-frame{border:1px solid #d6d6d6}
+        .legacy-products-table{font-size:9px;table-layout:fixed;width:100%}
+        .legacy-products-table thead{background:#0647a7;color:#fff}
         .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
         .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
         .legacy-products-table th:nth-child(2){width:17%}.legacy-products-table th:nth-child(3){width:18%}.legacy-products-table th:nth-child(4){width:11%}.legacy-products-table th:nth-child(5){width:30%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:9%}.legacy-products-table th:nth-child(8){width:7%}
@@ -412,7 +444,6 @@ export default function ProductSearch({
         .legacy-pagination label input{width:42px;height:26px;border:1px solid #333;border-radius:4px;text-align:center;font-size:10px}
         .legacy-queue-panel{display:flex;flex-direction:column;min-height:285px;margin-bottom:9px;padding:8px}
         .legacy-queue-panel h2{margin-bottom:7px}
-        .legacy-queue-scroll{flex:1;max-height:250px}
         .legacy-queue-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:auto;padding-top:7px;color:#143d75;font-size:9px}
         .legacy-queue-footer button{height:24px;padding:0 9px;border:0;border-radius:4px;background:#dedede;color:#425064;font-size:9px;font-weight:700}
         .legacy-preview-panel{padding:8px}
@@ -425,7 +456,8 @@ export default function ProductSearch({
         .legacy-output-buttons .save-pdf,.legacy-output-buttons .print-tags{background:#0647a7}
         .legacy-output-buttons button:disabled{opacity:.48;cursor:not-allowed}
         .legacy-format-notice,.legacy-preview-empty{margin-top:8px;padding:11px;border:1px solid #dbe3ed;border-radius:4px;background:#fbfcfe;color:#546981;font-size:10px}
-        .ptg-print-preview{margin-top:10px}
+        .legacy-result-count{margin:6px 0 0;text-align:center;font-size:9px}
+        .ptg-print-preview{display:none}
         .legacy-print-sheet{box-sizing:border-box;display:grid;place-items:start center;width:8.5in;height:11in;margin:0 auto 16px;padding-top:.3in;background:#fff;page-break-after:always;break-after:page}
         .legacy-print-sheet:last-child{page-break-after:auto;break-after:auto}
         .legacy-price-tag{box-sizing:border-box;position:relative;display:grid;grid-template-columns:20fr 51fr 26fr 46fr 70fr 60fr 74fr 101fr 21fr;grid-template-rows:17fr 19fr 19fr 19fr 19fr 19fr 19fr 33fr 33fr 33fr 19fr 12fr 19fr 23fr 21fr 19fr 19fr 19fr 19fr 19fr 22fr 19fr 19fr 19fr 19fr 19fr 7fr 19fr 19fr 19fr 19fr 19fr 19fr 19fr;width:7.8in;height:10.4in;overflow:hidden;border:1px solid #003da5;background:#fff;color:#003da5;font-family:Arial,Helvetica,sans-serif}
@@ -436,11 +468,11 @@ export default function ProductSearch({
         .legacy-brand-label{grid-column:1/3;grid-row:7;align-self:center;padding-left:6%;font-size:30px;font-weight:bold}
         .legacy-brand-value{grid-column:3/6;grid-row:7;align-self:center;font-size:34px;font-weight:bold}
         .legacy-model-label{grid-column:1/3;grid-row:8/10;align-self:start;padding:3px 0 0 6%;font-size:32px;font-weight:bold}
-        .legacy-model-value{grid-column:3/10;grid-row:8/11;align-self:center;padding:0 4%;font-size:38px;line-height:1.15;font-weight:bold;text-align:center}
+        .legacy-model-value{grid-column:3/10;grid-row:8/11;align-self:center;padding:0 4%;line-height:1.15;font-weight:bold;text-align:center;overflow-wrap:anywhere}
         .legacy-srp-label{grid-column:1/3;grid-row:11;align-self:center;padding-left:6%;font-size:24px;font-weight:bold}
         .legacy-srp{grid-column:3/6;grid-row:11;align-self:center;font-size:26px;font-weight:bold;text-decoration:line-through}
         .legacy-cash{grid-column:1/5;grid-row:13;align-self:center;padding-left:6%;font-size:24px;font-weight:bold}
-        .legacy-pay-label{grid-column:2/5;grid-row:14/16;align-self:center;padding-left:6%;font-size:42px;font-weight:bold}
+        .legacy-pay-label{grid-column:2/5;grid-row:14/16;align-self:center;padding-left:6%;font-size:28px;font-weight:bold;white-space:nowrap}
         .legacy-pay-value{grid-column:5/9;grid-row:14/16;display:flex;align-items:center;justify-content:center;background:#fff500;color:#003da5;font-size:68px;font-weight:900;white-space:nowrap}
         .legacy-valid-until{grid-column:2/9;grid-row:16;align-self:center;justify-self:stretch;overflow:visible;color:#003da5;font-size:20px;font-weight:700;text-align:center;white-space:nowrap}
         .legacy-save-label{grid-column:2/4;grid-row:17/19;align-self:center;padding-right:10px;font-size:24px;font-weight:bold;text-align:right}
@@ -459,7 +491,7 @@ export default function ProductSearch({
           html,body{margin:0!important;padding:0!important;background:#fff!important}
           body *{visibility:hidden!important}
           .ptg-print-preview,.ptg-print-preview *{visibility:visible!important}
-          .ptg-print-preview{position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important}
+          .ptg-print-preview{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important}
           .ptg-print-hide,.legacy-preview-heading,.legacy-format-notice,.legacy-preview-empty{display:none!important}
           .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding-top:.3in!important;box-shadow:none!important}
           .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}

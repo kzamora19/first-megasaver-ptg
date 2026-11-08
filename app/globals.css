@@ -179,7 +179,7 @@ footer {
 .ptg-sidebar{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:25px 17px;background:#102b4d;color:#fff}
 .ptg-brand{display:block;padding:4px 8px 30px;color:#fff;text-decoration:none}
 .ptg-brand-lockup{display:block}
-.ptg-brand img{display:block;width:100%;height:auto;border-radius:9px;background:#fff}
+.ptg-brand img{display:block;width:100%;height:auto;filter:invert(1) hue-rotate(180deg);mix-blend-mode:screen}
 .ptg-brand small{display:block;margin-top:8px;color:#b8cbe0;font-size:9px;letter-spacing:.13em}
 .ptg-user-chip strong,.ptg-user-chip small{display:block}
 .ptg-nav-label{padding:12px 11px 9px;color:#829bb7;font-size:9px;font-weight:900;letter-spacing:.16em}
