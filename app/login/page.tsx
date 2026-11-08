@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import AppDialog from "@/components/app-dialog";
 import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
 import { useRouter } from "next/navigation";
-import { establishPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
+import { establishPtgAuthSession, getAvailabilityNotice, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 import { withBasePath } from "@/lib/base-path";
 
 export default function LoginPage() {
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [branchCode, setBranchCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [availabilityNotice, setAvailabilityNotice] = useState<ReturnType<typeof getAvailabilityNotice>>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState(false);
@@ -94,7 +95,9 @@ export default function LoginPage() {
       router.replace(destination);
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to connect to the authentication service. Please try again.");
+      const notice = getAvailabilityNotice(error);
+      if (notice) setAvailabilityNotice(notice);
+      else setMessage(error instanceof Error ? error.message : "Unable to connect to the authentication service. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -134,6 +137,9 @@ export default function LoginPage() {
           {notice && <p className="legacy-recovery-notice" role="status">{notice}</p>}
         </div>
       </section>
+      {availabilityNotice && <AppDialog title={availabilityNotice.title} busy={false} closeIcon onClose={() => setAvailabilityNotice(null)}>
+        <p>{availabilityNotice.message}</p>
+      </AppDialog>}
       {recovery && <AppDialog title={resetToken ? "Choose a new password" : "Forgot password"} busy={recoveryBusy} closeIcon onClose={closeRecovery}>
         {!recoveryDone && <form className="auth-form" onSubmit={submitRecovery}>
           {resetToken ? <>

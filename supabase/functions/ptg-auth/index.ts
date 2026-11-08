@@ -39,7 +39,7 @@ const json = (origin: string, body: unknown, status = 200) => new Response(JSON.
 
 const genericLoginFailure = { ok: false, message: "Invalid username or password, or account unavailable." };
 
-async function activeSession(request: Request, touchActivity: boolean): Promise<Session | null> {
+async function activeSession(request: Request, touchActivity: boolean): Promise<Session | { unavailable: string } | null> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return null;
   const userClient = createClient(projectUrl, publicKey, {
@@ -52,12 +52,15 @@ async function activeSession(request: Request, touchActivity: boolean): Promise<
   const appSessionId = request.headers.get("x-ptg-session-id");
   if (!appSessionId || appSessionId.length > 100) return null;
   const { data: row, error: sessionError } = await admin.from("app_sessions")
-    .select("id,user_id,branch_id,session_version,last_activity_at,expires_at,revoked_at")
+    .select("id,user_id,branch_id,session_version,last_activity_at,expires_at,revoked_at,revoke_reason")
     .eq("id", appSessionId)
     .eq("user_id", authData.user.id)
-    .is("revoked_at", null)
     .maybeSingle();
   if (sessionError || !row) return null;
+  if (row.revoked_at) {
+    return ["MASTER_SYSTEM", "MAINTENANCE_MODE", "BRANCH_OFF", "BRANCH_UNAVAILABLE"].includes(row.revoke_reason)
+      ? { unavailable: row.revoke_reason } : null;
+  }
 
   const now = Date.now();
   const idleExpired = now - new Date(row.last_activity_at).getTime() > 30 * 60 * 1000;
@@ -90,7 +93,7 @@ async function activeSession(request: Request, touchActivity: boolean): Promise<
         revoked_at: new Date().toISOString(),
         revoke_reason: "BRANCH_UNAVAILABLE",
       }).eq("id", appSessionId).is("revoked_at", null);
-      return null;
+      return { unavailable: "BRANCH_OFF" };
     }
     branchCode = branch.branch_code;
     branchName = branch.branch_name;
@@ -161,13 +164,7 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
     await recordLogin("DENIED", "Account disabled.", identity);
     return json(origin, genericLoginFailure, 401);
   }
-  if (
-    identity.account_scope === "BRANCH" &&
-    (identity.branch_status !== "ACTIVE" || identity.operational_status !== "ON" || !identity.branch_id)
-  ) {
-    await recordLogin("DENIED", "Branch unavailable.", identity);
-    return json(origin, genericLoginFailure, 401);
-  }
+  if (identity.account_scope === "BRANCH" && !identity.branch_id) return json(origin, genericLoginFailure, 401);
   if (identity.locked_until && new Date(identity.locked_until).getTime() > Date.now()) {
     await recordLogin("DENIED", "Account temporarily locked.", identity);
     return json(origin, genericLoginFailure, 401);
@@ -197,15 +194,17 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
     expires_at: expiresAt,
   }).select("id").single();
   if (sessionError || !appSession) {
-    await authClient.auth.signOut();
+    await authClient.auth.signOut({ scope: "local" });
     const availabilityMessages: Record<string, string> = {
       PTG_SYSTEM_OFF: "The Price Tag Generator is temporarily unavailable.",
       PTG_MAINTENANCE: "The Price Tag Generator is temporarily unavailable for maintenance.",
       PTG_BRANCH_OFF: "Your branch is currently offline.",
     };
-    const availabilityMessage = availabilityMessages[sessionError?.message ?? ""];
+    const reason = sessionError?.message ?? "";
+    const availabilityMessage = availabilityMessages[reason];
+    const availability = reason === "PTG_SYSTEM_OFF" ? "MASTER_SYSTEM" : reason === "PTG_MAINTENANCE" ? "MAINTENANCE_MODE" : reason === "PTG_BRANCH_OFF" ? "BRANCH_OFF" : undefined;
     await recordLogin("DENIED", availabilityMessage ?? "Unable to establish application session.", identity);
-    return json(origin, { ok: false, message: availabilityMessage ?? "Unable to establish a secure application session." }, 503);
+    return json(origin, { ok: false, availability, message: availabilityMessage ?? "Unable to establish a secure application session." }, 503);
   }
 
   await recordLogin("SUCCESS", "Sign-in successful.", identity);
@@ -255,6 +254,7 @@ Deno.serve(async request => {
     const session = await activeSession(request, action !== "session-status");
     if (!session) return json(origin, { ok: false, message: "Please sign in again." }, 401);
 
+    if ("unavailable" in session) return json(origin, { ok: false, availability: session.unavailable, message: "PTG is temporarily unavailable." }, 401);
     if (action === "session-status") return json(origin, { ok: true });
     if (action === "session") {
       return json(origin, { ok: true, account: {

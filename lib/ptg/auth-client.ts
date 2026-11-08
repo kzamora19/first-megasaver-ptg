@@ -8,6 +8,7 @@ const sessionStorageKey = "ptg_app_session_id";
 export type EdgeAuthResponse = {
   ok?: boolean;
   message?: string;
+  availability?: string;
   account?: {
     username: string;
     displayName: string;
@@ -68,8 +69,9 @@ export async function invokePtgAuth(action: string, fields: Record<string, unkno
   });
   const result = await response.json().catch(() => ({})) as EdgeAuthResponse;
   if (!response.ok || result.ok !== true) {
-    const error = new Error(result.message ?? "Authentication request failed.") as Error & { status?: number };
+    const error = new Error(result.message ?? "Authentication request failed.") as Error & { status?: number; availability?: string };
     error.status = response.status;
+    error.availability = result.availability;
     throw error;
   }
   return result;
@@ -86,4 +88,19 @@ export async function establishPtgAuthSession(result: EdgeAuthResponse) {
   });
   if (error) throw new Error("Could not establish the Supabase sign-in session.");
   setPtgAppSessionId(result.appSessionId);
+}
+
+export function getAvailabilityNotice(error: unknown) {
+  if (!error || typeof error !== "object" || !("availability" in error)) return null;
+  switch (error.availability) {
+    case "MAINTENANCE_MODE":
+      return { title: "PTG is under maintenance", message: "Please try again when maintenance is complete." };
+    case "MASTER_SYSTEM":
+      return { title: "PTG is temporarily unavailable", message: "Please try again when the system is back online." };
+    case "BRANCH_OFF":
+    case "BRANCH_UNAVAILABLE":
+      return { title: "PTG is unavailable for your branch", message: "Contact your branch administrator or try again when your branch is back online." };
+    default:
+      return null;
+  }
 }

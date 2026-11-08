@@ -238,7 +238,9 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
             if (await confirm({
               title: "Turn " + control.title + (enabled ? " on?" : " off?"),
               message: restrict
-                ? "Branch users and Branch Admins will be signed out. System Admins keep full access."
+                ? (control.key === "MAINTENANCE_MODE"
+                  ? "PTG will show a maintenance warning and sign out all branch accounts. System Admins keep access."
+                  : "PTG will become unavailable and sign out all branch accounts. System Admins keep access.")
                 : "Branch access still depends on the other availability switch and each branch’s status.",
               label: enabled ? "Turn on" : "Turn off",
               danger: restrict,
@@ -266,6 +268,7 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
             <Rocker label={branch.branch_name + " access"} enabled={branch.operational_status === "ON"} disabled={busy || branch.status !== "ACTIVE"} onChange={async enabled => {
               if (await confirm({
                 title: "Turn " + branch.branch_code + (enabled ? " on?" : " off?"),
+                message: enabled ? "Branch users can sign in once system-wide restrictions are lifted." : "PTG will become unavailable for this branch and its users will be signed out.",
                 label: enabled ? "Turn on" : "Turn off", danger: !enabled,
               })) {
                 mutate("securityBranch", { command: enabled ? "on" : "off", branchId: branch.id }, "Branch updated.");

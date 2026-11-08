@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import AppDialog from "@/components/app-dialog";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
   clearPtgAuthSession,
+  getAvailabilityNotice,
   invokePtgAuth,
   usesEdgeAuth,
   type EdgeAuthResponse,
@@ -26,6 +28,7 @@ export default function ClientSessionGate({
   const router = useRouter();
   const [session, setSession] = useState<PtgClientSession | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [availabilityNotice, setAvailabilityNotice] = useState<ReturnType<typeof getAvailabilityNotice>>(null);
   const allowedRoles = allowRoles?.join("|") ?? "";
 
   useEffect(() => {
@@ -69,8 +72,15 @@ export default function ClientSessionGate({
       } catch (error) {
         if (cancelled || (error instanceof Error && error.name === "AbortError")) return;
         if (usesEdgeAuth && typeof error === "object" && error !== null && "status" in error && error.status === 401) {
-          await clearPtgAuthSession();
-          router.replace("/login");
+          const notice = getAvailabilityNotice(error);
+          if (notice) {
+            setAvailabilityNotice(notice);
+            setSession(null);
+            void clearPtgAuthSession().catch(() => {});
+          } else {
+            await clearPtgAuthSession();
+            router.replace("/login");
+          }
           return;
         }
         setStatus("error");
@@ -105,10 +115,14 @@ export default function ClientSessionGate({
         if (!stopped && typeof error === "object" && error !== null && "status" in error && error.status === 401) {
           stopped = true;
           setSession(null);
+          const notice = getAvailabilityNotice(error);
+          if (notice) setAvailabilityNotice(notice);
           try {
             await clearPtgAuthSession();
+          } catch {
+            // The application session ID has already been cleared.
           } finally {
-            router.replace("/login");
+            if (!notice) router.replace("/login");
           }
         }
       } finally {
@@ -140,6 +154,13 @@ export default function ClientSessionGate({
       void client.removeChannel(channel);
     };
   }, [role, router, watchAvailability]);
+
+  if (availabilityNotice) {
+    return <AppDialog title={availabilityNotice.title} busy={false} closeIcon onClose={() => router.replace("/login")}>
+      <p>Your PTG session has ended. {availabilityNotice.message}</p>
+      <button type="button" className="admin-button" onClick={() => router.replace("/login")}>Return to sign-in</button>
+    </AppDialog>;
+  }
 
   if (status === "loading") {
     return <main className="shell"><section className="panel" role="status">Checking your PTG session…</section></main>;
