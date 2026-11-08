@@ -1,6 +1,5 @@
 "use client";
 
-import WorkspaceNav from "@/components/workspace-nav";
 import LogoutButton from "@/app/dashboard/logout-button";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -257,7 +256,6 @@ export default function ProductSearch({
       <img src={withBasePath(logos.appHeader?.url || "/legacy-ptg/app-header.png") + (logos.appHeader?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver · Appliance · Gadgets · Furniture" className="ptg-print-hide" style={{ display: "block", width: "100%", height: "auto", margin: "0 0 9px", padding: 0, border: 0, borderRadius: 5 }} />
 
       <section className="legacy-branch-tools ptg-print-hide">
-        <WorkspaceNav role={systemRole} active="/products" />
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
           {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
@@ -395,7 +393,8 @@ export default function ProductSearch({
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
         .legacy-tools-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#123b72;font-size:10px}
-        .legacy-tools-account{display:flex;align-items:center;gap:12px}
+        .legacy-tools-account{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px 12px}
+        .legacy-tools-account .secondary-button{height:26px;min-height:26px;margin:0;line-height:1}
         .legacy-tools-heading small{color:#71839a;font-size:9px}
         .legacy-branch-tools nav{display:flex;gap:6px;flex-wrap:wrap}
         .legacy-branch-tools a,.legacy-branch-tools button{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:700;text-decoration:none}

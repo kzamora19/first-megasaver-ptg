@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 const publicBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 import PwaRegister from "@/components/pwa-register";
+import WorkspaceLayout from "@/components/workspace-layout";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <PwaRegister />
-        {children}
+        <WorkspaceLayout>{children}</WorkspaceLayout>
       </body>
     </html>
   );

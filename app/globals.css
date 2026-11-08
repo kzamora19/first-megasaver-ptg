@@ -223,7 +223,7 @@ footer {
 .ptg-module-link:hover{text-decoration:underline}.ptg-module-disabled{color:#9aa4b2}
 .ptg-footer{display:flex;justify-content:space-between;gap:16px;margin:25px 2px 0;color:#9aa5b4;font-size:8px;letter-spacing:.04em}
 @media(max-width:1050px){.ptg-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:720px){.ptg-app{grid-template-columns:1fr}.ptg-sidebar{position:relative;height:auto;padding:14px}.ptg-brand{padding:0 5px 12px}.ptg-nav-label,.ptg-sidebar-bottom{display:none}.ptg-sidebar:after{content:"Dashboard   ·   Price Memo Import";display:block;padding:9px 8px 2px;color:#d4e1ef;font-size:10px;word-spacing:12px}.ptg-nav-item{display:inline-flex;margin:2px;padding:9px}.ptg-main{padding:20px 15px}.ptg-topbar{align-items:flex-start;flex-direction:column}.ptg-session{align-self:flex-start}.ptg-welcome{min-height:160px;padding:23px}.ptg-welcome-art{width:75px;height:75px;margin-right:18px}.ptg-welcome-art span{font-size:40px}.ptg-module-grid{grid-template-columns:1fr}.ptg-section-heading{align-items:flex-start;flex-direction:column}.ptg-footer{flex-direction:column}}
+@media(max-width:720px){.ptg-app{grid-template-columns:1fr}.ptg-sidebar{position:relative;height:auto;padding:14px}.ptg-brand{padding:0 5px 12px}.ptg-nav-label,.ptg-sidebar-bottom{display:none}.ptg-nav-item{display:inline-flex;margin:2px;padding:9px}.ptg-main{padding:20px 15px}.ptg-topbar{align-items:flex-start;flex-direction:column}.ptg-session{align-self:flex-start}.ptg-welcome{min-height:160px;padding:23px}.ptg-welcome-art{width:75px;height:75px;margin-right:18px}.ptg-welcome-art span{font-size:40px}.ptg-module-grid{grid-template-columns:1fr}.ptg-section-heading{align-items:flex-start;flex-direction:column}.ptg-footer{flex-direction:column}}
 
 
 .ptg-product-page{width:min(1500px,100%);margin:0 auto}
@@ -287,6 +287,23 @@ footer {
 .loading-status{margin-top:18px;color:#75839a;font-size:12px}
 @media(max-width:760px){.logo-manager{padding:20px 15px 36px}.slot-grid{grid-template-columns:1fr}.slot-actions{grid-template-columns:auto minmax(0,1fr)}.slot-actions button{grid-row:2}.slot-actions .remove-button{grid-column:2}}
 
-.ptg-workspace-menu{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;padding:6px;background:#edf4fc;border-radius:5px}
-.ptg-workspace-menu a{padding:5px 8px;color:#124a9c;font-size:12px;font-weight:700;text-decoration:none}
-.ptg-workspace-menu a[aria-current="page"]{background:#124a9c;color:#fff;border-radius:4px}
+
+.ptg-sidebar{height:100dvh;overflow-y:auto}
+.ptg-sidebar-content{display:flex;flex:1;flex-direction:column;min-height:0}
+.ptg-workspace-content{min-width:0}
+.ptg-menu-toggle{display:none}
+@media(max-width:720px){
+  .ptg-app{grid-template-rows:auto 1fr}
+  .ptg-sidebar{position:sticky;top:0;z-index:5;height:auto;max-height:100dvh}
+  .ptg-sidebar-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .ptg-sidebar-header .ptg-brand{width:min(190px, 75%);padding:0}
+  .ptg-menu-toggle{display:grid;place-items:center;width:42px;height:42px;border:1px solid #45617e;border-radius:6px;background:transparent;color:#fff;font-size:24px;cursor:pointer}
+  .ptg-sidebar-content{display:none;padding-top:14px}
+  .ptg-sidebar[data-menu-open="true"] .ptg-sidebar-content{display:flex}
+  .ptg-sidebar .ptg-nav-label,.ptg-sidebar .ptg-sidebar-bottom{display:block}
+  .ptg-sidebar .ptg-nav-item{display:flex;margin:2px 0}
+}
+@media print{
+  .ptg-app,.ptg-workspace-content{display:block!important;min-height:0!important}
+  .ptg-sidebar{display:none!important}
+}

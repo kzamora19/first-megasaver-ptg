@@ -1,10 +1,8 @@
 "use client";
 
-import WorkspaceNav from "@/components/workspace-nav";
 
 
 import ClientSessionGate from "@/components/client-session-gate";
-import LogoutButton from "./logout-button";
 import { withBasePath } from "@/lib/base-path";
 
 type ModuleCard = {
@@ -71,26 +69,7 @@ function DashboardContent({session}:{session:import("@/components/client-session
   ];
 
   return (
-    <main className="ptg-app">
-      <aside className="ptg-sidebar">
-        <a className="ptg-brand" href={withBasePath("/dashboard")} aria-label="Branchline Price Tag Generator home">
-          <span className="ptg-brand-lockup">
-            <img src={withBasePath("/branchline-logo.png")} alt="" />
-            <small>PRICE TAG GENERATOR</small>
-          </span>
-        </a>
-        <div className="ptg-nav-label">WORKSPACE</div>
-        <WorkspaceNav role={session.role} active="/dashboard" sidebar />
-        <div className="ptg-sidebar-bottom">
-          <div className="ptg-user-chip">
-            <span className="ptg-avatar">{session.username.slice(0, 1).toUpperCase()}</span>
-            <span><strong>{session.username}</strong><small>{session.role.replaceAll("_", " ")}</small></span>
-          </div>
-          <LogoutButton />
-        </div>
-      </aside>
-
-      <section className="ptg-main">
+    <main className="ptg-main">
         <header className="ptg-topbar">
           <div><span className="ptg-breadcrumb">FIRST MEGASAVER / WORKSPACE</span><h1>Dashboard</h1></div>
           <div className="ptg-session"><span className="ptg-online-dot" /> Session active <span className="ptg-session-divider" /> {session.branchCode ?? "SYSTEM"}</div>
@@ -123,7 +102,6 @@ function DashboardContent({session}:{session:import("@/components/client-session
         </div>
 
         <footer className="ptg-footer"><span>FIRST MEGASAVER · PRICE TAG GENERATOR</span><span>Development environment · Production Apps Script remains unchanged</span></footer>
-      </section>
     </main>
   );
 }
