@@ -380,14 +380,14 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all visible products" checked={results.length > 0 && results.every(item => queue.some(queued => queued.id === item.id))} onChange={event => toggleVisible(event.target.checked)} /></th>
-              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
+              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
               {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               <BlankRows used={Math.max(1, results.length)} />
             </tbody>
@@ -403,14 +403,14 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setQueuePage(1); setActiveProduct(null); } }} /></th>
-              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
+              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
               {queueRows.length ? queueRows.map(product => <tr key={product.id}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
               <BlankRows used={Math.max(1, queueRows.length)} />
             </tbody>
@@ -532,8 +532,8 @@ export default function ProductSearch({
           {detailProduct.category && <><dt>Category</dt><dd>{detailProduct.category}</dd></>}
           {detailProduct.sub_category && <><dt>Subcategory</dt><dd>{detailProduct.sub_category}</dd></>}
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
-          <dt>SRP</dt><dd>{peso(detailProduct.srp)}</dd>
-          <dt>Pay Now</dt><dd>{peso(priceNow(detailProduct))}</dd>
+          <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
+          <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
             <dt>Memo ID</dt><dd>{detailMemo.memo_id || "—"}</dd>
@@ -557,6 +557,8 @@ export default function ProductSearch({
         .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
         .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}
         .legacy-product-details dt{font-weight:700}
+        .legacy-products-table td.ptg-srp-amount,.legacy-product-details .ptg-srp-amount{color:#b42318}
+        .legacy-products-table td.ptg-tag-this-amount,.legacy-product-details .ptg-tag-this-amount{color:#12366c;font-weight:800}
         .legacy-product-details dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         .legacy-product-installment-table{width:100%;margin-top:1rem;border-collapse:collapse;font-size:.85rem;text-align:left}
         .legacy-product-installment-table caption{text-align:left;font-size:.9rem;font-weight:700;margin-bottom:.4rem}
