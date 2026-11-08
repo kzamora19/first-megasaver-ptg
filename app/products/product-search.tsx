@@ -33,7 +33,7 @@ type Product = {
   remarks: string;
   eligible_for_price_tag?: boolean;
   price_tag_status?: string;
-  price_memos: MemoInfo | MemoInfo[];
+  price_memos: MemoInfo | MemoInfo[] | null;
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
 type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
@@ -144,6 +144,7 @@ const endDate = (period: string) => {
   return "";
 };
 const displayStatus = (product: Product) => {
+  if (product.price_tag_status === "SRP ONLY") return "SRP ONLY";
   if (product.eligible_for_price_tag === true || String(product.price_tag_status || "").toUpperCase().includes("ELIGIBLE")) return "YES";
   if (product.eligible_for_price_tag === false || product.price_tag_status) return "NO";
   return "NO";
@@ -235,7 +236,7 @@ export default function ProductSearch({
       setPage(Number(payload.page || requestedPage));
       setMessage(query.trim()
         ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
-        : (payload.total ? "Imported price memo products." : "No imported price memo products found."));
+        : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
     } catch (error) {
       setResults([]);
       setTotal(0);

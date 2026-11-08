@@ -480,19 +480,20 @@ async function securityAction(session: Session, origin: string, body: Record<str
     const { rows, verified } = body;
     const source = clean(body.source, 250);
     if (!source || verified !== true || !Array.isArray(rows) || !rows.length || rows.length > 10000) throw new Error("SECURITY_INPUT");
-    const importDate = new Date().toISOString();
-    const records = new Map();
+    const records = new Map<string, { barcode: string; description: string; srp: number | null }>();
     for (const row of rows) {
       const barcode = clean(row?.barcode, 100);
       const description = clean(row?.description, 1000);
+      const key = /^\d+$/.test(barcode) ? barcode.replace(/^0+(?=\d)/, "") : barcode.toUpperCase();
       const srp = row?.srp;
-      if (!barcode || !description || typeof srp !== "number" || !Number.isFinite(srp) || srp < 0 || records.has(barcode)) throw new Error("SECURITY_INPUT");
-      records.set(barcode, { barcode, model_description: description, srp, source_file: source, import_date: importDate });
+      if (!barcode || !description || records.has(key)) throw new Error("SECURITY_INPUT");
+      records.set(key, { barcode, description, srp: typeof srp === "number" && Number.isFinite(srp) && srp > 0 ? srp : null });
     }
-    const { error } = await admin.from("product_srp").upsert([...records.values()], { onConflict: "barcode" });
+    const { data: saved, error } = await admin.rpc("ptg_import_srp", { p_rows: [...records.values()], p_source: source });
     if (error) throw new Error("SECURITY_WRITE_FAILED");
-    await audit(session, null, "IMPORT_SRP", source, "Imported " + records.size + " SRP records.");
-    return json(origin, { ok: true, count: records.size });
+    const preserved = records.size - Number(saved);
+    await audit(session, null, "IMPORT_SRP", source, "Saved " + saved + " SRP records and preserved " + preserved + " existing records.");
+    return json(origin, { ok: true, count: saved, preserved });
   }
   return json(origin, { ok: false, message: "Unsupported security action." }, 400);
 }

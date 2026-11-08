@@ -87,12 +87,13 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
   if (!["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) return respond(origin, fail("PTG access is not enabled for this account."), 403);
   const q = clean(body.q, 100);
-  const page = Math.max(1, Math.trunc(Number(body.page || 1)) || 1);
+  const page = Math.min(1_000_000, Math.max(1, Math.trunc(Number(body.page || 1)) || 1));
   const pageSize = 5;
   let query = admin.from("memo_products")
     .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,eligible_for_price_tag,price_tag_status,price_memos!inner(branch_id,memo_id,period,memo_type,created_at:imported_at)", { count: "exact" })
     .order("brand", { ascending: true })
-    .order("model", { ascending: true });
+    .order("model", { ascending: true })
+    .order("id", { ascending: true });
   if (q.length >= 2) {
     const safeQ = q.replace(/[,%()]/g, "");
     const matches = ["barcode.ilike.%" + safeQ + "%", "model.ilike.%" + safeQ + "%", "brand.ilike.%" + safeQ + "%"];
@@ -131,7 +132,20 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
       sub_category: match?.sub_category ?? "",
     };
   });
-  return respond(origin, { ok: true, products, total: count ?? products.length, page, pageSize });
+  const memoCount = count ?? products.length;
+  const fallbackFrom = Math.max(0, from - memoCount);
+  const remaining = pageSize - products.length;
+  const fallback = await admin.rpc("ptg_search_srp_fallback", {
+    p_query: q, p_branch_id: session.branchId ?? null, p_system_admin: session.role === "SYSTEM_ADMIN",
+  }, { count: "exact" }).order("brand").order("model").order("id")
+    .range(fallbackFrom, fallbackFrom + Math.max(1, remaining) - 1);
+  if (fallback.error) return respond(origin, fail("Could not search the product SRP register."), 500);
+  const srpProducts = (fallback.data ?? []).slice(0, remaining).map(row => ({
+    ...row, description: row.model, cash_payment: row.srp, tag_this: row.srp,
+    eligible_for_price_tag: false, price_tag_status: "SRP ONLY", price_memos: null,
+  }));
+  return respond(origin, { ok: true, products: [...products, ...srpProducts],
+    total: memoCount + (fallback.count ?? srpProducts.length), page, pageSize });
 }
 
 async function searchProductMaster(origin: string, session: ActiveSession, body: Record<string, unknown>) {

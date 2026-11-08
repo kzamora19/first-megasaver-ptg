@@ -15,7 +15,7 @@ type Session = { id: string; branch_id: string; account: string; device_label: s
 type Permission = { permission_key: string; label: string; scope_description: string };
 type Grant = { role_key: string; permission_key: string; access_level: string };
 type Audit = { id: string; created_at: string; actor: string; current_role: string; event_category: string; action: string; target_identifier: string; outcome: string; message: string };
-type Result = { ok: boolean; message?: string; controls?: Control[]; branches?: Branch[]; sessions?: Session[]; catalog?: Permission[]; grants?: Grant[]; events?: Audit[]; allowed?: boolean; count?: number };
+type Result = { ok: boolean; message?: string; controls?: Control[]; branches?: Branch[]; sessions?: Session[]; catalog?: Permission[]; grants?: Grant[]; events?: Audit[]; allowed?: boolean; count?: number; preserved?: number };
 
 const date = (value: string) => new Date(value).toLocaleString();
 const descriptions: Record<SecuritySection, string> = {
@@ -163,15 +163,15 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
       const description = (row[descriptionIndex] ?? "").trim();
       const value = (row[srpIndex] ?? "").replace(/[₱,\s]/g, "");
       const srp = Number(value);
-      if (!barcode || !description || !/^\d+(?:\.\d+)?$/.test(value) || !Number.isFinite(srp) || seen.has(barcode)) {
-        throw new Error("Check the barcode, description, and SRP in product row " + (index + 1) + ". Barcodes must be unique.");
+      if (!barcode || !description || seen.has(barcode)) {
+        throw new Error("Check the barcode and description in product row " + (index + 1) + ". Barcodes must be unique.");
       }
       seen.add(barcode);
-      return { barcode, description, srp };
+      return { barcode, description, srp: /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(srp) ? srp : null };
     });
     const result = await request("securityImportSrp", { source: selected.name, verified, rows });
     setVerified(false);
-    return "Imported " + result.count + " SRP records.";
+    return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records with no valid incoming price.";
   }
 
   function submitManualSrp(event: FormEvent<HTMLFormElement>) {
@@ -195,7 +195,7 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
       const result = await request("securityImportSrp", { source: "Manual entry", verified: fields.has("verified"), rows });
       form.reset();
       setManualRows([0]);
-      return "Saved " + result.count + (result.count === 1 ? " product SRP." : " product SRPs.");
+      return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records with no valid incoming price.";
     });
   }
 
@@ -333,7 +333,7 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
     {section === "srp" && <>
       <section className="admin-card">
         <h3>Enter SRPs manually</h3>
-        <p>Enter one or more products. Saving updates existing SRPs by barcode and adds new barcodes to the SRP register.</p>
+        <p>Enter one or more products. A positive SRP updates an existing barcode. A zero SRP preserves an existing record or adds a zero placeholder for a new barcode.</p>
         <form className="admin-form" onSubmit={submitManualSrp}>
           <fieldset disabled={busy} className="srp-manual-form">
             {manualRows.map((id, index) => <div className="srp-manual-fields" key={id} role="group" aria-label={"Product " + (index + 1)}>
