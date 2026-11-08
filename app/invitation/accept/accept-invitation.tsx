@@ -1,5 +1,6 @@
 "use client";
 import {useState} from "react";
+import { requestPtgAccounts, usesEdgeAccounts } from "@/lib/ptg/accounts-client";
 export default function AcceptInvitation({token}:{token:string}){
  const [busy,setBusy]=useState(false),[done,setDone]=useState(false),[error,setError]=useState("");
  async function accept(){setBusy(true);setError("");try{const r=await fetch("/api/invitations/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||"Unable to accept invitation.");setDone(true);}catch(e){setError(e instanceof Error?e.message:"Unable to accept invitation.");}finally{setBusy(false);}}
