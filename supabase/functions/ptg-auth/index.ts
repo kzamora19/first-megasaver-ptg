@@ -132,6 +132,13 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
   if (!Array.isArray(identities) || identities.length !== 1) return json(origin, genericLoginFailure, 401);
 
   const identity = identities[0];
+  const { data: profile, error: profileError } = await admin.from("user_profiles")
+    .select("legacy_role,must_change_password")
+    .eq("id", identity.auth_user_id)
+    .maybeSingle();
+  if (profileError || !profile) {
+    return json(origin, { ok: false, message: "Authentication service is temporarily unavailable." }, 503);
+  }
   if (!identity.is_active) return json(origin, genericLoginFailure, 401);
   if (
     identity.account_scope === "BRANCH" &&
@@ -174,10 +181,10 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
       username: identity.username,
       displayName: identity.display_name,
       role: identity.role_key,
-      legacyRole: identity.legacy_role ?? "",
+      legacyRole: profile.legacy_role ?? "",
       branchCode: identity.branch_code,
       branchName: identity.branch_name,
-      mustChangePassword: identity.must_change_password === true,
+      mustChangePassword: profile.must_change_password === true,
     },
     appSessionId: appSession.id,
     authSession: {
