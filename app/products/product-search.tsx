@@ -266,8 +266,7 @@ export default function ProductSearch({
     setActiveProduct(product);
     setDetailProduct(product);
   }
-  const canImport = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
-  const canManageUsers = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
+  const canManageBranch = systemRole === "BRANCH_ADMIN";
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -348,9 +347,9 @@ export default function ProductSearch({
 {systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
-          {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
-          {systemRole === "BRANCH_ADMIN" && <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>}
-          {canImport && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
+          {canManageBranch && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
+          {canManageBranch && <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>}
+          {canManageBranch && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
         </nav>
       </section>}
 
