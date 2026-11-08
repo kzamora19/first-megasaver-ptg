@@ -608,7 +608,7 @@ export default function ProductSearch({
           .ptg-compact-model{display:flex;gap:5px;min-height:38px;align-items:start}
           .ptg-compact-model strong{flex:1;text-align:center;overflow-wrap:anywhere}
           .ptg-compact-cash{font-size:10px}
-          .ptg-compact-pay{display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap}
+          .ptg-compact-pay{display:grid;grid-template-columns:30% minmax(0,1fr);align-items:center;justify-items:start;gap:6px;white-space:nowrap}
           .ptg-compact-pay strong{background:#fff500;padding:2px 6px;font-size:30px;print-color-adjust:exact}
           .ptg-compact-summary{display:flex;justify-content:space-between;gap:6px;font-size:11px}
           .ptg-compact-footer{position:relative;width:100%;margin: auto 0 0;flex:0 0 90px}
