@@ -455,7 +455,7 @@ export default function ProductSearch({
                 <span>{endDate(memo?.period || "") ? "Valid Until: " + endDate(memo?.period || "") : ""}</span>
                 <strong>SAVE: {peso(savings)}</strong>
               </div>}
-              <footer>{logos.social && <img src={artworkUrl("social")} alt="Price tag footer artwork" />}</footer>
+              {logos.social && <div className="ptg-compact-footer"><img src={artworkUrl("social")} alt="Price tag footer artwork" /></div>}
             </article>;
             return <article className="legacy-price-tag" key={product.id}>
                 {logos.header && <div className="legacy-tag-header"><img src={artworkUrl("header")} alt="Price tag header artwork" /></div>}
@@ -599,20 +599,20 @@ export default function ProductSearch({
           .legacy-four-sheet{grid-template-columns:repeat(2,3.822in);grid-template-rows:repeat(2,5.096in);gap:0}
           .legacy-four-sheet .legacy-price-tag{zoom:.49}
           .legacy-six-sheet{grid-template-columns:repeat(2,4.05in);grid-template-rows:repeat(3,calc(10.6in / 3));gap:0}
-          .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:100%;height:100%;padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
+          .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:2px;width:100%;height:100%;padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
           .ptg-compact-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 68px;min-height:0;border-bottom:2px solid #003da5}
           .ptg-compact-header img{display:block;min-width:0;height:100%;object-fit:contain;mix-blend-mode:multiply}
           .ptg-compact-main-logo{flex:1;width:0;object-position:left center}
           .ptg-compact-promo-logo{flex:0 0 26%;width:26%;margin-left:auto;object-position:right center}
           .ptg-compact-barcode{text-align:right;font-size:11px}
-          .ptg-compact-model{display:flex;gap:5px;min-height:42px;align-items:start}
+          .ptg-compact-model{display:flex;gap:5px;min-height:38px;align-items:start}
           .ptg-compact-model strong{flex:1;text-align:center;overflow-wrap:anywhere}
           .ptg-compact-cash{font-size:10px}
           .ptg-compact-pay{display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap}
           .ptg-compact-pay strong{background:#fff500;padding:2px 6px;font-size:30px;print-color-adjust:exact}
           .ptg-compact-summary{display:flex;justify-content:space-between;gap:6px;font-size:11px}
-          .ptg-compact-tag footer{margin-top:auto;flex:1 1 88px;min-height:0;max-height:100px}
-          .ptg-compact-tag footer img{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;mix-blend-mode:multiply}
+          .ptg-compact-footer{position:relative;width:100%;margin: auto 0 0;flex:0 0 90px}
+          .ptg-compact-footer img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;mix-blend-mode:multiply}
           .legacy-aircon-sheet{width:11in!important;height:8.5in!important}
           .ptg-aircon{width:10.4in;color:#003da5;font:700 14px/1.2 Arial,sans-serif}
           .ptg-aircon-header{height:1.15in;display:flex;align-items:center;justify-content:space-between;border:1px solid #003da5;padding:8px 16px}
