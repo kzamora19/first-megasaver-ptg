@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation";
+"use client";
 
-import { getActiveAppSession } from "@/lib/auth/session";
+import ClientSessionGate from "@/components/client-session-gate";
 import LogoutButton from "./logout-button";
-
-export const dynamic = "force-dynamic";
 
 type ModuleCard = {
   title: string;
@@ -14,11 +12,7 @@ type ModuleCard = {
   eyebrow: string;
 };
 
-export default async function DashboardPage() {
-  const session = await getActiveAppSession();
-  if (!session) redirect("/login");
-  if (session.mustChangePassword) redirect("/change-password");
-
+function DashboardContent({session}:{session:import("@/components/client-session-gate").PtgClientSession}) {
   const isSystemAdmin = session.role === "SYSTEM_ADMIN";
   const canManageMemos = ["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(session.role);
   const canUsePTG = canManageMemos || session.role === "BRANCH_USER";
@@ -133,4 +127,8 @@ export default async function DashboardPage() {
       </section>
     </main>
   );
+}
+
+export default function DashboardPage() {
+  return <ClientSessionGate>{session => <DashboardContent session={session} />}</ClientSessionGate>;
 }
