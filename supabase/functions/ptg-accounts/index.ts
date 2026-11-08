@@ -40,6 +40,7 @@ const respondError = (origin: string, error: unknown) => {
   if (code === "EMAIL_DELIVERY_FAILED") return json(origin, { ok: false, message: "The email could not be delivered. Verify the Gmail account and app password settings, then retry." }, 502);
   if (code === "SECURITY_INPUT") return json(origin, { ok: false, message: "Check the submitted values and try again." }, 400);
   if (code.startsWith("SECURITY_")) return json(origin, { ok: false, message: "The security operation could not be completed." }, 500);
+  if (code === "INVITATION_UPDATE_FAILED") return json(origin, { ok: false, message: "PTG could not save the invitation. Please retry or contact your System Admin." }, 503);
   if (code === "LAST_ADMIN") return json(origin, { ok: false, message: "The last active System Admin cannot be disabled." }, 400);
   return json(origin, { ok: false, message: "The account operation could not be completed." }, 400);
 };
@@ -222,13 +223,15 @@ async function createAccount(request: Request, session: Session, origin: string,
     p_legacy_role: legacyRole, p_branch_id: branchId, p_auth_email: authEmail,
   });
   if (provisionError) { await admin.auth.admin.deleteUser(userId); throw new Error("ACCOUNT_CREATE_FAILED"); }
-  const now = new Date().toISOString(), expires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), token = randomToken();
-  const { error: profileError } = await admin.from("user_profiles").update({
-    email, invitation_status: "SENT", invited_at: now, invitation_expires_at: expires, is_active: false, must_change_password: true,
-  }).eq("id", userId);
-  const tokenHash = await sha256(token);
-  const { error: tokenError } = await admin.schema("private").from("account_invitations").insert({ user_id: userId, token_hash: tokenHash, expires_at: expires });
-  if (profileError || tokenError) { await admin.auth.admin.deleteUser(userId); throw new Error("ACCOUNT_CREATE_FAILED"); }
+  const expires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const token = randomToken();
+  const { error: inviteError } = await admin.rpc("ptg_issue_invitation", {
+    p_user_id: userId, p_hash: await sha256(token), p_expires: expires, p_email: email,
+  });
+  if (inviteError) {
+    await admin.auth.admin.deleteUser(userId);
+    throw new Error("INVITATION_UPDATE_FAILED");
+  }
   try {
     const emailId = await sendInvitation(email, displayName, username, password, token);
     await audit(session, branchId, "CREATE_ACCOUNT_INVITATION", username, "Invitation emailed; account remains inactive until acceptance and initial password change.", { role, legacyRole, email, emailId, expires });
@@ -286,20 +289,15 @@ async function resendInvitation(userId: string, session: Session, origin: string
   await requirePermission(session, permission, "EXECUTE", target.branch_id);
   const username = await usernameFor(userId);
   if (!username) throw new Error("ACCOUNT_IDENTITY_NOT_FOUND");
-  const password = randomToken(24), token = randomToken(), expires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), now = new Date().toISOString();
+  const password = randomToken(24), token = randomToken(), expires = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const { error: passwordError } = await admin.auth.admin.updateUserById(userId, { password });
   if (passwordError) throw new Error("PASSWORD_UPDATE_FAILED");
   const { error: bumpError } = await admin.rpc("bump_ptg_user_session_version", { p_user_id: userId });
   if (bumpError) throw new Error("SESSION_REVOKE_FAILED");
-  const { error: delError } = await admin.schema("private").from("account_invitations").delete().eq("user_id", userId).is("accepted_at", null);
-  if (delError) throw new Error("INVITATION_UPDATE_FAILED");
-  const { error: insError } = await admin.schema("private").from("account_invitations").insert({ user_id: userId, token_hash: await sha256(token), expires_at: expires });
-  if (insError) throw new Error("INVITATION_UPDATE_FAILED");
-  const { error: profileError } = await admin.from("user_profiles").update({
-    is_active: false, must_change_password: true, invitation_status: "SENT", invited_at: now,
-    invitation_expires_at: expires, invitation_accepted_at: null, activated_at: null, updated_at: now,
-  }).eq("id", userId);
-  if (profileError) throw new Error("INVITATION_UPDATE_FAILED");
+  const { error: inviteError } = await admin.rpc("ptg_issue_invitation", {
+    p_user_id: userId, p_hash: await sha256(token), p_expires: expires, p_email: target.email,
+  });
+  if (inviteError) throw new Error("INVITATION_UPDATE_FAILED");
   const emailId = await sendInvitation(target.email, target.display_name, username, password, token);
   await audit(session, target.branch_id, "RESEND_ACCOUNT_INVITATION", username, "New single-use invitation and temporary password emailed.", { email: target.email, emailId, expires });
   return json(origin, { ok: true, invitationStatus: "SENT" });
@@ -308,18 +306,10 @@ async function resendInvitation(userId: string, session: Session, origin: string
 async function acceptInvitation(body: Record<string, unknown>, origin: string) {
   const token = String(body.token ?? "");
   if (token.length < 30 || token.length > 200) return json(origin, { ok: false, message: "This invitation is invalid or expired." }, 400);
-  const hash = await sha256(token), now = new Date().toISOString();
-  const { data: invite, error } = await admin.schema("private").from("account_invitations")
-    .select("id,user_id,expires_at,accepted_at").eq("token_hash", hash).maybeSingle();
-  if (error || !invite || invite.accepted_at || new Date(invite.expires_at).getTime() <= Date.now()) return json(origin, { ok: false, message: "This invitation is invalid, expired, or already used." }, 400);
-  const { data: consumed, error: consumeError } = await admin.schema("private").from("account_invitations")
-    .update({ accepted_at: now }).eq("id", invite.id).is("accepted_at", null).gt("expires_at", now).select("id").maybeSingle();
-  if (consumeError || !consumed) return json(origin, { ok: false, message: "This invitation has already been used or expired." }, 409);
-  const { data: profile, error: profileError } = await admin.from("user_profiles")
-    .update({ is_active: true, invitation_status: "ACCEPTED", invitation_accepted_at: now, updated_at: now })
-    .eq("id", invite.user_id).eq("invitation_status", "SENT").select("id").maybeSingle();
-  if (profileError || !profile) return json(origin, { ok: false, message: "The invitation could not be activated. Contact your System Admin." }, 503);
-  await admin.from("security_audit_logs").insert({ actor_user_id: null, event_category: "ACCOUNT_SECURITY", action: "ACCEPT_ACCOUNT_INVITATION", target_identifier: invite.user_id, outcome: "SUCCESS", message: "Employee accepted account invitation. Initial password change remains required." });
+  const { data: userId, error } = await admin.rpc("ptg_accept_invitation", { p_hash: await sha256(token) });
+  if (error) return json(origin, { ok: false, message: "The invitation could not be activated. Contact your System Admin." }, 503);
+  if (!userId) return json(origin, { ok: false, message: "This invitation is invalid, expired, or already used." }, 400);
+  await admin.from("security_audit_logs").insert({ actor_user_id: null, event_category: "ACCOUNT_SECURITY", action: "ACCEPT_ACCOUNT_INVITATION", target_identifier: userId, outcome: "SUCCESS", message: "Employee accepted account invitation. Initial password change remains required." });
   return json(origin, { ok: true });
 }
 
