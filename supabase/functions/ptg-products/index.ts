@@ -112,16 +112,25 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   if (error) return respond(origin, fail("Could not search imported memo products."), 500);
   const rows = data ?? [];
   const barcodes = [...new Set(rows.map(row => row.barcode).filter(Boolean))];
-  const descriptions = barcodes.length
-    ? await admin.from("product_master").select("barcode,description,sub_category").in("barcode", barcodes)
+  const barcodeVariants = (barcode: string) => {
+    if (!/^\d+$/.test(barcode)) return [barcode];
+    const unpadded = barcode.replace(/^0+(?=\d)/, "");
+    return [...new Set([barcode, unpadded, unpadded.padStart(8, "0")])];
+  };
+  const lookupBarcodes = [...new Set(barcodes.flatMap(barcodeVariants))];
+  const descriptions = lookupBarcodes.length
+    ? await admin.from("product_master").select("barcode,description,sub_category").in("barcode", lookupBarcodes)
     : { data: [], error: null };
   if (descriptions.error) return respond(origin, fail("Could not load product descriptions."), 500);
   const detail = new Map((descriptions.data ?? []).map(item => [item.barcode, item]));
-  const products = rows.map(row => ({
-    ...row,
-    description: detail.get(row.barcode)?.description ?? row.model,
-    sub_category: detail.get(row.barcode)?.sub_category ?? "",
-  }));
+  const products = rows.map(row => {
+    const match = barcodeVariants(row.barcode ?? "").map(barcode => detail.get(barcode)).find(Boolean);
+    return {
+      ...row,
+      description: match?.description?.trim() || row.model,
+      sub_category: match?.sub_category ?? "",
+    };
+  });
   return respond(origin, { ok: true, products, total: count ?? products.length, page, pageSize });
 }
 
