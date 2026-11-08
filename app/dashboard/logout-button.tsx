@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { clearPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -11,7 +12,11 @@ export default function LogoutButton() {
     if (busy) return;
     setBusy(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+      if (usesEdgeAuth) {
+        try { await invokePtgAuth("logout"); } finally { await clearPtgAuthSession(); }
+      } else {
+        await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+      }
     } finally {
       router.replace("/login");
       router.refresh();
