@@ -1,3 +1,5 @@
+import { withBasePath } from "@/lib/base-path";
+
 export const metadata = { title: "Branchline · Price Tag Generator", description: "Branchline Price Tag Generator" };
 
 const migrationAreas = [
@@ -21,7 +23,7 @@ export default function Home() {
           remains the production system while the replacement is developed
           and verified.
         </p>
-        <p className="intro"><a href="/login" style={{ color: "white", fontWeight: 800 }}>Open secure login →</a></p>
+        <p className="intro"><a href={withBasePath("/login")} style={{ color: "white", fontWeight: 800 }}>Open secure login →</a></p>
         <div className="status">
           <span className="status-dot" />
           Development scaffold · Not yet connected to production data
