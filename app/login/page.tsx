@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import AppDialog from "@/components/app-dialog";
+import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
 import { useRouter } from "next/navigation";
 import { establishPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 import { withBasePath } from "@/lib/base-path";
@@ -13,6 +15,56 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [recoveryDone, setRecoveryDone] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("reset");
+    if (token) {
+      setResetToken(token);
+      setRecovery(true);
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+  }, []);
+
+  function closeRecovery() {
+    setRecovery(false);
+    setResetToken("");
+    setRecoveryMessage("");
+    setRecoveryDone(false);
+  }
+
+  async function submitRecovery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (recoveryBusy || recoveryDone) return;
+    const form = new FormData(event.currentTarget);
+    setRecoveryBusy(true);
+    setRecoveryMessage("");
+    try {
+      const response = await requestPtgAccounts("POST", resetToken
+        ? { action: "finishPasswordRecovery", token: resetToken, password: form.get("password"), confirmPassword: form.get("confirmPassword") }
+        : { action: "forgotPassword", username: form.get("username"), branchCode: form.get("branchCode") });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || "Password recovery is temporarily unavailable.");
+      if (resetToken) {
+        setNotice("Password updated. Sign in with your new password.");
+        setPassword("");
+        closeRecovery();
+      } else {
+        setRecoveryMessage("If the account is eligible, PTG will email recovery instructions to the registered address or notify the branch administrators.");
+        setRecoveryDone(true);
+      }
+    } catch (error) {
+      setRecoveryMessage(error instanceof Error ? error.message : "Unable to reach PTG. Please try again.");
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -76,12 +128,30 @@ export default function LoginPage() {
           </form>
           <p className="legacy-login-message" role="status">{message}</p>
           <div className="legacy-login-security">
-            <a href={withBasePath("/admin/accounts")}>SYSTEM SECURITY ADMINISTRATION</a>
+            <button className="legacy-forgot-button" type="button" onClick={() => setRecovery(true)}>Forgot password?</button>
             <div><span className="legacy-security-dot" />Protected by System Security</div>
           </div>
-          <p className="legacy-login-footnote">Development environment · No production records connected</p>
+          {notice && <p className="legacy-recovery-notice" role="status">{notice}</p>}
         </div>
       </section>
+      {recovery && <AppDialog title={resetToken ? "Choose a new password" : "Forgot password"} busy={recoveryBusy} closeIcon onClose={closeRecovery}>
+        {!recoveryDone && <form className="auth-form" onSubmit={submitRecovery}>
+          {resetToken ? <>
+            <label htmlFor="recovery-password">New password</label>
+            <input id="recovery-password" name="password" type="password" autoComplete="new-password" minLength={12} maxLength={1024} required />
+            <label htmlFor="recovery-confirm">Confirm password</label>
+            <input id="recovery-confirm" name="confirmPassword" type="password" autoComplete="new-password" minLength={12} maxLength={1024} required />
+          </> : <>
+            <p>Enter your username. Add your branch code if the username is shared across branches.</p>
+            <label htmlFor="recovery-username">Username</label>
+            <input id="recovery-username" name="username" autoComplete="username" defaultValue={username} maxLength={120} required />
+            <label htmlFor="recovery-branch">Branch code (optional)</label>
+            <input id="recovery-branch" name="branchCode" defaultValue={branchCode} maxLength={30} />
+          </>}
+          <button type="submit" disabled={recoveryBusy}>{recoveryBusy ? "Please wait…" : resetToken ? "Update password" : "Request password recovery"}</button>
+        </form>}
+        {recoveryMessage && <p role="status">{recoveryMessage}</p>}
+      </AppDialog>}
       <style jsx global>{`
         .legacy-login-shell{background:radial-gradient(ellipse at 50% 0,#f7fbff 0,#eaf2fb 70%,#e5edf7 100%)!important}
         .legacy-login-card{width:min(510px,100%)!important;padding:0!important;overflow:hidden;border-radius:20px!important;box-shadow:0 22px 54px rgba(27,61,103,.16)!important}
@@ -101,10 +171,10 @@ export default function LoginPage() {
         .legacy-login-form button:disabled{opacity:.65;cursor:wait}
         .legacy-login-message{min-height:20px;margin:10px 0 0;color:#b3261e;font-size:12px;line-height:1.4;text-align:center}
         .legacy-login-security{display:grid;justify-items:center;gap:13px;margin:22px 0 0}
-        .legacy-login-security>a{color:#123b72;font-size:11px;font-weight:900;text-decoration:none}
+        .legacy-forgot-button{border:0;background:transparent;color:#123b72;font:inherit;font-size:12px;font-weight:800;text-decoration:underline;cursor:pointer}
         .legacy-login-security>div{display:flex;align-items:center;gap:9px;color:#123b72;font-size:11px;font-weight:700}
         .legacy-security-dot{width:9px;height:9px;border-radius:50%;background:#00c96b;box-shadow:0 0 9px rgba(0,201,107,.5)}
-        .legacy-login-footnote{margin:17px 0 0;color:#8792a2;font-size:9px;text-align:center}
+        .legacy-recovery-notice{margin:14px 0 0;color:#17643c;font-size:12px;text-align:center}
         @media(max-width:520px){.legacy-login-card{border-radius:15px!important}.legacy-login-body{padding:23px 20px 25px}}
       `}</style>
     </main>

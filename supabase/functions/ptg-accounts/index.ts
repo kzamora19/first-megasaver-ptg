@@ -502,6 +502,71 @@ async function securityAction(session: Session, origin: string, body: Record<str
   return json(origin, { ok: false, message: "Unsupported security action." }, 400);
 }
 
+
+async function forgotPassword(body: Record<string, unknown>, origin: string) {
+  const reply = () => json(origin, { ok: true });
+  const username = clean(body.username, 120).toUpperCase();
+  const branchCode = clean(body.branchCode, 30).toUpperCase();
+  if (!username) return reply();
+  const { data: identities, error } = await admin.rpc("resolve_ptg_login_identity", {
+    p_username: username, p_branch_code: branchCode || null,
+  });
+  if (error || identities?.length !== 1 || !identities[0].is_active) return reply();
+  const identity = identities[0];
+  const managed = identity.role_key === "BRANCH_USER";
+  let recipients: string[] = [];
+  if (managed && identity.branch_id) {
+    const { data } = await admin.from("user_profiles").select("email")
+      .eq("branch_id", identity.branch_id).eq("role_key", "BRANCH_ADMIN").eq("is_active", true);
+    recipients = [...new Set((data ?? []).map(row => row.email?.trim().toLowerCase()).filter((email): email is string => !!email))];
+  } else if (["SYSTEM_ADMIN", "BRANCH_ADMIN"].includes(identity.role_key)) {
+    const { data } = await admin.from("user_profiles").select("email").eq("id", identity.auth_user_id).maybeSingle();
+    if (data?.email) recipients = [data.email];
+  }
+  if (!recipients.length) return reply();
+  const token = managed ? null : randomToken();
+  const { data: issued } = await admin.rpc("ptg_issue_password_recovery", {
+    p_user_id: identity.auth_user_id, p_hash: token ? await sha256(token) : null,
+  });
+  if (!issued) return reply();
+  const url = token ? appUrl + "/login/#reset=" + token : appUrl + "/admin/accounts/";
+  const content = token
+    ? "Use the link to choose a new PTG password within 30 minutes."
+    : "A PTG password reset was requested for " + identity.username + " (" + identity.branch_code +
+      "). Sign in to PTG and use Account Administration to reset this account's password.";
+  await Promise.allSettled(recipients.map(async to => {
+    try {
+      await sendEmail({ to, subject: "First Megasaver PTG password recovery", text: content + "\n" + url,
+        html: '<p>' + escapeHtml(content) + '</p><p><a href="' + escapeHtml(url) + '">' + (token ? "Reset password" : "Open Account Administration") + "</a></p>" });
+    } catch {
+      console.error("PTG recovery email delivery failed.");
+    }
+  }));
+  return reply();
+}
+
+async function finishPasswordRecovery(body: Record<string, unknown>, origin: string) {
+  const token = String(body.token ?? "");
+  const password = String(body.password ?? "");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return json(origin, { ok: false, message: "This recovery link is invalid or expired." }, 400);
+  if (password.length < 12 || password.length > 1024 || password !== body.confirmPassword) {
+    return json(origin, { ok: false, message: "Enter matching passwords of at least 12 characters." }, 400);
+  }
+  const { data: userId, error } = await admin.rpc("ptg_claim_password_recovery", { p_hash: await sha256(token) });
+  if (error) return json(origin, { ok: false, message: "Password recovery is temporarily unavailable." }, 503);
+  if (!userId) return json(origin, { ok: false, message: "This recovery link is invalid, expired, or already used." }, 400);
+  const { error: passwordError } = await admin.auth.admin.updateUserById(userId, { password });
+  if (passwordError) return json(origin, { ok: false, message: "Unable to save the new password. Request a new recovery link and try again." }, 400);
+  const { error: revokeError } = await admin.rpc("bump_ptg_user_session_version", { p_user_id: userId });
+  const { error: profileError } = await admin.from("user_profiles").update({
+    must_change_password: false, failed_login_attempts: 0, locked_until: null,
+    invitation_status: "ACTIVATED", activated_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  }).eq("id", userId);
+  if (revokeError || profileError) return json(origin, { ok: false, message: "Password saved, but account recovery could not be finalized. Contact your PTG administrator." }, 503);
+  await audit(null, null, "COMPLETE_PASSWORD_RECOVERY", userId, "Administrator completed password recovery.");
+  return json(origin, { ok: true });
+}
+
 Deno.serve(async request => {
   const origin = request.headers.get("origin") ?? "";
   if (!origin || !allowedOrigins.has(origin)) return new Response(JSON.stringify({ ok: false, message: "Request origin is not allowed." }), { status: 403 });
@@ -524,6 +589,8 @@ Deno.serve(async request => {
     if (request.method !== "POST") return json(origin, { ok: false, message: "Method not allowed." }, 405);
     const body = await request.json() as Record<string, unknown>;
     const action = clean(body.action, 40);
+    if (action === "forgotPassword") return await forgotPassword(body, origin);
+    if (action === "finishPasswordRecovery") return await finishPasswordRecovery(body, origin);
     if (action === "acceptInvitation") return await acceptInvitation(body, origin);
     if (action === "bootstrapStart") return await bootstrapStart(body, origin);
     if (action === "bootstrapFinish") return await bootstrapFinish(body, origin);
