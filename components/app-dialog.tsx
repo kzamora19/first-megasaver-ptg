@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
-export default function SecurityDialog({ title, busy, onClose, children }: {
+export default function AppDialog({ title, busy, onClose, children }: {
   title: string;
   busy: boolean;
   onClose: () => void;
@@ -17,7 +17,7 @@ export default function SecurityDialog({ title, busy, onClose, children }: {
     return () => element?.close();
   }, []);
 
-  return <dialog ref={dialog} className="security-dialog" aria-labelledby={titleId}
+  return <dialog ref={dialog} className="app-dialog" aria-labelledby={titleId}
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
     <header>
       <h3 id={titleId}>{title}</h3>

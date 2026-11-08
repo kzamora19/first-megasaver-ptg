@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppConfirm } from "@/components/app-confirm";
+
 import { withBasePath } from "@/lib/base-path";
 
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
@@ -33,6 +35,7 @@ async function saveLogo(key: LogoKey, file: File) {
 }
 
 export default function LogoManager() {
+  const confirm = useAppConfirm();
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkInputKey, setBulkInputKey] = useState(0);
@@ -129,7 +132,7 @@ export default function LogoManager() {
 
   async function remove(key: LogoKey) {
     if (!logos[key]) return;
-    if (!window.confirm("Remove this uploaded logo? Its slot will be left empty.")) return;
+    if (!await confirm({ title: "Remove uploaded logo?", message: "Its slot will be left empty.", label: "Remove logo", danger: true })) return;
     setBusyKey(key);
     setMessage("");
     try {
