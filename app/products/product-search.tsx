@@ -387,6 +387,9 @@ export default function ProductSearch({
                 {logos.social && <div className="legacy-tag-footer"><img src={artworkUrl("social")} alt="Price tag footer artwork" /></div>}
               </article>;
           })}
+          {Array.from({ length: tagsPerSheet - sheet.length }, (_, index) =>
+            <div className="legacy-empty-print-slot" key={"empty-" + index} aria-hidden="true" />
+          )}
           </div>)}
         </div>}
         {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
@@ -464,7 +467,7 @@ export default function ProductSearch({
         .legacy-format-notice,.legacy-preview-empty{margin-top:8px;padding:11px;border:1px solid #dbe3ed;border-radius:4px;background:#fbfcfe;color:#546981;font-size:10px}
         .legacy-result-count{margin:6px 0 0;text-align:center;font-size:9px}
         .ptg-print-preview{display:none}
-        .legacy-print-sheet{box-sizing:border-box;display:grid;place-items:start center;width:8.5in;height:11in;margin:0 auto 16px;padding-top:.3in;background:#fff;page-break-after:always;break-after:page}
+        .legacy-print-sheet{box-sizing:border-box;display:grid;place-content:center;place-items:center;width:8.5in;height:11in;margin:0 auto 16px;background:#fff;page-break-after:always;break-after:page}
         .legacy-print-sheet:last-child{page-break-after:auto;break-after:auto}
         .legacy-price-tag{box-sizing:border-box;position:relative;display:grid;grid-template-columns:20fr 51fr 26fr 46fr 70fr 60fr 74fr 101fr 21fr;grid-template-rows:17fr 19fr 19fr 19fr 19fr 19fr 19fr 33fr 33fr 33fr 19fr 12fr 19fr 23fr 21fr 19fr 19fr 19fr 19fr 19fr 22fr 19fr 19fr 19fr 19fr 19fr 7fr 19fr 19fr 19fr 19fr 19fr 19fr 19fr;width:7.8in;height:10.4in;overflow:hidden;border:1px solid #003da5;background:#fff;color:#003da5;font-family:Arial,Helvetica,sans-serif}
         .legacy-tag-header{grid-column:1/10;grid-row:1/6}
@@ -500,10 +503,10 @@ export default function ProductSearch({
           .ptg-print-preview,.ptg-print-preview *{visibility:visible!important}
           .ptg-print-preview{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;margin:0!important;padding:0!important}
           .ptg-print-hide,.legacy-preview-heading,.legacy-format-notice,.legacy-preview-empty{display:none!important}
-          .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding-top:.3in!important;box-shadow:none!important}
-          .legacy-half-sheet{grid-template-columns:repeat(2,5.07in);justify-content:center;column-gap:0;width:11in!important;height:8.5in!important;padding-top:.4in!important}
+          .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding:0!important;box-shadow:none!important}
+          .legacy-half-sheet{grid-template-columns:repeat(2,5.07in);grid-template-rows:6.76in;gap:0;width:11in!important;height:8.5in!important}
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
-          .legacy-half-sheet .legacy-price-tag:first-child:not(:only-child){border-right:0!important}
+          .legacy-half-sheet .legacy-price-tag:first-child:has(+ .legacy-price-tag){border-right:0!important}
           .legacy-price-tag{width:7.8in!important;height:10.4in!important;border:1px solid #003da5!important}
           .legacy-tag-header img,.legacy-tag-footer img{print-color-adjust:exact;-webkit-print-color-adjust:exact}
         }
