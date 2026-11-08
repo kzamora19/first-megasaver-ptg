@@ -27,6 +27,12 @@
 | `/api/logos` | Public read through safe logo metadata/public Storage URLs; authenticated System Admin Edge Functions for upload, replacement, removal and audit. |
 | Next.js protected server pages | Static routes with a client-side auth gate. RLS and Edge Function authorization remain the actual security boundary; hiding a page is not authorization. |
 
+## Current code progress
+
+The first code slice on `migration/github-pages` moves protected page rendering and role-based navigation into a shared client session gate. The dashboard, product search, memo import, product master, account administration, Logo Manager, and invitation token page no longer need server-side page rendering. The session response now includes the branch and password-change fields those screens require.
+
+This is an intermediate step: the gate still calls the existing Next.js `/api/auth/session` route, and the `app/api/**` handlers plus `proxy.ts` still require a server. GitHub Pages export is not enabled yet. The next implementation stage is moving auth/session behavior and the remaining API operations to Supabase Edge Functions, then replacing the remaining server-only calls before enabling static export.
+
 ## Work sequence
 
 1. **Foundation:** establish a static build/deploy workflow on this branch and identify every runtime-only Next.js dependency.
