@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 
 type Product = { barcode: string; description: string; brand: string; category: string; sub_category: string };
 type ImportSummary = { received: number; uniqueValid: number; inserted: number; updated: number; invalidRows: number; duplicateRows: number };
@@ -79,12 +80,22 @@ export default function ProductMasterImporter() {
     if (!products.length || !fileName || busy) return;
     setBusy(true); setMessage(""); setError(false); setSummary(null);
     try {
-      const response = await fetch("/api/products/master", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceFile: fileName, rows: products }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.message || "Import failed.");
+      let result: { ok: boolean; summary?: ImportSummary; message?: string };
+      if (usesEdgeData) {
+        result = await invokePtgData("ptg-products", {
+          action: "master-import",
+          sourceFile: fileName,
+          rows: products,
+        }) as typeof result;
+      } else {
+        const response = await fetch("/api/products/master", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceFile: fileName, rows: products }),
+        });
+        result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Import failed.");
+      }
+      if (!result.ok) throw new Error(result.message || "Import failed.");
       setSummary(result.summary as ImportSummary);
       setMessage("Product Master import completed.");
       setProducts([]);
