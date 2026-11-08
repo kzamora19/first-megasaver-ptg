@@ -41,6 +41,11 @@ export function clearPtgAppSessionId() {
   document.cookie = `ptg_app_session=; Path=/; Max-Age=0; SameSite=Strict${secure}`;
 }
 
+export async function clearPtgAuthSession() {
+  clearPtgAppSessionId();
+  await createClient().auth.signOut({ scope: "local" });
+}
+
 export async function invokePtgAuth(action: string, fields: Record<string, unknown> = {}) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
