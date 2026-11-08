@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Session = {
   id: string;
@@ -39,7 +39,7 @@ const json = (origin: string, body: unknown, status = 200) => new Response(JSON.
 
 const genericLoginFailure = { ok: false, message: "Invalid username or password, or account unavailable." };
 
-async function activeSession(request: Request): Promise<{ session: Session; userClient: SupabaseClient } | null> {
+async function activeSession(request: Request): Promise<Session | null> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return null;
   const userClient = createClient(projectUrl, publicKey, {
@@ -100,19 +100,16 @@ async function activeSession(request: Request): Promise<{ session: Session; user
     .eq("id", appSessionId).is("revoked_at", null);
   const { data: username } = await admin.rpc("get_ptg_login_username", { p_user_id: authData.user.id });
   return {
-    userClient,
-    session: {
-      id: row.id,
-      userId: authData.user.id,
-      role: profile.role_key,
-      legacyRole: profile.legacy_role ?? "",
-      branchId: row.branch_id,
-      branchCode,
-      branchName,
-      username: typeof username === "string" ? username : "",
-      displayName: profile.display_name ?? "",
-      mustChangePassword: profile.must_change_password === true,
-    },
+    id: row.id,
+    userId: authData.user.id,
+    role: profile.role_key,
+    legacyRole: profile.legacy_role ?? "",
+    branchId: row.branch_id,
+    branchCode,
+    branchName,
+    username: typeof username === "string" ? username : "",
+    displayName: profile.display_name ?? "",
+    mustChangePassword: profile.must_change_password === true,
   };
 }
 
@@ -253,9 +250,8 @@ Deno.serve(async request => {
     const action = String(body.action ?? "");
     if (action === "login") return await login(body, request, origin);
 
-    const active = await activeSession(request);
-    if (!active) return json(origin, { ok: false, message: "Please sign in again." }, 401);
-    const { session, userClient } = active;
+    const session = await activeSession(request);
+    if (!session) return json(origin, { ok: false, message: "Please sign in again." }, 401);
 
     if (action === "session") {
       return json(origin, { ok: true, account: {
@@ -282,8 +278,25 @@ Deno.serve(async request => {
         return json(origin, { ok: false, message: "Password must be at least 12 characters." }, 400);
       }
       if (password !== confirmPassword) return json(origin, { ok: false, message: "Passwords do not match." }, 400);
-      const { error } = await userClient.auth.updateUser({ password });
-      if (error) return json(origin, { ok: false, message: "Unable to update password." }, 400);
+      // The Edge Function has a verified bearer token, but no locally stored Auth session.
+      const response = await fetch(projectUrl + "/auth/v1/user", {
+        method: "PUT",
+        headers: {
+          apikey: publicKey,
+          Authorization: request.headers.get("authorization")!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        const code = problem.error_code ?? problem.code;
+        const message = code === "same_password" ? "Choose a password different from your current password."
+          : code === "weak_password" ? "Choose a stronger password and try again."
+          : code === "reauthentication_needed" || response.status === 401 ? "Sign in again before changing your password."
+          : "Unable to update password. Please try again.";
+        return json(origin, { ok: false, message }, response.status >= 500 ? 503 : 400);
+      }
       const now = new Date().toISOString();
       const { error: profileError } = await admin.from("user_profiles").update({
         must_change_password: false,
