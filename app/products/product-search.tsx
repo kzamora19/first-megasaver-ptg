@@ -395,11 +395,7 @@ export default function ProductSearch({
               <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} className="legacy-product-detail-row" onClick={event => {
-                if ((event.target as HTMLElement).closest("input, button")) return;
-                event.currentTarget.querySelector("button")?.focus();
-                openProductDetails(product);
-              }}>
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
@@ -422,11 +418,7 @@ export default function ProductSearch({
               <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>PAY NOW</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {queueRows.length ? queueRows.map(product => <tr key={product.id} className="legacy-product-detail-row" onClick={event => {
-                if ((event.target as HTMLElement).closest("input, button")) return;
-                event.currentTarget.querySelector("button")?.focus();
-                openProductDetails(product);
-              }}>
+              {queueRows.length ? queueRows.map(product => <tr key={product.id}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
@@ -573,8 +565,6 @@ export default function ProductSearch({
         </dl>
       </AppDialog>}
       <style jsx global>{`
-        .legacy-product-detail-row{cursor:pointer}
-        .legacy-product-detail-row:hover td,.legacy-product-detail-row:focus-within td{background:#eff6ff}
         .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
         .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
         .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}
