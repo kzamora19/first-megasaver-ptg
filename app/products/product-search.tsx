@@ -445,7 +445,7 @@ export default function ProductSearch({
                 {logos.header && <img src={artworkUrl("header")} className="ptg-compact-main-logo" alt="Price tag header artwork" />}
                 {logos.promo && <img src={artworkUrl("promo")} className="ptg-compact-promo-logo" alt="Promo artwork" />}
               </header>
-              <div className="ptg-compact-barcode">Barcode: {product.barcode}</div>
+              <div className="ptg-compact-barcode">Barcode: <strong>{product.barcode}</strong></div>
               <div>Brand: <strong>{product.brand}</strong></div>
               <div className="ptg-compact-model">MODEL: <strong>{modelDescription}</strong></div>
               {!srpOnly && <div>SRP: <strong>{peso(product.srp)}</strong></div>}
@@ -605,6 +605,7 @@ export default function ProductSearch({
           .ptg-compact-main-logo{flex:1;width:0;object-position:left center}
           .ptg-compact-promo-logo{flex:0 0 26%;width:26%;margin-left:auto;object-position:right center}
           .ptg-compact-barcode{text-align:right;font-size:11px}
+          .ptg-compact-barcode strong{display:inline-block;min-width:8em;padding:1px 5px;background:#e1e4e8;color:#344761;text-align:center;white-space:nowrap;print-color-adjust:exact;-webkit-print-color-adjust:exact}
           .ptg-compact-model{display:flex;gap:5px;min-height:38px;align-items:start}
           .ptg-compact-model strong{flex:1;text-align:center;overflow-wrap:anywhere}
           .ptg-compact-cash{font-size:10px}
