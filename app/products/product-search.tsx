@@ -414,7 +414,7 @@ export default function ProductSearch({
         <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setQueuePage(1); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
       </section>
 
-      <section className="legacy-preview-panel">
+      <section id="print-price-tags" className="legacy-preview-panel">
         <div className="legacy-preview-heading">
           <h2>Print Price Tags</h2>
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>

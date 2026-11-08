@@ -44,17 +44,10 @@ function DashboardContent({session}:{session:import("@/components/client-session
       eyebrow: "WORKFLOW",
     },
     {
-      title: "Price Tag Designer",
-      description: "Prepare the remaining tag formats, installment details, validity dates, and promotional artwork.",
-      action: "In development",
-      available: false,
-      eyebrow: "TAG DESIGN",
-    },
-    {
-      title: "Print Preview & PDF",
-      description: "Open the first 1 WHOLE print preview from the selected product queue.",
-      href: canUsePTG ? "/products" : undefined,
-      action: canUsePTG ? "Open print workflow" : "PTG access required",
+      title: "Print Price Tags",
+      description: "Choose from seven layouts, then print or save the selected products as a PDF.",
+      href: canUsePTG ? "/products/#print-price-tags" : undefined,
+      action: canUsePTG ? "Open print tools" : "PTG access required",
       available: canUsePTG,
       eyebrow: "OUTPUT",
     },
@@ -85,14 +78,14 @@ function DashboardContent({session}:{session:import("@/components/client-session
         </section>
 
         <section className="ptg-section-heading">
-          <div><h2>Application modules</h2><p>Use the available tools below. Modules are being delivered in stages.</p></div>
+          <div><h2>Application modules</h2><p>Open a tool to manage products, pricing, or print output.</p></div>
           <span className="ptg-branch-pill">{session.branchCode ?? "SYSTEM"} · {session.role.replaceAll("_", " ")}</span>
         </section>
 
         <div className="ptg-module-grid">
           {modules.map((module, index) => (
             <article className={`ptg-module-card ${module.available ? "is-ready" : "is-building"}`} key={module.title}>
-              <div className="ptg-module-top"><span className="ptg-module-icon">{["₱", "▧", "⌕", "▤", "▣", "✧"][index]}</span><span className={module.available ? "ptg-module-state ready" : "ptg-module-state"}>{module.available ? "AVAILABLE" : "COMING NEXT"}</span></div>
+              <div className="ptg-module-top"><span className="ptg-module-icon">{["₱", "▧", "⌕", "▣", "✧"][index]}</span><span className={module.available ? "ptg-module-state ready" : "ptg-module-state"}>{module.available ? "AVAILABLE" : "RESTRICTED"}</span></div>
               <p className="ptg-module-eyebrow">{module.eyebrow}</p>
               <h3>{module.title}</h3>
               <p className="ptg-module-description">{module.description}</p>

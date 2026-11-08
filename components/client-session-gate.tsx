@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import WorkspaceLoader from "@/components/workspace-loader";
 import AppDialog from "@/components/app-dialog";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,7 @@ export default function ClientSessionGate({
 }) {
   const router = useRouter();
   const [session, setSession] = useState<PtgClientSession | null>(null);
+  const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [availabilityNotice, setAvailabilityNotice] = useState<ReturnType<typeof getAvailabilityNotice>>(null);
   const allowedRoles = allowRoles?.join("|") ?? "";
@@ -36,6 +38,7 @@ export default function ClientSessionGate({
     let cancelled = false;
     const checkSession = async () => {
       try {
+        setProgress(10);
         let account: PtgClientSession | undefined;
         if (usesEdgeAuth) {
           const result = await invokePtgAuth("session");
@@ -67,6 +70,9 @@ export default function ClientSessionGate({
           router.replace(deniedTo);
           return;
         }
+        setProgress(100);
+        await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        if (cancelled) return;
         setSession(account);
         setStatus("ready");
       } catch (error) {
@@ -163,7 +169,7 @@ export default function ClientSessionGate({
   }
 
   if (status === "loading") {
-    return <main className="shell"><section className="panel" role="status">Checking your PTG session…</section></main>;
+    return <WorkspaceLoader progress={progress} />;
   }
   if (status === "error") {
     return <main className="shell"><section className="panel" role="alert">
