@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 
 type MemoInfo = {
   memo_id: string;
@@ -122,11 +123,22 @@ export default function ProductSearch({
   const loadProducts = useCallback(async (query: string, requestedPage: number) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(requestedPage) });
-      if (query.trim()) params.set("q", query.trim());
-      const response = await fetch("/api/products/search?" + params.toString(), { cache: "no-store" });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.message || "Search failed.");
+      let payload: { ok: boolean; products: Product[]; total: number; page: number };
+      if (usesEdgeData) {
+        payload = await invokePtgData("ptg-products", {
+          action: "search",
+          q: query.trim(),
+          page: requestedPage,
+        }) as typeof payload;
+      } else {
+        const params = new URLSearchParams({ page: String(requestedPage) });
+        if (query.trim()) params.set("q", query.trim());
+        const response = await fetch("/api/products/search?" + params.toString(), { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Search failed.");
+        payload = result;
+      }
+      if (!payload.ok) throw new Error("Search failed.");
       setResults(payload.products as Product[]);
       setTotal(Number(payload.total || 0));
       setPage(Number(payload.page || requestedPage));
