@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { establishPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,22 +27,27 @@ export default function LoginPage() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ username, password, branchCode }),
-      });
-      const result = await response.json();
-      if (!response.ok || result.ok !== true) {
-        setMessage(result.message ?? "Unable to sign in.");
-        return;
+      if (usesEdgeAuth) {
+        const result = await invokePtgAuth("login", { username, password, branchCode });
+        await establishPtgAuthSession(result);
+      } else {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({ username, password, branchCode }),
+        });
+        const result = await response.json();
+        if (!response.ok || result.ok !== true) {
+          setMessage(result.message ?? "Unable to sign in.");
+          return;
+        }
       }
       setPassword("");
       router.replace("/dashboard");
       router.refresh();
-    } catch {
-      setMessage("Unable to connect to the authentication service. Please try again.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to connect to the authentication service. Please try again.");
     } finally {
       setBusy(false);
     }
