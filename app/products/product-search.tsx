@@ -442,8 +442,8 @@ export default function ProductSearch({
             const savings = amount(product.srp) - pay;
             if (compact) return <article className="ptg-compact-tag" key={product.id}>
               <header className="ptg-compact-header">
-                {logos.header && <img src={artworkUrl("header")} alt="Price tag header artwork" />}
-                {logos.promo && <img src={artworkUrl("promo")} alt="Promo artwork" />}
+                {logos.header && <img src={artworkUrl("header")} className="ptg-compact-main-logo" alt="Price tag header artwork" />}
+                {logos.promo && <img src={artworkUrl("promo")} className="ptg-compact-promo-logo" alt="Promo artwork" />}
               </header>
               <div className="ptg-compact-barcode">Barcode: {product.barcode}</div>
               <div>Brand: <strong>{product.brand}</strong></div>
@@ -600,9 +600,10 @@ export default function ProductSearch({
           .legacy-four-sheet .legacy-price-tag{zoom:.49}
           .legacy-six-sheet{grid-template-columns:repeat(2,4.05in);grid-template-rows:repeat(3,calc(10.6in / 3));gap:0}
           .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:100%;height:100%;padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
-          .ptg-compact-header{display:flex;align-items:center;justify-content:space-between;gap:8px;height:55px;border-bottom:2px solid #003da5}
-          .ptg-compact-header img{width:70%;height:100%;object-fit:contain;mix-blend-mode:multiply}
-          .ptg-compact-header img[alt="Promo artwork"]{width:26%;margin-left:auto}
+          .ptg-compact-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 68px;min-height:0;border-bottom:2px solid #003da5}
+          .ptg-compact-header img{display:block;min-width:0;height:100%;object-fit:contain;mix-blend-mode:multiply}
+          .ptg-compact-main-logo{flex:1;width:0;object-position:left center}
+          .ptg-compact-promo-logo{flex:0 0 26%;width:26%;margin-left:auto;object-position:right center}
           .ptg-compact-barcode{text-align:right;font-size:11px}
           .ptg-compact-model{display:flex;gap:5px;min-height:42px;align-items:start}
           .ptg-compact-model strong{flex:1;text-align:center;overflow-wrap:anywhere}
