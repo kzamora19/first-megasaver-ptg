@@ -1,5 +1,7 @@
 "use client";
 
+import { withBasePath } from "@/lib/base-path";
+
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 
@@ -97,7 +99,7 @@ export default function LogoManager() {
   return (
     <main className="logo-manager">
       <header className="manager-top">
-        <a href="/dashboard">← Dashboard</a>
+        <a href={withBasePath("/dashboard")}>← Dashboard</a>
         <span>ASSETS / BRANDING</span>
       </header>
       <section className="manager-intro">
