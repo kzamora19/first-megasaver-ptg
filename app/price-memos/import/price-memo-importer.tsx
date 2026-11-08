@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { parsePriceMemo, type ParsedMemo } from "@/lib/price-memos/parse-price-memo";
+import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 
 type Summary={skipped:boolean;duplicate:boolean;totalProducts:number};
 type MemoEntry={id:number;fileName:string;parsed?:ParsedMemo;error?:string;summary?:Summary;status:"READY"|"ERROR"|"IMPORTED"|"SKIPPED"|"FAILED"};
@@ -44,12 +45,21 @@ export default function PriceMemoImporter() {
     for(const entry of ready) {
       try {
         const parsed=entry.parsed!;
-        const response=await fetch("/api/price-memos/import",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({memoId:parsed.memoId,period:parsed.period,memoType:parsed.memoType,sourceFile:entry.fileName,duplicateAction,products:parsed.products})
-        });
-        const result=await response.json();
-        if(!response.ok||!result.ok)throw new Error(result.message||"Import failed.");
+        let result: {ok:boolean;summary?:Summary;message?:string};
+        if(usesEdgeData){
+          result=await invokePtgData("ptg-memos",{
+            action:"import",memoId:parsed.memoId,period:parsed.period,memoType:parsed.memoType,
+            sourceFile:entry.fileName,duplicateAction,products:parsed.products
+          }) as typeof result;
+        }else{
+          const response=await fetch("/api/price-memos/import",{
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({memoId:parsed.memoId,period:parsed.period,memoType:parsed.memoType,sourceFile:entry.fileName,duplicateAction,products:parsed.products})
+          });
+          result=await response.json();
+          if(!response.ok||!result.ok)throw new Error(result.message||"Import failed.");
+        }
+        if(!result.ok)throw new Error(result.message||"Import failed.");
         const summary=result.summary as Summary;
         setEntries(current=>current.map(item=>item.id===entry.id?{...item,summary,status:summary.skipped?"SKIPPED":"IMPORTED"}:item));
         if(summary.skipped)skipped++;else imported++;
