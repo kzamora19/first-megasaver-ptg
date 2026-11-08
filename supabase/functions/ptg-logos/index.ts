@@ -97,8 +97,12 @@ async function audit(actorUserId: string, action: string, key: string, message: 
   });
 }
 
+function isLogoSlot(key: string) {
+  return logoSlots.has(key) || /^aircon:[A-Z0-9]{1,40}$/.test(key);
+}
+
 async function getLogos(origin: string) {
-  const { data, error } = await admin.from("logo_assets").select("logo_key,storage_path,mime_type,original_file_name,updated_at").in("logo_key", [...logoSlots]);
+  const { data, error } = await admin.from("logo_assets").select("logo_key,storage_path,mime_type,original_file_name,updated_at").or("logo_key.in.(" + [...logoSlots].join(",") + "),logo_key.like.aircon:*");
   if (error) return respond(origin, { ok: false, message: "Could not load saved logos." }, 500);
   const logos: Record<string, { url: string; originalFileName: string; updatedAt: string }> = {};
   if (data?.length) {
@@ -131,7 +135,7 @@ async function uploadLogo(request: Request, origin: string) {
   const form = await request.formData();
   const key = String(form.get("key") || "");
   const file = form.get("file");
-  if (!logoSlots.has(key)) return respond(origin, { ok: false, message: "Select a valid logo slot." }, 400);
+  if (!isLogoSlot(key)) return respond(origin, { ok: false, message: "Select a valid logo slot." }, 400);
   if (!(file instanceof File)) return respond(origin, { ok: false, message: "Choose an image to upload." }, 400);
   if (!(file.type in allowedTypes)) return respond(origin, { ok: false, message: "Upload a PNG, JPG/JPEG, or WEBP image." }, 400);
   if (!file.size || file.size > maxFileBytes) return respond(origin, { ok: false, message: "Images must be 5 MB or smaller." }, 400);
@@ -144,7 +148,7 @@ async function uploadLogo(request: Request, origin: string) {
   catch (error) { return respond(origin, { ok: false, message: error instanceof Error ? error.message : "Could not prepare logo storage." }, 500); }
   const { data: previous, error: previousError } = await admin.from("logo_assets").select("storage_path").eq("logo_key", key).maybeSingle();
   if (previousError) return respond(origin, { ok: false, message: "Could not read the current logo." }, 500);
-  const path = key + "/" + crypto.randomUUID() + "." + allowedTypes[file.type];
+  const path = key.replace(":", "/") + "/" + crypto.randomUUID() + "." + allowedTypes[file.type];
   const upload = await admin.storage.from(bucketName).upload(path, buffer, { contentType: file.type, cacheControl: "3600", upsert: false });
   if (upload.error) return respond(origin, { ok: false, message: "Logo upload failed." }, 500);
   const { error: saveError } = await admin.from("logo_assets").upsert({
@@ -169,7 +173,7 @@ async function removeLogo(request: Request, origin: string) {
   if ("response" in auth) return auth.response;
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const key = String(body.key || "");
-  if (!logoSlots.has(key)) return respond(origin, { ok: false, message: "Select a valid logo slot." }, 400);
+  if (!isLogoSlot(key)) return respond(origin, { ok: false, message: "Select a valid logo slot." }, 400);
   const { data: current, error: readError } = await admin.from("logo_assets").select("storage_path").eq("logo_key", key).maybeSingle();
   if (readError) return respond(origin, { ok: false, message: "Could not read the current logo." }, 500);
   const { error: deleteError } = await admin.from("logo_assets").delete().eq("logo_key", key);

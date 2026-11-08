@@ -36,7 +36,7 @@ type Product = {
   price_memos: MemoInfo | MemoInfo[];
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
-type LogoKey = "header" | "promo" | "social" | "appHeader";
+type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
 type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; updatedAt: string }>>;
 
 const formats: { key: FormatKey; label: string }[] = [
@@ -288,6 +288,20 @@ export default function ProductSearch({
     window.print();
   }
 
+  function airconBrandArtwork(brand: string) {
+    const key = brand.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!key) return undefined;
+    const normalized = ["TMAMA", "TOUGHMAM"].includes(key) ? "TOUGHMAMA" : key;
+    const exact = artworkUrl(`aircon:${normalized}`);
+    if (exact) return exact;
+    const candidates = Object.keys(logos).filter((slot): slot is `aircon:${string}` => slot.startsWith("aircon:"))
+      .filter(slot => {
+        const name = slot.slice(7);
+        return normalized.startsWith(name) || name.startsWith(normalized);
+      });
+    return candidates.length === 1 ? artworkUrl(candidates[0]) : undefined;
+  }
+
   function artworkUrl(key: LogoKey) {
     const url = logos[key]?.url;
     return url ? url + (url.includes("?") ? "&" : "?") + "refresh=" + logoVersion : undefined;
@@ -407,7 +421,9 @@ export default function ProductSearch({
             <article className="ptg-aircon">
               <header className="ptg-aircon-header">
                 {logos.header && <img src={artworkUrl("header")} alt="Price tag header artwork" />}
-                <strong>{brand || "AIRCON"}</strong>
+                {airconBrandArtwork(brand)
+                  ? <img className="ptg-aircon-brand-logo" src={airconBrandArtwork(brand)} alt={brand} />
+                  : <strong>{brand || "AIRCON"}</strong>}
               </header>
               <table className="ptg-aircon-products">
                 <thead><tr>{["BC#", "CAPACITY", "RECOMMENDED FLOOR AREA", "MODEL", "SRP", "NOW PAY ONLY", "SAVE"].map(label => <th key={label}>{label}</th>)}</tr></thead>
@@ -618,6 +634,7 @@ export default function ProductSearch({
           .ptg-aircon{width:10.4in;color:#003da5;font:700 14px/1.2 Arial,sans-serif}
           .ptg-aircon-header{height:1.15in;display:flex;align-items:center;justify-content:space-between;border:1px solid #003da5;padding:8px 16px}
           .ptg-aircon-header img{width:76%;height:100%;object-fit:contain}
+          .ptg-aircon-header .ptg-aircon-brand-logo{width:20%;margin-left:auto;object-fit:contain;mix-blend-mode:multiply}
           .ptg-aircon-header strong{margin-left:auto;font-size:25px}
           .ptg-aircon table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center}
           .ptg-aircon th,.ptg-aircon td{border:1px solid #003da5;padding:4px;overflow-wrap:anywhere}

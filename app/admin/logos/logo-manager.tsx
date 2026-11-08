@@ -5,7 +5,7 @@ import { withBasePath } from "@/lib/base-path";
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 
-type LogoKey = "header" | "promo" | "social" | "appHeader";
+type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
 type LogoAsset = { url: string; originalFileName: string; updatedAt: string };
 type LogoMap = Partial<Record<LogoKey, LogoAsset>>;
 const slots: { key: LogoKey; name: string; detail: string }[] = [
@@ -16,6 +16,8 @@ const slots: { key: LogoKey; name: string; detail: string }[] = [
 ];
 
 export default function LogoManager() {
+  const [brand, setBrand] = useState("");
+  const [draftBrands, setDraftBrands] = useState<string[]>([]);
   const [logos, setLogos] = useState<LogoMap>({});
   const [files, setFiles] = useState<Partial<Record<LogoKey, File>>>({});
   const [loading, setLoading] = useState(true);
@@ -96,6 +98,11 @@ export default function LogoManager() {
     }
   }
 
+  const brandKeys = [...new Set([...Object.keys(logos).filter(key => key.startsWith("aircon:")).map(key => key.slice(7)), ...draftBrands])].sort();
+  const brandSlots = brandKeys.map((key): (typeof slots)[number] => ({
+    key: `aircon:${key}`, name: key + " Aircon Brand Logo", detail: "Shown in the top-right corner of that brand’s Aircon sheet.",
+  }));
+
   return (
     <main className="logo-manager">
       <header className="manager-top">
@@ -109,8 +116,22 @@ export default function LogoManager() {
       </section>
 
       {message && <p className="manager-message" role="status">{message}</p>}
+      <form className="manager-intro" onSubmit={event => {
+        event.preventDefault();
+        let key = brand.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (["TMAMA", "TOUGHMAM"].includes(key)) key = "TOUGHMAMA";
+        if (!key || key.length > 40) {
+          setMessage("Enter an Aircon brand name with 1–40 letters or digits.");
+          return;
+        }
+        setDraftBrands(current => current.includes(key) ? current : [...current, key]);
+        setBrand("");
+      }}>
+        <label>Aircon brand <input value={brand} onChange={event => setBrand(event.target.value)} placeholder="e.g. LG or TCL" required /></label>
+        <button type="submit" className="admin-button small">Add brand logo slot</button>
+      </form>
       <section className="slot-grid" aria-label="Logo slots">
-        {slots.map(slot => {
+        {[...slots, ...brandSlots].map(slot => {
           const saved = logos[slot.key];
           const preview = saved?.url;
           return (
