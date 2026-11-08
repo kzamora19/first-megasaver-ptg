@@ -140,13 +140,12 @@ async function uploadLogo(request: Request, origin: string) {
   if (!signatureMatches(bytes, file.type)) return respond(origin, { ok: false, message: "The selected file does not match its image type." }, 400);
 
   const actor = auth.session!;
-  const adminCheck = admin;
   try { await ensureBucket(); }
   catch (error) { return respond(origin, { ok: false, message: error instanceof Error ? error.message : "Could not prepare logo storage." }, 500); }
-  const { data: previous, error: previousError } = await adminCheck.from("logo_assets").select("storage_path").eq("logo_key", key).maybeSingle();
+  const { data: previous, error: previousError } = await admin.from("logo_assets").select("storage_path").eq("logo_key", key).maybeSingle();
   if (previousError) return respond(origin, { ok: false, message: "Could not read the current logo." }, 500);
   const path = key + "/" + crypto.randomUUID() + "." + allowedTypes[file.type];
-  const upload = await adminCheck.storage.from(bucketName).upload(path, buffer, { contentType: file.type, cacheControl: "3600", upsert: false });
+  const upload = await admin.storage.from(bucketName).upload(path, buffer, { contentType: file.type, cacheControl: "3600", upsert: false });
   if (upload.error) return respond(origin, { ok: false, message: "Logo upload failed." }, 500);
   const { error: saveError } = await adminCheck.from("logo_assets").upsert({
     logo_key: key,
@@ -167,7 +166,7 @@ async function uploadLogo(request: Request, origin: string) {
 
 async function removeLogo(request: Request, origin: string) {
   const auth = await requireSystemAdmin(request, origin);
-  if (auth.response) return auth.response;
+  if ("response" in auth) return auth.response;
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const key = String(body.key || "");
   if (!logoSlots.has(key)) return respond(origin, { ok: false, message: "Select a valid logo slot." }, 400);
