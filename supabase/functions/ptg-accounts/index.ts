@@ -409,7 +409,7 @@ async function securityAction(session: Session, origin: string, body: Record<str
     const actors = new Map(profiles?.data?.map(profile => [profile.id, profile]));
     return json(origin, { ok: true, events: data.map(({ actor_user_id, metadata, ...event }) => ({
       ...event, actor: typeof metadata?.username === "string" ? metadata.username : actors.get(actor_user_id)?.display_name ?? "—",
-      current_role: typeof metadata?.role === "string" ? metadata.role : actors.get(actor_user_id)?.role_key ?? "—",
+      current_role: event.event_category === "AUTHENTICATION" && typeof metadata?.role === "string" ? metadata.role : actors.get(actor_user_id)?.role_key ?? "—",
     })) });
   }
   if (action === "securitySessions") {

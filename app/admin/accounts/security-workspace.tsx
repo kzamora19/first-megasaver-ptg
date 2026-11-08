@@ -106,9 +106,9 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
     if (!records.length || records.length > 10000) throw new Error("Use a workbook containing 1 to 10,000 product rows.");
     const seen = new Set<string>();
     const rows = records.map((row, index) => {
-      const barcode = row[barcodeIndex].trim();
-      const description = row[descriptionIndex].trim();
-      const value = row[srpIndex].replace(/[₱,\s]/g, "");
+      const barcode = (row[barcodeIndex] ?? "").trim();
+      const description = (row[descriptionIndex] ?? "").trim();
+      const value = (row[srpIndex] ?? "").replace(/[₱,\s]/g, "");
       const srp = Number(value);
       if (!barcode || !description || !/^\d+(?:\.\d+)?$/.test(value) || !Number.isFinite(srp) || seen.has(barcode)) {
         throw new Error("Check the barcode, description, and SRP in product row " + (index + 1) + ". Barcodes must be unique.");
