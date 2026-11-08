@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { establishPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
+import { withBasePath } from "@/lib/base-path";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [appHeaderLogo, setAppHeaderLogo] = useState("/legacy-ptg/app-header.png");
+  const [appHeaderLogo, setAppHeaderLogo] = useState(withBasePath("/legacy-ptg/app-header.png"));
 
   useEffect(() => {
     const loadLogo = async () => {
@@ -89,7 +90,7 @@ export default function LoginPage() {
           </form>
           <p className="legacy-login-message" role="status">{message}</p>
           <div className="legacy-login-security">
-            <a href="/admin/accounts">SYSTEM SECURITY ADMINISTRATION</a>
+            <a href={withBasePath("/admin/accounts")}>SYSTEM SECURITY ADMINISTRATION</a>
             <div><span className="legacy-security-dot" />Protected by System Security</div>
           </div>
           <p className="legacy-login-footnote">Development environment · No production records connected</p>
