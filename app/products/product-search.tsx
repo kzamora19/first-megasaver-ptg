@@ -388,9 +388,9 @@ export default function ProductSearch({
 
       <style jsx global>{`
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
-        .legacy-ptg-banner{position:relative;display:flex;align-items:center;justify-content:center;min-height:76px;margin-bottom:9px;padding:5px 10px;border-radius:5px;background:#075fc6;overflow:hidden}
-        .legacy-ptg-banner img{display:block;width:100%;height:68px;object-fit:contain;object-position:left center}
-        .legacy-ptg-banner>span{position:absolute;right:14px;top:8px;color:#fff;font-size:9px;text-shadow:0 1px 2px #003b84}
+        .legacy-ptg-banner{position:relative;margin-bottom:9px;border-radius:5px;overflow:hidden}
+        .legacy-ptg-banner img{display:block;width:100%;height:auto}
+        .legacy-ptg-banner>span{position:absolute;right:14px;top:8px;padding:3px 6px;border-radius:3px;background:rgba(0,35,86,.35);color:#fff;font-size:9px}
         .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
         .legacy-tools-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#123b72;font-size:10px}
@@ -471,16 +471,16 @@ export default function ProductSearch({
         .legacy-model-value{grid-column:3/10;grid-row:8/11;align-self:center;padding:0 4%;line-height:1.15;font-weight:bold;text-align:center;overflow-wrap:anywhere}
         .legacy-srp-label{grid-column:1/3;grid-row:11;align-self:center;padding-left:6%;font-size:24px;font-weight:bold}
         .legacy-srp{grid-column:3/6;grid-row:11;align-self:center;font-size:26px;font-weight:bold;text-decoration:line-through}
-        .legacy-cash{grid-column:1/5;grid-row:13;align-self:center;padding-left:6%;font-size:24px;font-weight:bold}
-        .legacy-pay-label{grid-column:2/5;grid-row:14/16;align-self:center;padding-left:6%;font-size:28px;font-weight:bold;white-space:nowrap}
+        .legacy-cash{grid-column:1/5;grid-row:13;align-self:center;padding-left:6%;font-size:19px;font-weight:bold}
+        .legacy-pay-label{grid-column:1/5;grid-row:14/16;align-self:center;justify-self:end;margin-right:14px;font-size:35px;font-weight:bold;white-space:nowrap}
         .legacy-pay-value{grid-column:5/9;grid-row:14/16;display:flex;align-items:center;justify-content:center;background:#fff500;color:#003da5;font-size:68px;font-weight:900;white-space:nowrap}
-        .legacy-valid-until{grid-column:2/9;grid-row:16;align-self:center;justify-self:stretch;overflow:visible;color:#003da5;font-size:20px;font-weight:700;text-align:center;white-space:nowrap}
-        .legacy-save-label{grid-column:2/4;grid-row:17/19;align-self:center;padding-right:10px;font-size:24px;font-weight:bold;text-align:right}
-        .legacy-save-value{grid-column:4/7;grid-row:17/19;align-self:center;font-size:44px;font-weight:bold;white-space:nowrap}
-        .legacy-installment-logo{position:relative;grid-column:1/10;grid-row:19/22;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;width:100%;height:100%}
+        .legacy-valid-until{grid-column:5/9;grid-row:17;align-self:center;justify-self:stretch;overflow:visible;color:#003da5;font-size:20px;font-weight:700;text-align:center;white-space:nowrap}
+        .legacy-save-label{grid-column:2/4;grid-row:18/20;align-self:center;padding-right:10px;font-size:24px;font-weight:bold;text-align:right}
+        .legacy-save-value{grid-column:4/7;grid-row:18/20;align-self:center;font-size:44px;font-weight:bold;white-space:nowrap}
+        .legacy-installment-logo{position:relative;grid-column:1/10;grid-row:20/23;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;width:100%;height:100%}
         .legacy-installment-logo:before{content:"";position:absolute;top:10px;left:2%;right:2%;height:3px;background:#003da5}
         .legacy-installment-logo span{position:relative;z-index:1;padding:3px 16px 4px;border-radius:0 0 5px 5px;background:#003da5;color:white;font-size:18px;font-weight:bold}
-        .legacy-installments{grid-column:2/9;grid-row:22/27;display:grid;grid-template-rows:repeat(5,1fr);align-items:center;padding:0 3%}
+        .legacy-installments{grid-column:2/9;grid-row:23/28;display:grid;grid-template-rows:repeat(5,1fr);align-items:center;padding:0 3%}
         .legacy-installment-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:12px;color:#003da5;font-size:22px;font-weight:bold;white-space:nowrap}
         .legacy-installment-row span{text-align:right}
         .legacy-installment-row strong{font-weight:bold}
