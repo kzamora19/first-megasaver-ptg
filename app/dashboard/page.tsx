@@ -2,6 +2,7 @@
 
 import ClientSessionGate from "@/components/client-session-gate";
 import LogoutButton from "./logout-button";
+import { withBasePath } from "@/lib/base-path";
 
 type ModuleCard = {
   title: string;
@@ -69,19 +70,19 @@ function DashboardContent({session}:{session:import("@/components/client-session
   return (
     <main className="ptg-app">
       <aside className="ptg-sidebar">
-        <a className="ptg-brand" href="/dashboard" aria-label="Branchline Price Tag Generator home">
+        <a className="ptg-brand" href={withBasePath("/dashboard")} aria-label="Branchline Price Tag Generator home">
           <span className="ptg-brand-lockup">
-            <img src="/branchline-logo.png" alt="" />
+            <img src={withBasePath("/branchline-logo.png")} alt="" />
             <small>PRICE TAG GENERATOR</small>
           </span>
         </a>
         <div className="ptg-nav-label">WORKSPACE</div>
         <a className="ptg-nav-item active" href="/dashboard"><span>▦</span> Dashboard</a>
-        {canManageMemos && <a className="ptg-nav-item" href="/price-memos/import"><span>▤</span> Price Memo Import</a>}
-        {canUsePTG && <a className="ptg-nav-item" href="/products"><span>⌕</span> Product Search &amp; Queue</a>}
-        {isSystemAdmin && <a className="ptg-nav-item" href="/admin/logos"><span>✧</span> Logo Manager</a>}
-        {isSystemAdmin && <a className="ptg-nav-item" href="/product-master"><span>▧</span> Product Master</a>}
-        {canManageMemos && <a className="ptg-nav-item" href="/admin/accounts"><span>♙</span> Account Administration</a>}
+        {canManageMemos && <a className="ptg-nav-item" href={withBasePath("/price-memos/import")}><span>▤</span> Price Memo Import</a>}
+        {canUsePTG && <a className="ptg-nav-item" href={withBasePath("/products")}><span>⌕</span> Product Search &amp; Queue</a>}
+        {isSystemAdmin && <a className="ptg-nav-item" href={withBasePath("/admin/logos")}><span>✧</span> Logo Manager</a>}
+        {isSystemAdmin && <a className="ptg-nav-item" href={withBasePath("/product-master")}><span>▧</span> Product Master</a>}
+        {canManageMemos && <a className="ptg-nav-item" href={withBasePath("/admin/accounts")}><span>♙</span> Account Administration</a>}
         <div className="ptg-sidebar-bottom">
           <div className="ptg-user-chip">
             <span className="ptg-avatar">{session.username.slice(0, 1).toUpperCase()}</span>
@@ -118,7 +119,7 @@ function DashboardContent({session}:{session:import("@/components/client-session
               <p className="ptg-module-eyebrow">{module.eyebrow}</p>
               <h3>{module.title}</h3>
               <p className="ptg-module-description">{module.description}</p>
-              {module.href ? <a className="ptg-module-link" href={module.href}>{module.action} <span>→</span></a> : <span className="ptg-module-disabled">{module.action}</span>}
+              {module.href ? <a className="ptg-module-link" href={withBasePath(module.href)}>{module.action} <span>→</span></a> : <span className="ptg-module-disabled">{module.action}</span>}
             </article>
           ))}
         </div>
