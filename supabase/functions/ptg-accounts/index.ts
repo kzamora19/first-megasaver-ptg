@@ -1,10 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@10.3.1";
 
 const projectUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const publicKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
-const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
-const resendFrom = Deno.env.get("RESEND_FROM_EMAIL") ?? "";
+const gmailUser = Deno.env.get("GMAIL_USER")?.trim() ?? "";
+const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD")?.replace(/\s+/g, "") ?? "";
 const appUrl = (Deno.env.get("PTG_APP_URL") ?? "https://kzamora19.github.io/first-megasaver-ptg").replace(/\/+$/, "");
 const allowedOrigins = new Set(
   (Deno.env.get("PTG_ALLOWED_ORIGINS") ?? "https://kzamora19.github.io,http://localhost:3000,http://127.0.0.1:3000")
@@ -35,8 +36,8 @@ const respondError = (origin: string, error: unknown) => {
   const code = error instanceof Error ? error.message : "";
   if (code === "AUTH_REQUIRED") return json(origin, { ok: false }, 401);
   if (code === "PERMISSION_DENIED") return json(origin, { ok: false, message: "You are not authorized to perform this action." }, 403);
-  if (code === "EMAIL_PROVIDER_NOT_CONFIGURED") return json(origin, { ok: false, message: "Resend email is not configured in Supabase yet." }, 503);
-  if (code === "EMAIL_DELIVERY_FAILED") return json(origin, { ok: false, message: "The email could not be delivered. Verify the Resend sender settings and retry." }, 502);
+  if (code === "EMAIL_PROVIDER_NOT_CONFIGURED") return json(origin, { ok: false, message: "Gmail email delivery is not configured in Supabase yet." }, 503);
+  if (code === "EMAIL_DELIVERY_FAILED") return json(origin, { ok: false, message: "The email could not be delivered. Verify the Gmail account and app password settings, then retry." }, 502);
   if (code === "LAST_ADMIN") return json(origin, { ok: false, message: "The last active System Admin cannot be disabled." }, 400);
   return json(origin, { ok: false, message: "The account operation could not be completed." }, 400);
 };
@@ -97,16 +98,31 @@ async function audit(session: Session | null, branchId: string | null, action: s
   if (error) throw new Error("AUDIT_WRITE_FAILED");
 }
 async function sendEmail(input: { to: string; subject: string; text: string; html: string }) {
-  if (!resendKey || !resendFrom) throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + resendKey, "Content-Type": "application/json", "User-Agent": "First-Megasaver-PTG/1.0" },
-    body: JSON.stringify({ from: resendFrom, to: [input.to], subject: input.subject, text: input.text, html: input.html }),
+  if (!gmailUser || !gmailPassword) throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
+  const transport = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: { user: gmailUser, pass: gmailPassword },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
-  if (!response.ok) throw new Error("EMAIL_DELIVERY_FAILED");
-  const result = await response.json() as { id?: string };
-  if (!result.id) throw new Error("EMAIL_DELIVERY_FAILED");
-  return result.id;
+  try {
+    const result = await transport.sendMail({
+      from: "First Megasaver PTG <" + gmailUser + ">",
+      to: input.to,
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+    });
+    if (!result.messageId || result.rejected.length) throw new Error("EMAIL_DELIVERY_FAILED");
+    return result.messageId;
+  } catch {
+    throw new Error("EMAIL_DELIVERY_FAILED");
+  } finally {
+    transport.close();
+  }
 }
 function inviteEmail(name: string, username: string, password: string, acceptUrl: string) {
   const safeName = escapeHtml(name), safeUser = escapeHtml(username), safePass = escapeHtml(password), safeUrl = escapeHtml(acceptUrl);
