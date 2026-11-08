@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
+import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 
 type LogoKey = "header" | "promo" | "social" | "appHeader";
 type LogoAsset = { url: string; originalFileName: string; updatedAt: string };
@@ -22,7 +23,9 @@ export default function LogoManager() {
   const loadLogos = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/logos", { cache: "no-store" });
+      const response = usesEdgeAssets
+        ? await requestPtgLogos("GET")
+        : await fetch("/api/logos", { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || "Could not load saved logos.");
       setLogos(result.logos || {});
@@ -52,7 +55,9 @@ export default function LogoManager() {
     form.set("key", key);
     form.set("file", file);
     try {
-      const response = await fetch("/api/logos", { method: "PUT", body: form });
+      const response = usesEdgeAssets
+        ? await requestPtgLogos("POST", form)
+        : await fetch("/api/logos", { method: "PUT", body: form });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || "Logo upload failed.");
       setFiles(current => { const next = { ...current }; delete next[key]; return next; });
@@ -71,11 +76,13 @@ export default function LogoManager() {
     setBusyKey(key);
     setMessage("");
     try {
-      const response = await fetch("/api/logos", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
-      });
+      const response = usesEdgeAssets
+        ? await requestPtgLogos("DELETE", { key })
+        : await fetch("/api/logos", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key }),
+          });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || "Logo removal failed.");
       setMessage(result.message || "Logo replacement removed.");
