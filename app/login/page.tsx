@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { establishPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
+import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,9 +16,16 @@ export default function LoginPage() {
   const [appHeaderLogo, setAppHeaderLogo] = useState("/legacy-ptg/app-header.png");
 
   useEffect(() => {
-    fetch("/api/logos", { cache: "no-store" }).then(response => response.json()).then(result => {
-      if (result.ok && result.logos?.appHeader?.url) setAppHeaderLogo(result.logos.appHeader.url);
-    }).catch(() => {});
+    const loadLogo = async () => {
+      try {
+        const response = usesEdgeAssets
+          ? await requestPtgLogos("GET")
+          : await fetch("/api/logos", { cache: "no-store" });
+        const result = await response.json();
+        if (result.ok && result.logos?.appHeader?.url) setAppHeaderLogo(result.logos.appHeader.url);
+      } catch { /* Keep the built-in logo if branding cannot be loaded. */ }
+    };
+    void loadLogo();
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
