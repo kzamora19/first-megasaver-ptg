@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 export const usesEdgeAuth = process.env.NEXT_PUBLIC_PTG_USE_EDGE_AUTH === "true";
 const sessionStorageKey = "ptg_app_session_id";
 
-type EdgeAuthResponse = {
+export type EdgeAuthResponse = {
   ok?: boolean;
   message?: string;
   account?: {
