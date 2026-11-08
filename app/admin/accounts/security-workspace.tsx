@@ -148,27 +148,38 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
     if (selected.size > 15 * 1024 * 1024) throw new Error("The workbook exceeds 15 MB.");
     const { read, utils } = await import("xlsx");
     const workbook = read(await selected.arrayBuffer());
-    const sheet = workbook.SheetNames.find(name => name.trim().toLowerCase() === "product master");
-    if (!sheet) throw new Error("The workbook needs a Product Master worksheet.");
-    const [headers = [], ...records] = utils.sheet_to_json<string[]>(workbook.Sheets[sheet], { header: 1, raw: false, defval: "", blankrows: false });
-    const columns = headers.map(value => value.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
-    const barcodeIndex = columns.findIndex(value => ["barcode", "itemcode"].includes(value));
-    const descriptionIndex = columns.findIndex(value => ["modeldescription", "description", "itemname", "model"].includes(value));
-    const srpIndex = columns.indexOf("srp");
-    if ([barcodeIndex, descriptionIndex, srpIndex].includes(-1)) throw new Error("Use Barcode, Model / Description, and SRP columns.");
-    if (!records.length || records.length > 10000) throw new Error("Use a workbook containing 1 to 10,000 product rows.");
-    const seen = new Set<string>();
-    const rows = records.map((row, index) => {
-      const barcode = (row[barcodeIndex] ?? "").trim();
-      const description = (row[descriptionIndex] ?? "").trim();
-      const value = (row[srpIndex] ?? "").replace(/[₱,\s]/g, "");
-      const srp = Number(value);
-      if (!barcode || !description || seen.has(barcode)) {
-        throw new Error("Check the barcode and description in product row " + (index + 1) + ". Barcodes must be unique.");
-      }
-      seen.add(barcode);
-      return { barcode, description, srp: /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(srp) ? srp : null };
+    const sheet = ["product master", "products", "product_srp"]
+      .map(expected => workbook.SheetNames.find(name => name.trim().toLowerCase() === expected))
+      .find(Boolean);
+    if (!sheet) throw new Error("Use a workbook with a Product Master, Products, or PRODUCT_SRP worksheet.");
+    const records = utils.sheet_to_json<string[]>(workbook.Sheets[sheet], { header: 1, raw: false, defval: "", blankrows: true });
+    const header = records.slice(0, 10).map(row => {
+      const columns = row.map(value => value.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+      return {
+        barcode: columns.findIndex(value => value === "barcode" || value === "itemcode"),
+        description: ["modeldescription", "description", "itemname", "model"].map(value => columns.indexOf(value)).find(index => index >= 0) ?? -1,
+        srp: columns.indexOf("srp"),
+      };
     });
+    const headerIndex = header.findIndex(({ barcode, description, srp }) => barcode >= 0 && description >= 0 && srp >= 0);
+    if (headerIndex < 0) throw new Error("Use Barcode, Model / Description, and SRP columns.");
+    const columns = header[headerIndex];
+    const seen = new Set<string>();
+    const rows = records.slice(headerIndex + 1).flatMap((row, index) => {
+      const barcode = (row[columns.barcode] ?? "").trim();
+      const description = (row[columns.description] ?? "").trim();
+      const rawPrice = (row[columns.srp] ?? "").trim();
+      if (!barcode && !description && !rawPrice) return [];
+      const key = /^\d+$/.test(barcode) ? barcode.replace(/^0+(?=\d)/, "") : barcode.toUpperCase();
+      const rowNumber = headerIndex + index + 2;
+      if (!barcode || !description) throw new Error("Enter a barcode and description in worksheet row " + rowNumber + ".");
+      if (seen.has(key)) throw new Error("Duplicate barcode " + barcode + " in worksheet row " + rowNumber + ".");
+      seen.add(key);
+      const value = rawPrice.replace(/[₱,\s]/g, "");
+      const srp = Number(value);
+      return [{ barcode, description, srp: /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(srp) ? srp : null }];
+    });
+    if (!rows.length || rows.length > 10000) throw new Error("Use a workbook containing 1 to 10,000 product rows.");
     const result = await request("securityImportSrp", { source: selected.name, verified, rows });
     setVerified(false);
     return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records with no valid incoming price.";
@@ -356,13 +367,13 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
       </section>
       <section className="admin-card">
       <h3>Verify the source workbook</h3>
-      <p>Use the current Head Office workbook. Import time records when PTG received the workbook. It cannot establish when the prices took effect.</p>
+      <p>Use the current Head Office workbook or Product Data Extractor export. Import time records when PTG received the workbook. It cannot establish when the prices took effect.</p>
       <p>For product names, barcodes, and categories, open <Link className="admin-link" href="/product-master/">Product Master</Link>.</p>
       <form className="security-form" onReset={() => { setFile(null); setVerified(false); }} onSubmit={event => {
         event.preventDefault();
         if (file && verified) void run(() => importSrp(file));
       }}>
-        <label>Product Master workbook (.xlsx or .xls)<input type="file" accept=".xlsx,.xls" required onChange={event => {
+        <label>SRP workbook (.xlsx or .xls)<input type="file" accept=".xlsx,.xls" required onChange={event => {
           setFile(event.target.files?.[0] ?? null);
           setVerified(false);
         }} /></label>
