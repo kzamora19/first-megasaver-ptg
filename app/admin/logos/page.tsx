@@ -1,13 +1,10 @@
-import { redirect } from "next/navigation";
-import { getActiveAppSession } from "@/lib/auth/session";
+"use client";
+
+import ClientSessionGate from "@/components/client-session-gate";
 import LogoManager from "./logo-manager";
 
-export const dynamic = "force-dynamic";
-
-export default async function LogoManagerPage() {
-  const session = await getActiveAppSession();
-  if (!session) redirect("/login");
-  if (session.mustChangePassword) redirect("/change-password");
-  if (session.role !== "SYSTEM_ADMIN") redirect("/no-access");
-  return <LogoManager />;
+export default function LogoManagerPage() {
+  return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>
+    {() => <LogoManager />}
+  </ClientSessionGate>;
 }
