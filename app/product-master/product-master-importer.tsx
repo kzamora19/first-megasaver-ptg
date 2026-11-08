@@ -68,7 +68,7 @@ export default function ProductMasterImporter() {
       }
       const parsed = parseSheet(rows);
       if (!parsed.length) throw new Error("No product rows were found below the header.");
-      if (parsed.length > 5000) throw new Error("This file contains more than 5,000 product rows. Split it before importing.");
+      if (parsed.length > 10000) throw new Error("This file contains more than 10,000 product rows. Split it before importing.");
       setProducts(parsed); setFileName(file.name);
       setMessage("File read successfully. Review the sample below before importing.");
     } catch (e) {
@@ -112,7 +112,7 @@ export default function ProductMasterImporter() {
         <label className="upload-drop">
           <input type="file" accept=".xlsx,.xls,.csv" onChange={e => void handleFile(e.target.files?.[0])} />
           <strong>Choose an Excel or CSV file</strong>
-          <span>Maximum 15 MB · Up to 5,000 product rows</span>
+          <span>Maximum 15 MB · Up to 10,000 product rows</span>
         </label>
         {fileName && <p className="admin-muted">Selected: <strong>{fileName}</strong> · {products.length.toLocaleString()} rows</p>}
         {message && <p className={error ? "admin-alert error" : "admin-alert success"} role="status">{message}</p>}
