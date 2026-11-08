@@ -1,7 +1,6 @@
 export const securitySections = [
-  ["master", "Master System"],
+  ["master", "System Availability"],
   ["branches", "Branch Control"],
-  ["maintenance", "Maintenance Mode"],
   ["admins", "System Admin"],
   ["permissions", "Permissions"],
   ["srp", "Product SRP Import"],

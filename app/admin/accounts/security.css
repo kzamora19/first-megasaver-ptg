@@ -9,3 +9,29 @@
 .security-form input, .security-form select { font: inherit; max-width: 100%; }
 .security-form .security-check { display: flex; align-items: center; }
 .security-error { color: #9f2020; }
+
+.security-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.security-control-grid .admin-card { display: grid; align-content: start; justify-items: start; }
+.security-card-heading, .security-dialog header, .security-pagination { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.security-card-heading, .security-dialog header { justify-content: space-between; }
+.security-dialog h3 { margin: 0; }
+.security-dialog { width: min(36rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; padding: 1.5rem; border: 1px solid #d4dfed; border-radius: 1rem; color: #142842; }
+.security-dialog::backdrop { background: rgb(13 31 51 / 58%); }
+.security-dialog .admin-form { margin-top: 1rem; }
+.security-rocker { display: inline-grid; grid-template-columns: repeat(2, 1fr); width: max-content; padding: 3px; gap: 3px; border: 1px solid #c7d5e3; background: #e5edf5; border-radius: 999px; }
+.security-rocker button { min-width: 3rem; min-height: 2rem; padding: 0.25rem 0.65rem; border: 1px solid transparent; border-radius: 999px; font: inherit; font-size: 0.8rem; font-weight: 800; cursor: pointer; background: transparent; color: #344a64; }
+.security-rocker button[aria-pressed="true"] { color: white; cursor: default; background: #ad2437; box-shadow: 0 0 0.55rem rgb(218 47 69 / 55%); }
+.security-rocker button[data-on="true"][aria-pressed="true"] { background: #08783f; box-shadow: 0 0 0.55rem rgb(24 184 96 / 55%); }
+.security-rocker button:not([aria-pressed="true"]):enabled:hover { background: #fff; }
+.security-rocker button:focus-visible { outline: 2px solid #133b66; outline-offset: 2px; }
+.security-rocker button:disabled { cursor: default; opacity: 0.72; }
+.security-paged-table { width: 100%; min-width: 0; table-layout: fixed; margin-top: 0.8rem; }
+.security-paged-table tbody tr { height: 3.25rem; }
+.security-paged-table th, .security-paged-table td { overflow-wrap: anywhere; }
+.security-paged-table tbody td { padding-block: 0.25rem; vertical-align: middle; }
+.security-paged-table tbody td > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.2; }
+.security-pagination { justify-content: center; margin: 0.85rem 0; }
+@media (max-width: 700px) {
+  .security-control-grid { grid-template-columns: 1fr; }
+  .security-paged-table th, .security-paged-table td { padding-inline: 0.2rem; font-size: 0.68rem; }
+}

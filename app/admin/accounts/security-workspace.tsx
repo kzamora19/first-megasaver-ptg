@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { requestPtgAccounts, usesEdgeAccounts } from "@/lib/ptg/accounts-client";
 import { getSecuritySection, securitySections, type SecuritySection } from "@/lib/ptg/security-sections";
+import SecurityDialog from "./security-dialog";
 import AccountAdministration from "./account-administration";
 
 type Branch = { id: string; branch_code: string; branch_name: string; status: string; operational_status: string };
@@ -17,9 +18,8 @@ type Result = { ok: boolean; message?: string; controls?: Control[]; branches?: 
 
 const date = (value: string) => new Date(value).toLocaleString();
 const descriptions: Record<SecuritySection, string> = {
-  master: "Manage availability across all branches.",
+  master: "Manage Master System and Maintenance Mode across all branches.",
   branches: "Manage branches, branch accounts, and active sessions.",
-  maintenance: "Temporarily restrict branch access during maintenance.",
   admins: "Manage System Admin accounts, invitations, and passwords.",
   permissions: "Review role permissions and test authorization for your current session.",
   srp: "Update the separate product SRP register from a verified Head Office workbook.",
@@ -45,6 +45,52 @@ export default function SecurityWorkspace() {
   </main>;
 }
 
+function Rocker({ label, enabled, disabled, onChange }: {
+  label: string;
+  enabled: boolean;
+  disabled: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
+  return <div className="security-rocker" role="group" aria-label={label}>
+    {[true, false].map(value => <button type="button" key={String(value)} data-on={value}
+      aria-pressed={value === enabled} disabled={disabled}
+      onClick={() => { if (value !== enabled) onChange(value); }}>{value ? "ON" : "OFF"}</button>)}
+  </div>;
+}
+
+const PAGE_SIZE = 10;
+
+function SecurityTable({ label, headers, rows, empty }: {
+  label: string;
+  headers: string[];
+  rows: { id: string; cells: ReactNode[] }[];
+  empty: string;
+}) {
+  const [selectedPage, setPage] = useState(1);
+  const lastPage = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = Math.min(selectedPage, lastPage);
+  const visible = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  return <>
+    <table className="admin-table security-paged-table" aria-label={label}>
+      <thead><tr>{headers.map(header => <th scope="col" key={header}>{header}</th>)}</tr></thead>
+      <tbody>
+        {visible.map(row => <tr key={row.id}>{row.cells.map((cell, index) =>
+          <td key={headers[index]}><span title={typeof cell === "string" ? cell : undefined}>{cell}</span></td>
+        )}</tr>)}
+        {!rows.length && <tr><td colSpan={headers.length}>{empty}</td></tr>}
+        {Array.from({ length: PAGE_SIZE - (rows.length ? visible.length : 1) }, (_, index) =>
+          <tr key={index} aria-hidden="true"><td colSpan={headers.length} /></tr>)}
+      </tbody>
+    </table>
+    <nav className="security-pagination" aria-label={label + " pagination"}>
+      <button className="admin-button small secondary" type="button" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
+      <span role="status">Page {page} of {lastPage}</span>
+      <button className="admin-button small secondary" type="button" disabled={page === lastPage} onClick={() => setPage(page + 1)}>Next</button>
+    </nav>
+  </>;
+}
+
 function SecurityPanel({ section }: { section: SecuritySection }) {
   const [data, setData] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,6 +99,8 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
   const [file, setFile] = useState<File | null>(null);
   const [verified, setVerified] = useState(false);
   const [accountRefresh, setAccountRefresh] = useState(0);
+  const [auditRefresh, setAuditRefresh] = useState(0);
+  const [branchDialog, setBranchDialog] = useState<"add" | Branch | null>(null);
   const [permissionKey, setPermissionKey] = useState("");
   const [mode, setMode] = useState("VIEW");
 
@@ -85,6 +133,7 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
   function mutate(action: string, input: Record<string, unknown>, message: string) {
     void run(async () => {
       await request(action, input);
+      setBranchDialog(null);
       await load();
       if (action === "securityBranch") setAccountRefresh(value => value + 1);
       return message;
@@ -125,41 +174,64 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
   const masterOn = data?.controls?.find(row => row.control_key === "MASTER_SYSTEM")?.enabled ?? true;
   const maintenanceOn = data?.controls?.find(row => row.control_key === "MAINTENANCE_MODE")?.enabled ?? false;
   const status = !masterOn ? "System offline" : maintenanceOn ? "Maintenance active" : "System accessible";
-  const isMaster = section === "master";
-  const switchOn = isMaster ? masterOn : maintenanceOn;
   const needsData = section !== "admins" && section !== "srp";
 
   if (!usesEdgeAccounts) return <AccountAdministration role="SYSTEM_ADMIN" />;
 
   return <div className="security-panel">
     <h2>{securitySections.find(([key]) => key === section)?.[1]}</h2>
-    {error && <p role="alert" className="security-error">{error}</p>}
+    {error && !branchDialog && <p role="alert" className="security-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {needsData && !data && !error && <p role="status">Loading security information…</p>}
     {needsData && !data && error && <button className="admin-button" disabled={busy} onClick={() => void run(async () => { await load(); return ""; })}>Retry</button>}
-    {data && (section === "master" || section === "maintenance") && <>
-      <section className="admin-card">
-        <h3>{status}</h3>
-        <p>{isMaster ? "Master System overrides branch availability." : "Maintenance preserves branch settings."} System Admins retain access to restore service.</p>
-        <div className="admin-actions">
-          {[true, false].map(enabled => <button key={String(enabled)} className="admin-button secondary" type="button" aria-pressed={switchOn === enabled}
-            disabled={busy || switchOn === enabled}
-            onClick={() => {
-              if (window.confirm("Turn " + (isMaster ? "Master System" : "Maintenance Mode") + (enabled ? " on?" : " off?"))) {
-                mutate("securityControl", { key: isMaster ? "MASTER_SYSTEM" : "MAINTENANCE_MODE", enabled }, "Availability updated.");
-              }
-            }}>{enabled ? "On" : "Off"}</button>)}
-        </div>
-      </section>
-      {isMaster && <section className="admin-card"><h3>Branch status summary</h3>
+    {data && section === "master" && <>
+      <p role="status"><strong>{status}</strong></p>
+      <div className="security-control-grid">
+        {[
+          { title: "Master System", key: "MASTER_SYSTEM", enabled: masterOn, help: "Turning this off blocks access across all branches." },
+          { title: "Maintenance Mode", key: "MAINTENANCE_MODE", enabled: maintenanceOn, help: "Turning this on temporarily blocks access and preserves branch settings." },
+        ].map(control => <section className="admin-card" key={control.key}>
+          <h3>{control.title}</h3>
+          <p>{control.help}</p>
+          <Rocker label={control.title} enabled={control.enabled} disabled={busy} onChange={enabled => {
+            if (window.confirm("Turn " + control.title + (enabled ? " on?" : " off?"))) {
+              mutate("securityControl", { key: control.key, enabled }, "Availability updated.");
+            }
+          }} />
+        </section>)}
+      </div>
+      <p>System Admins retain access to restore service.</p>
+      <section className="admin-card"><h3>Branch status summary</h3>
         <ul>{branches.filter(branch => branch.status === "ACTIVE").map(branch => <li key={branch.id}>
           {branch.branch_code} · {branch.branch_name} · {masterOn && !maintenanceOn && branch.operational_status === "ON" ? "Online" : "Offline"}
-        </li>)}</ul></section>}
+        </li>)}</ul>
+      </section>
     </>}
     {section === "branches" && data && <>
       <section className="admin-card">
-        <h3>Branch registry</h3>
-        <form className="security-form" onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        <div className="security-card-heading">
+          <h3>Branch registry</h3>
+          <button className="admin-button" type="button" disabled={busy} onClick={() => { setError(""); setBranchDialog("add"); }}>Add branch</button>
+        </div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Code</th><th>Branch</th><th>Status</th><th>Access</th><th>Actions</th></tr></thead>
+          <tbody>{branches.map(branch => <tr key={branch.id}><td>{branch.branch_code}</td><td>{branch.branch_name}</td><td>{branch.status}</td><td>
+            <Rocker label={branch.branch_name + " access"} enabled={branch.operational_status === "ON"} disabled={busy || branch.status !== "ACTIVE"} onChange={enabled => {
+              if (window.confirm("Turn " + branch.branch_code + (enabled ? " on?" : " off?"))) {
+                mutate("securityBranch", { command: enabled ? "on" : "off", branchId: branch.id }, "Branch updated.");
+              }
+            }} />
+          </td><td>
+            {branch.status === "ACTIVE"
+              ? <button type="button" className="admin-button small secondary" disabled={busy} onClick={() => { setError(""); setBranchDialog(branch); }}>Deactivate</button>
+              : <button type="button" className="admin-button small secondary" disabled={busy} onClick={() => {
+                if (window.confirm("Reactivate " + branch.branch_code + "?")) mutate("securityBranch", { command: "reactivate", branchId: branch.id }, "Branch reactivated.");
+              }}>Reactivate</button>}
+          </td></tr>)}</tbody></table></div>
+      </section>
+      {branchDialog && <SecurityDialog title={branchDialog === "add" ? "Add branch" : "Deactivate " + branchDialog.branch_code}
+        busy={busy} onClose={() => { setBranchDialog(null); setError(""); }}>
+        {error && <p role="alert" className="security-error">{error}</p>}
+        {branchDialog === "add" ? <form className="admin-form" onSubmit={event => {
           event.preventDefault();
           const fields = new FormData(event.currentTarget);
           mutate("securityBranch", { command: "add", code: fields.get("code"), name: fields.get("name") }, "Branch added.");
@@ -167,19 +239,13 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
           <label>Branch code<input name="code" required pattern="[A-Za-z0-9]{2,12}" maxLength={12} /></label>
           <label>Branch name<input name="name" required maxLength={120} /></label>
           <button className="admin-button" disabled={busy}>Add branch</button>
-        </form>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Code</th><th>Branch</th><th>Status</th><th>Access</th><th>Actions</th></tr></thead>
-          <tbody>{branches.map(branch => <tr key={branch.id}><td>{branch.branch_code}</td><td>{branch.branch_name}</td><td>{branch.status}</td><td>{branch.operational_status}</td><td>
-            <div className="admin-actions">
-              {(branch.status === "ACTIVE" ? [branch.operational_status === "ON" ? "off" : "on", "deactivate"] : ["reactivate"]).map(command =>
-                <button key={command} className="admin-button small secondary" disabled={busy} onClick={() => {
-                  if (window.confirm("Apply " + command + " to " + branch.branch_code + "?")) {
-                    mutate("securityBranch", { command, branchId: branch.id }, "Branch updated.");
-                  }
-                }}>{command === "on" ? "Turn on" : command === "off" ? "Turn off" : command === "deactivate" ? "Deactivate" : "Reactivate"}</button>)}
-            </div>
-          </td></tr>)}</tbody></table></div>
-      </section>
+        </form> : <>
+          <p>{branchDialog.branch_name} will lose PTG access and its active sessions will be signed out.</p>
+          <button type="button" className="admin-button danger" disabled={busy} onClick={() => {
+            mutate("securityBranch", { command: "deactivate", branchId: branchDialog.id }, "Branch deactivated.");
+          }}>Deactivate branch</button>
+        </>}
+      </SecurityDialog>}
       <AccountAdministration key={accountRefresh} role="SYSTEM_ADMIN" scope="branch" />
       <section className="admin-card">
         <h3>Active branch sessions</h3>
@@ -200,12 +266,18 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
     </>}
     {section === "permissions" && data && <section className="admin-card">
       <h3>Role permission matrix</h3>
-      <div className="admin-table-wrap"><table className="admin-table">
-        <thead><tr><th>Permission</th><th>System Admin</th><th>Branch Admin</th><th>Branch User</th><th>Scope</th></tr></thead>
-        <tbody>{data.catalog?.map(permission => <tr key={permission.permission_key}><td>{permission.label}</td>
-          {["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].map(role => <td key={role}>{data.grants?.find(grant => grant.role_key === role && grant.permission_key === permission.permission_key)?.access_level.replaceAll("_", " ") ?? "NONE"}</td>)}
-          <td>{permission.scope_description}</td></tr>)}</tbody>
-      </table></div>
+      <SecurityTable label="Role permission matrix" empty="No permissions found."
+        headers={["Permission", "System Admin", "Branch Admin", "Branch User", "Scope"]}
+        rows={(data.catalog ?? []).map(permission => ({
+          id: permission.permission_key,
+          cells: [
+            permission.label,
+            ...["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].map(role =>
+              data.grants?.find(grant => grant.role_key === role && grant.permission_key === permission.permission_key)?.access_level.replaceAll("_", " ") ?? "NONE"
+            ),
+            permission.scope_description,
+          ],
+        }))} />
       <h3>Authorization test</h3>
       <form className="security-form" onSubmit={event => {
         event.preventDefault();
@@ -238,10 +310,14 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
     {section === "audit" && data && <section className="admin-card">
       <h3>Security activity</h3>
       <p>Showing the latest {data.events?.length ?? 0} events.</p>
-      <button className="admin-button small secondary" disabled={busy} onClick={() => void run(async () => { await load(); return "Audit log refreshed."; })}>Refresh log</button>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Timestamp</th><th>Account</th><th>Current role</th><th>Event</th><th>Action</th><th>Target</th><th>Result</th><th>Details</th></tr></thead>
-        <tbody>{data.events?.length ? data.events.map(event => <tr key={event.id}><td>{date(event.created_at)}</td><td>{event.actor}</td><td>{event.current_role.replaceAll("_", " ")}</td><td>{event.event_category}</td><td>{event.action}</td><td>{event.target_identifier}</td><td>{event.outcome}</td><td>{event.message}</td></tr>) : <tr><td colSpan={8}>No events recorded.</td></tr>}</tbody>
-      </table></div>
+      <button className="admin-button small secondary" disabled={busy} onClick={() => void run(async () => { await load(); setAuditRefresh(value => value + 1); return "Audit log refreshed."; })}>Refresh log</button>
+      <SecurityTable key={auditRefresh} label="Security activity" empty="No events recorded."
+        headers={["Timestamp", "Account", "Current role", "Event", "Action", "Target", "Result", "Details"]}
+        rows={(data.events ?? []).map(event => ({
+          id: event.id,
+          cells: [date(event.created_at), event.actor, event.current_role.replaceAll("_", " "), event.event_category,
+            event.action, event.target_identifier, event.outcome, event.message],
+        }))} />
     </section>}
   </div>;
 }
