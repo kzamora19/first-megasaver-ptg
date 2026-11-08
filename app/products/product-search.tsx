@@ -165,6 +165,12 @@ export default function ProductSearch({
   legacyRole?: string;
   systemRole?: string;
 }) {
+  useEffect(() => {
+    if (window.location.hash === "#print-price-tags") {
+      document.getElementById("print-price-tags")?.scrollIntoView();
+    }
+  }, []);
+
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
