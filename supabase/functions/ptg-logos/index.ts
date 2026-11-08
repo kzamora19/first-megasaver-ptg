@@ -127,7 +127,7 @@ async function requireSystemAdmin(request: Request, origin: string) {
 
 async function uploadLogo(request: Request, origin: string) {
   const auth = await requireSystemAdmin(request, origin);
-  if (auth.response) return auth.response;
+  if ("response" in auth) return auth.response;
   const form = await request.formData();
   const key = String(form.get("key") || "");
   const file = form.get("file");
