@@ -1,5 +1,5 @@
-const CACHE_NAME = "first-megasaver-ptg-shell-v1";
-const OFFLINE_URL = "/offline.html";
+const CACHE_NAME = "first-megasaver-ptg-shell-v2";
+const OFFLINE_URL = new URL("offline.html", self.registration.scope).pathname;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
