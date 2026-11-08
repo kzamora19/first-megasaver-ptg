@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
-export default function AppDialog({ title, busy, onClose, children }: {
+export default function AppDialog({ title, busy, onClose, children, closeIcon = false }: {
   title: string;
+  closeIcon?: boolean;
   busy: boolean;
   onClose: () => void;
   children: ReactNode;
@@ -21,7 +22,7 @@ export default function AppDialog({ title, busy, onClose, children }: {
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
     <header>
       <h3 id={titleId}>{title}</h3>
-      <button type="button" className="admin-button small secondary" disabled={busy} onClick={onClose}>Cancel</button>
+      <button type="button" className="admin-button small secondary" disabled={busy} onClick={onClose} aria-label={closeIcon ? "Close" : undefined}>{closeIcon ? "×" : "Cancel"}</button>
     </header>
     {children}
   </dialog>;

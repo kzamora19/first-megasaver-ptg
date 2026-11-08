@@ -419,14 +419,7 @@ export default function ProductSearch({
       <section className="legacy-preview-panel">
         <div className="legacy-preview-heading">
           <h2>Print Price Tags</h2>
-          <div className="legacy-preview-controls">
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
-            <div className="legacy-output-buttons ptg-print-hide">
-              <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>
-              <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
-              <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print Price Tags</button>
-            </div>
-          </div>
         </div>
         {logoMessage && <p className="legacy-status-message ptg-print-hide" role="status">{logoMessage}</p>}
         {!printable && <div className="legacy-format-notice" role="alert">
@@ -434,6 +427,11 @@ export default function ProductSearch({
           Check or remove: {invalidAircon.map(product => product.model || product.barcode).join(", ")}.
         </div>}
         {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
+        <div className="legacy-output-buttons ptg-print-hide">
+          <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>
+          <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
+          <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print Price Tags</button>
+        </div>
       </section>
       </div>
 
@@ -522,7 +520,7 @@ export default function ProductSearch({
           )}
           </div>)}
         </div>}
-      {detailProduct && <AppDialog title="Product details" busy={false} onClose={() => setDetailProduct(null)}>
+      {detailProduct && <AppDialog title="Product details" closeIcon busy={false} onClose={() => setDetailProduct(null)}>
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
           <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
@@ -618,11 +616,10 @@ export default function ProductSearch({
         .legacy-queue-panel h2{margin-bottom:7px}
         .legacy-queue-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:auto;padding-top:7px;color:#143d75;font-size:9px}
         .legacy-queue-footer button{height:24px;padding:0 9px;border:0;border-radius:4px;background:#dedede;color:#425064;font-size:9px;font-weight:700}
-        .legacy-preview-panel{padding:8px}
+        .legacy-preview-panel{display:flex;flex-direction:column;min-width:0;padding:8px}
         .legacy-preview-heading h2{margin-bottom:5px}
-        .legacy-preview-controls{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px}
         .preview-format-controls{min-width:0;flex:1}
-        .legacy-output-buttons{display:flex;gap:4px;flex:0 0 auto}
+        .legacy-output-buttons{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;margin-top:auto;padding-top:8px}
         .legacy-output-buttons button{height:24px;padding:0 8px;border:0;border-radius:4px;color:#fff;font-size:8px;font-weight:800;white-space:nowrap}
         .legacy-output-buttons .refresh-logos{background:#e4effd;color:#124a9c;border:1px solid #8eb6e9}
         .legacy-output-buttons .save-pdf,.legacy-output-buttons .print-tags{background:#0647a7}
