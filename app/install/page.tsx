@@ -1,4 +1,5 @@
 import InstallApp from "@/components/install-app";
+import { withBasePath } from "@/lib/base-path";
 
 export const metadata = {
   title: "Install Branchline PTG",
@@ -50,7 +51,7 @@ export default function InstallPage() {
           <li>Updates are delivered through the website; you do not need to reinstall for every release.</li>
           <li>For shared branch computers, sign out after use and do not save your password in the browser.</li>
         </ul>
-        <p><a className="admin-link" href="/login">Continue to PTG sign in →</a></p>
+        <p><a className="admin-link" href={withBasePath("/login")}>Continue to PTG sign in →</a></p>
       </section>
     </main>
   );
