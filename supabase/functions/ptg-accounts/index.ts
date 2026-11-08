@@ -127,32 +127,35 @@ async function sendEmail(input: { to: string; subject: string; text: string; htm
     transport.close();
   }
 }
-function inviteEmail(name: string, username: string, password: string, acceptUrl: string) {
+function inviteEmail(name: string, username: string, password: string, acceptUrl: string, managed: boolean) {
   const safeName = escapeHtml(name), safeUser = escapeHtml(username), safePass = escapeHtml(password), safeUrl = escapeHtml(acceptUrl);
   const login = appUrl + "/login";
+  const instructions = managed ? "After accepting, sign in with the password above. Your administrator manages password changes." : "After accepting, sign in and change your temporary password.";
+  const passwordLabel = managed ? "Password" : "Temporary password";
   const text = "Hello " + name + ",\n\nYour First Megasaver PTG account has been created.\n\nUsername: " + username +
-    "\nTemporary password: " + password + "\n\nAccept your invitation: " + acceptUrl +
-    "\n\nAfter accepting, sign in and change your temporary password.\n\nLogin: " + login + "\n\nThis invitation expires in 48 hours.";
+    "\n" + passwordLabel + ": " + password + "\n\nAccept your invitation: " + acceptUrl +
+    "\n\n" + instructions + "\n\nLogin: " + login + "\n\nThis invitation expires in 48 hours.";
   const html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#172033;line-height:1.6"><h2>First Megasaver · Price Tag Generator</h2><p>Hello ' +
-    safeName + ', your account has been created.</p><p><b>Username:</b> ' + safeUser + '<br><b>Temporary password:</b> <code>' + safePass +
-    '</code></p><p><a href="' + safeUrl + '">Accept invitation</a></p><p>After accepting, sign in and change your temporary password.</p><p><a href="' +
+    safeName + ', your account has been created.</p><p><b>Username:</b> ' + safeUser + '<br><b>' + passwordLabel + ':</b> <code>' + safePass +
+    '</code></p><p><a href="' + safeUrl + '">Accept invitation</a></p><p>' + instructions + '</p><p><a href="' +
     escapeHtml(login) + '">Open PTG</a></p><p>This invitation expires in 48 hours.</p></div>';
   return { to: "", subject: "Your First Megasaver PTG account invitation", text, html };
 }
-async function sendInvitation(email: string, displayName: string, username: string, password: string, token: string) {
+async function sendInvitation(email: string, displayName: string, username: string, password: string, token: string, managed: boolean) {
   const acceptUrl = appUrl + "/invitation/accept?token=" + encodeURIComponent(token);
-  const mail = inviteEmail(displayName, username, password, acceptUrl); mail.to = email;
+  const mail = inviteEmail(displayName, username, password, acceptUrl, managed); mail.to = email;
   return sendEmail(mail);
 }
-async function sendReset(email: string, displayName: string, username: string, password: string) {
+async function sendReset(email: string, displayName: string, username: string, password: string, managed: boolean) {
   const loginUrl = appUrl + "/login";
+  const passwordLabel = managed ? "New password" : "Temporary password";
   const safeName = escapeHtml(displayName), safeUser = escapeHtml(username), safePass = escapeHtml(password), safeLogin = escapeHtml(loginUrl);
   const text = "Hello " + displayName + ",\n\nYour PTG password has been reset.\nUsername: " + username +
-    "\nTemporary password: " + password + "\n\nSign in at " + loginUrl + " and change the temporary password.";
+    "\n" + passwordLabel + ": " + password + "\n\nSign in at " + loginUrl + (managed ? " with the new password." : " and change the temporary password.");
   const html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#172033;line-height:1.6"><h2>First Megasaver PTG</h2><p>Hello ' +
-    safeName + ', your password has been reset.</p><p><b>Username:</b> ' + safeUser + '<br><b>Temporary password:</b> <code>' + safePass +
-    '</code></p><p><a href="' + safeLogin + '">Sign in and change your password</a></p></div>';
-  return sendEmail({ to: email, subject: "Your First Megasaver PTG temporary password", text, html });
+    safeName + ', your password has been reset.</p><p><b>Username:</b> ' + safeUser + '<br><b>' + passwordLabel + ':</b> <code>' + safePass +
+    '</code></p><p><a href="' + safeLogin + '">' + (managed ? "Sign in with your new password" : "Sign in and change your password") + '</a></p></div>';
+  return sendEmail({ to: email, subject: "Your First Megasaver PTG password reset", text, html });
 }
 async function usernameFor(userId: string) {
   const { data } = await admin.rpc("get_ptg_login_username", { p_user_id: userId });
@@ -233,8 +236,8 @@ async function createAccount(request: Request, session: Session, origin: string,
     throw new Error("INVITATION_UPDATE_FAILED");
   }
   try {
-    const emailId = await sendInvitation(email, displayName, username, password, token);
-    await audit(session, branchId, "CREATE_ACCOUNT_INVITATION", username, "Invitation emailed; account remains inactive until acceptance and initial password change.", { role, legacyRole, email, emailId, expires });
+    const emailId = await sendInvitation(email, displayName, username, password, token, role === "BRANCH_USER");
+    await audit(session, branchId, "CREATE_ACCOUNT_INVITATION", username, "Invitation emailed; account remains inactive until acceptance.", { role, legacyRole, email, emailId, expires });
     return json(origin, { ok: true, account: { id: userId, username, displayName, email, role, legacyRole, branchId, invitationStatus: "SENT", expiresAt: expires } }, 201);
   } catch (error) {
     await admin.auth.admin.deleteUser(userId);
@@ -248,6 +251,17 @@ async function updateAccount(request: Request, session: Session, origin: string,
   const target = await getTarget(userId);
   const action = clean(body.action, 40).toUpperCase();
   if (session.role === "BRANCH_ADMIN" && target.role_key !== "BRANCH_USER") throw new Error("PERMISSION_DENIED");
+  if (action === "DELETE_USER") {
+    if (session.role !== "SYSTEM_ADMIN" || target.role_key === "SYSTEM_ADMIN" || !target.branch_id || userId === session.userId) {
+      throw new Error("PERMISSION_DENIED");
+    }
+    await requirePermission(session, "BRANCH_USER_ACCOUNT_MANAGEMENT", "EXECUTE", target.branch_id);
+    const username = await usernameFor(userId);
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) throw new Error("ACCOUNT_DELETE_FAILED");
+    await audit(session, target.branch_id, "DELETE_USER", username || userId, "Branch account permanently deleted.", { role: target.role_key });
+    return json(origin, { ok: true });
+  }
   if (action === "RESET_PASSWORD") {
     if (target.role_key === "SYSTEM_ADMIN" || !target.email) throw new Error("PERMISSION_DENIED");
     await requirePermission(session, "PASSWORD_RESET", "EXECUTE", target.branch_id);
@@ -256,8 +270,8 @@ async function updateAccount(request: Request, session: Session, origin: string,
     if (error) throw new Error("PASSWORD_UPDATE_FAILED");
     const { error: stateError } = await admin.rpc("reset_ptg_user_password_state", { p_user_id: userId });
     if (stateError) throw new Error("PASSWORD_UPDATE_FAILED");
-    const emailId = await sendReset(target.email, target.display_name, await usernameFor(userId), temporary);
-    await audit(session, target.branch_id, "RESET_PASSWORD", userId, "Random temporary password emailed; user must change it on next sign-in.", { role: target.role_key, email: target.email, emailId });
+    const emailId = await sendReset(target.email, target.display_name, await usernameFor(userId), temporary, target.role_key === "BRANCH_USER");
+    await audit(session, target.branch_id, "RESET_PASSWORD", userId, "Replacement password emailed.", { role: target.role_key, email: target.email, emailId });
     return json(origin, { ok: true });
   }
   if (action === "SET_STATUS") {
@@ -298,7 +312,7 @@ async function resendInvitation(userId: string, session: Session, origin: string
     p_user_id: userId, p_hash: await sha256(token), p_expires: expires, p_email: target.email,
   });
   if (inviteError) throw new Error("INVITATION_UPDATE_FAILED");
-  const emailId = await sendInvitation(target.email, target.display_name, username, password, token);
+  const emailId = await sendInvitation(target.email, target.display_name, username, password, token, target.role_key === "BRANCH_USER");
   await audit(session, target.branch_id, "RESEND_ACCOUNT_INVITATION", username, "New single-use invitation and temporary password emailed.", { email: target.email, emailId, expires });
   return json(origin, { ok: true, invitationStatus: "SENT" });
 }
@@ -309,7 +323,7 @@ async function acceptInvitation(body: Record<string, unknown>, origin: string) {
   const { data: userId, error } = await admin.rpc("ptg_accept_invitation", { p_hash: await sha256(token) });
   if (error) return json(origin, { ok: false, message: "The invitation could not be activated. Contact your System Admin." }, 503);
   if (!userId) return json(origin, { ok: false, message: "This invitation is invalid, expired, or already used." }, 400);
-  await admin.from("security_audit_logs").insert({ actor_user_id: null, event_category: "ACCOUNT_SECURITY", action: "ACCEPT_ACCOUNT_INVITATION", target_identifier: userId, outcome: "SUCCESS", message: "Employee accepted account invitation. Initial password change remains required." });
+  await admin.from("security_audit_logs").insert({ actor_user_id: null, event_category: "ACCOUNT_SECURITY", action: "ACCEPT_ACCOUNT_INVITATION", target_identifier: userId, outcome: "SUCCESS", message: "Employee accepted account invitation." });
   return json(origin, { ok: true });
 }
 

@@ -272,6 +272,9 @@ Deno.serve(async request => {
       return json(origin, { ok: true });
     }
     if (action === "change-password") {
+      if (session.role !== "SYSTEM_ADMIN" && session.role !== "BRANCH_ADMIN") {
+        return json(origin, { ok: false, message: "Your administrator manages your PTG password." }, 403);
+      }
       const password = String(body.password ?? "");
       const confirmPassword = String(body.confirmPassword ?? "");
       if (password.length < 12 || password.length > 1024) {

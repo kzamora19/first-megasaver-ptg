@@ -349,7 +349,7 @@ export default function ProductSearch({
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
           {canManageUsers && <a href={withBasePath("/admin/accounts")}>CHANGE BRANCH USER PASSWORD</a>}
-          <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>
+          {systemRole === "BRANCH_ADMIN" && <a href={withBasePath("/change-password")}>CHANGE MY PASSWORD</a>}
           {canImport && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
         </nav>
       </section>}
