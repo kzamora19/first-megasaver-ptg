@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+
+const publicBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 import PwaRegister from "@/components/pwa-register";
 import "./globals.css";
 
@@ -6,15 +8,15 @@ export const metadata: Metadata = {
   title: "Branchline · Price Tag Generator",
   description: "Branchline Price Tag Generator",
   applicationName: "Branchline · Price Tag Generator",
-  manifest: "/manifest.webmanifest",
+  manifest: `${publicBasePath}/manifest.webmanifest`,
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Branchline PTG",
   },
   icons: {
-    icon: [{ url: "/icons/ptg-icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icons/ptg-icon.svg", type: "image/svg+xml" }],
+    icon: [{ url: `${publicBasePath}/icons/ptg-icon.svg`, type: "image/svg+xml" }],
+    apple: [{ url: `${publicBasePath}/icons/ptg-icon.svg`, type: "image/svg+xml" }],
   },
 };
 
