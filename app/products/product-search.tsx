@@ -258,6 +258,9 @@ export default function ProductSearch({
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
   const detailMemo = memoInfo(detailProduct);
+  const detailInstallments = detailProduct ? ([6, 9, 12, 18, 24] as const)
+    .map(months => ({ months, total: amount(detailProduct[`months_${months}`]) }))
+    .filter(({ total }) => total > 0) : [];
 
   function openProductDetails(product: Product) {
     setActiveProduct(product);
@@ -351,40 +354,21 @@ export default function ProductSearch({
         </nav>
       </section>}
 
-      <section className="legacy-search-workflow ptg-print-hide">
-        <div className="legacy-search-card">
-          <h2>1. Select Product</h2>
+      <div className="legacy-search-workflow ptg-print-hide">
+        <section className="legacy-search-card">
+          <h2>Select Product</h2>
           <div className="legacy-search-fields">
             <form onSubmit={submitSearch} className="legacy-search-form">
               <label htmlFor="legacy-product-search">SEARCH PRODUCT</label>
               <div><input id="legacy-product-search" value={term} onChange={event => setTerm(event.target.value)} placeholder="Search brand, model, barcode, description..." aria-label="Search brand, model, barcode, description" /><button type="submit" disabled={loading}>{loading ? "SEARCHING…" : "SEARCH"}</button></div>
             </form>
-            <div className="legacy-format-controls">
-              <strong>PRINT FORMAT</strong>
-              <div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div>
-            </div>
             <div className="legacy-memo-info">
               <label>MEMO_ID<input readOnly value={currentMemo?.memo_id || ""} /></label>
               <label>PERIOD<input readOnly value={currentMemo?.period || ""} /></label>
               <label>IMPORT_DATE<input readOnly value={currentMemo?.created_at ? new Date(currentMemo.created_at).toLocaleDateString("en-US") : ""} /></label>
             </div>
           </div>
-        </div>
-
-        <aside className="legacy-installment-panel">
-          <h3>INSTALLMENT PRICE</h3>
-          <p>{activeProduct ? (activeProduct.brand + " " + activeProduct.model) : "Select a product to view installment prices."}</p>
-          <table>
-            <thead><tr><th>TERM</th><th>TOTAL INSTALLMENT</th><th>MONTHLY PAYMENT</th></tr></thead>
-            <tbody>
-              {activeProduct ? ([6, 9, 12, 18, 24] as const).map(months => {
-                const totalInstallment = amount(activeProduct["months_" + months as "months_6"]);
-                return <tr key={months}><td>{months} MONTHS</td><td>{totalInstallment ? peso(totalInstallment) : "—"}</td><td>{totalInstallment ? peso(totalInstallment / months) : "—"}</td></tr>;
-              }) : <tr><td colSpan={3}>Select a product.</td></tr>}
-            </tbody>
-          </table>
-        </aside>
-      </section>
+        </section>
 
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
@@ -410,7 +394,7 @@ export default function ProductSearch({
       </section>
 
       <section className="legacy-queue-panel ptg-print-hide">
-        <h2>2. Selected Products / Print Queue</h2>
+        <h2>Selected Products / Print Queue</h2>
         <div className="legacy-table-frame">
           <table className="legacy-products-table">
             <thead><tr>
@@ -434,7 +418,7 @@ export default function ProductSearch({
 
       <section className="legacy-preview-panel">
         <div className="legacy-preview-heading">
-          <h2>3. Print Price Tags</h2>
+          <h2>Print Price Tags</h2>
           <div className="legacy-preview-controls">
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
             <div className="legacy-output-buttons ptg-print-hide">
@@ -449,6 +433,10 @@ export default function ProductSearch({
           Aircon requires a capacity of 1.0, 1.5, 2.0, 2.5, or 3.0 HP in the product description or model.
           Check or remove: {invalidAircon.map(product => product.model || product.barcode).join(", ")}.
         </div>}
+        {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
+      </section>
+      </div>
+
         {printable && queue.length > 0 && <div className="ptg-print-preview">
           {format === "AIRCON" ? airconPages.map(({ brand, rows, key }) => <div className="legacy-print-sheet legacy-aircon-sheet" key={key}>
             <article className="ptg-aircon">
@@ -534,16 +522,10 @@ export default function ProductSearch({
           )}
           </div>)}
         </div>}
-        {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
-      </section>
-
       {detailProduct && <AppDialog title="Product details" busy={false} onClose={() => setDetailProduct(null)}>
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
-          <dt>Model</dt><dd>{detailProduct.model || "—"}</dd>
-          {detailProduct.description && detailProduct.description !== detailProduct.model && <>
-            <dt>Full description</dt><dd>{detailProduct.description}</dd>
-          </>}
+          <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
           <dt>Barcode</dt><dd>{detailProduct.barcode}</dd>
           {detailProduct.category && <><dt>Category</dt><dd>{detailProduct.category}</dd></>}
           {detailProduct.sub_category && <><dt>Subcategory</dt><dd>{detailProduct.sub_category}</dd></>}
@@ -556,13 +538,17 @@ export default function ProductSearch({
             <dt>Period</dt><dd>{detailMemo.period || "—"}</dd>
             <dt>Import date</dt><dd>{detailMemo.created_at ? new Date(detailMemo.created_at).toLocaleDateString("en-US") : "—"}</dd>
           </>}
-          {([6, 9, 12, 18, 24] as const).map(months => {
-            const total = amount(detailProduct[`months_${months}`]);
-            return total > 0 ? <div className="legacy-product-detail-term" key={months}>
-              <dt>{months} months</dt><dd>{peso(total)} total · {peso(total / months)} per month</dd>
-            </div> : null;
-          })}
         </dl>
+        <table className="legacy-product-installment-table">
+          <caption>Installment prices</caption>
+          <thead><tr><th scope="col">Term</th><th scope="col">Total installment</th><th scope="col">Monthly payment</th></tr></thead>
+          <tbody>
+            {detailInstallments.map(({ months, total }) =>
+              <tr key={months}><th scope="row">{months} months</th><td>{peso(total)}</td><td>{peso(total / months)}</td></tr>
+            )}
+            {!detailInstallments.length && <tr><td colSpan={3}>No installment prices available.</td></tr>}
+          </tbody>
+        </table>
       </AppDialog>}
       <style jsx global>{`
         .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
@@ -570,10 +556,13 @@ export default function ProductSearch({
         .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}
         .legacy-product-details dt{font-weight:700}
         .legacy-product-details dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
-        .legacy-product-detail-term{display:contents}
+        .legacy-product-installment-table{width:100%;margin-top:1rem;border-collapse:collapse;font-size:.85rem;text-align:left}
+        .legacy-product-installment-table caption{text-align:left;font-size:.9rem;font-weight:700;margin-bottom:.4rem}
+        .legacy-product-installment-table th,.legacy-product-installment-table td{padding:.45rem;border-bottom:1px solid #dbe3ed}
+        .legacy-product-installment-table thead{background:#f0f5fb}
         .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
-        .legacy-branch-tools,.legacy-search-card,.legacy-installment-panel,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
+        .legacy-branch-tools,.legacy-search-card,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}
         .legacy-tools-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#123b72;font-size:10px}
         .legacy-tools-account{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px 12px}
@@ -582,7 +571,11 @@ export default function ProductSearch({
         .legacy-branch-tools nav{display:flex;gap:6px;flex-wrap:wrap}
         .legacy-branch-tools a,.legacy-branch-tools button{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:700;text-decoration:none}
         .legacy-branch-tools button:disabled{border-color:#d5dae2;color:#999;background:#f6f7f9}
-        .legacy-search-workflow{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr);gap:10px;margin-bottom:10px}
+        .legacy-search-workflow{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);grid-template-areas:"search print" "results results" "queue queue";gap:10px}
+        .legacy-search-card{grid-area:search}
+        .legacy-results-panel{grid-area:results}
+        .legacy-queue-panel{grid-area:queue}
+        .legacy-preview-panel{grid-area:print}
         .legacy-search-card{padding:8px}
         .legacy-search-card h2,.legacy-queue-panel h2,.legacy-preview-heading h2{margin:0 0 6px;color:#0647a7;font-size:14px;font-weight:800}
         .legacy-search-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
@@ -598,13 +591,8 @@ export default function ProductSearch({
         .legacy-memo-info label{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;color:#164a8a;font-size:9px;font-weight:800}
         .legacy-memo-info label:first-child{grid-column:1/-1}
         .legacy-memo-info input{min-width:0;width:100%;height:24px;padding:0 5px;border:1px solid #d8e0eb;border-radius:3px;background:#fff;color:#3e4c5d;font:inherit;font-size:9px}
-        .legacy-installment-panel{min-height:176px;overflow:hidden}
-        .legacy-installment-panel h3{margin:0;padding:7px 9px;background:#0647a7;color:#fff;font-size:11px}
-        .legacy-installment-panel p{min-height:24px;margin:0;padding:6px 9px;color:#6e7887;font-size:9px}
-        .legacy-installment-panel table,.legacy-products-table{width:100%;border-collapse:collapse;table-layout:fixed}
-        .legacy-installment-panel th{padding:5px 3px;border-top:1px solid #d8e0eb;border-bottom:1px solid #d8e0eb;background:#f4f7fb;color:#0647a7;font-size:8px;text-align:center}
-        .legacy-installment-panel td{padding:5px 3px;border-bottom:1px solid #e6e9ee;color:#32445c;font-size:9px;text-align:center}
-        .legacy-results-panel{margin-bottom:10px;padding:8px}
+        .legacy-products-table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .legacy-results-panel{padding:8px}
         .legacy-status-message{min-height:0;margin:0;padding:0 2px 5px;color:#536781;font-size:9px}
         .legacy-table-frame{border:1px solid #d6d6d6}
         .legacy-products-table{font-size:9px;table-layout:fixed;width:100%}
@@ -626,13 +614,13 @@ export default function ProductSearch({
         .legacy-pagination button:disabled{opacity:.4}
         .legacy-pagination label{display:flex;align-items:center;gap:4px}
         .legacy-pagination label input{width:42px;height:26px;border:1px solid #333;border-radius:4px;text-align:center;font-size:10px}
-        .legacy-queue-panel{display:flex;flex-direction:column;min-height:285px;margin-bottom:9px;padding:8px}
+        .legacy-queue-panel{display:flex;flex-direction:column;min-height:285px;padding:8px}
         .legacy-queue-panel h2{margin-bottom:7px}
         .legacy-queue-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:auto;padding-top:7px;color:#143d75;font-size:9px}
         .legacy-queue-footer button{height:24px;padding:0 9px;border:0;border-radius:4px;background:#dedede;color:#425064;font-size:9px;font-weight:700}
         .legacy-preview-panel{padding:8px}
         .legacy-preview-heading h2{margin-bottom:5px}
-        .legacy-preview-controls{display:flex;align-items:end;justify-content:space-between;gap:10px}
+        .legacy-preview-controls{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px}
         .preview-format-controls{min-width:0;flex:1}
         .legacy-output-buttons{display:flex;gap:4px;flex:0 0 auto}
         .legacy-output-buttons button{height:24px;padding:0 8px;border:0;border-radius:4px;color:#fff;font-size:8px;font-weight:800;white-space:nowrap}
@@ -672,7 +660,7 @@ export default function ProductSearch({
         .legacy-tag-header-with-promo img{width:78%;object-position:left center}
         .legacy-tag-header-with-promo img.legacy-tag-promo{inset:0 0 0 auto;width:20%;object-position:right center}
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34}
-        @media(max-width:850px){.legacy-search-workflow{grid-template-columns:1fr}.legacy-installment-panel{min-height:155px}.legacy-preview-controls{align-items:flex-start;flex-direction:column}.legacy-output-buttons{flex-wrap:wrap}}
+        @media(max-width:1050px){.legacy-search-workflow{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "results" "queue" "print"}}
         @media print{
           @page{size:letter ${format === "TWO" || format === "AIRCON" ? "landscape" : "portrait"};margin:0}
           html,body{margin:0!important;padding:0!important;background:#fff!important}
