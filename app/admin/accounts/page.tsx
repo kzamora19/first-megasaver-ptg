@@ -2,13 +2,16 @@
 
 
 
+import { Suspense } from "react";
+import SecurityWorkspace from "./security-workspace";
+import "./security.css";
 import Link from "next/link";
 import ClientSessionGate from "@/components/client-session-gate";
 import AccountAdministration from "./account-administration";
 
 export default function AdminAccountsPage() {
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN", "BRANCH_ADMIN"]} deniedTo="/dashboard">
-    {session => <main className="shell admin-shell">
+    {session => session.role === "SYSTEM_ADMIN" ? <Suspense fallback={<p>Loading System Security…</p>}><SecurityWorkspace /></Suspense> : <main className="shell admin-shell">
       <section className="hero admin-hero">
         <p className="eyebrow">FIRST MEGASAVER · SYSTEM SECURITY</p>
         <h1>Administration</h1>

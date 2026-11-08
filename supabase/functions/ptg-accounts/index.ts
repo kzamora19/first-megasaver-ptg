@@ -38,6 +38,8 @@ const respondError = (origin: string, error: unknown) => {
   if (code === "PERMISSION_DENIED") return json(origin, { ok: false, message: "You are not authorized to perform this action." }, 403);
   if (code === "EMAIL_PROVIDER_NOT_CONFIGURED") return json(origin, { ok: false, message: "Gmail email delivery is not configured in Supabase yet." }, 503);
   if (code === "EMAIL_DELIVERY_FAILED") return json(origin, { ok: false, message: "The email could not be delivered. Verify the Gmail account and app password settings, then retry." }, 502);
+  if (code === "SECURITY_INPUT") return json(origin, { ok: false, message: "Check the submitted values and try again." }, 400);
+  if (code.startsWith("SECURITY_")) return json(origin, { ok: false, message: "The security operation could not be completed." }, 500);
   if (code === "LAST_ADMIN") return json(origin, { ok: false, message: "The last active System Admin cannot be disabled." }, 400);
   return json(origin, { ok: false, message: "The account operation could not be completed." }, 400);
 };
@@ -358,6 +360,143 @@ async function bootstrapFinish(body: Record<string, unknown>, origin: string) {
   return json(origin, { ok: true, username }, 201);
 }
 
+
+async function securityAction(session: Session, origin: string, body: Record<string, unknown>) {
+  if (session.role !== "SYSTEM_ADMIN" || session.mustChangePassword) throw new Error("PERMISSION_DENIED");
+  const action = body.action;
+  const require = (key: string, mode: "VIEW" | "EXECUTE" = "VIEW") => requirePermission(session, key, mode);
+  if (action === "securityStatus") {
+    await require("VIEW_SYSTEM_STATUS");
+    const [controls, branches] = await Promise.all([
+      admin.from("system_controls").select("control_key,enabled").in("control_key", ["MASTER_SYSTEM", "MAINTENANCE_MODE"]),
+      admin.from("branches").select("id,branch_code,branch_name,status,operational_status").order("branch_code"),
+    ]);
+    if (controls.error || branches.error) throw new Error("SECURITY_READ_FAILED");
+    return json(origin, { ok: true, controls: controls.data, branches: branches.data });
+  }
+  if (action === "securityPermissions") {
+    await require("SECURITY_CONFIGURATION");
+    const [catalog, grants] = await Promise.all([
+      admin.from("permission_catalog").select("permission_key,label,scope_description").order("label"),
+      admin.from("role_permissions").select("role_key,permission_key,access_level"),
+    ]);
+    if (catalog.error || grants.error) throw new Error("SECURITY_READ_FAILED");
+    return json(origin, { ok: true, catalog: catalog.data, grants: grants.data });
+  }
+  if (action === "securityTest") {
+    await require("SECURITY_CONFIGURATION");
+    const key = clean(body.permissionKey, 80);
+    const mode = body.mode;
+    const { data, error } = await admin.from("permission_catalog").select("permission_key").eq("permission_key", key).maybeSingle();
+    if (error || !data || (mode !== "VIEW" && mode !== "EXECUTE")) throw new Error("SECURITY_INPUT");
+    try {
+      await requirePermission(session, key, mode);
+      return json(origin, { ok: true, allowed: true });
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== "PERMISSION_DENIED") throw error;
+      return json(origin, { ok: true, allowed: false });
+    }
+  }
+  if (action === "securityAudit") {
+    await require("SECURITY_LOG_VIEW");
+    const { data, error } = await admin.from("security_audit_logs")
+      .select("id,created_at,actor_user_id,event_category,action,target_identifier,outcome,message")
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(200);
+    if (error) throw new Error("SECURITY_READ_FAILED");
+    const ids = [...new Set(data.flatMap(row => row.actor_user_id ? [row.actor_user_id] : []))];
+    const profiles = ids.length ? await admin.from("user_profiles").select("id,display_name,role_key").in("id", ids) : null;
+    if (profiles?.error) throw new Error("SECURITY_READ_FAILED");
+    const actors = new Map(profiles?.data?.map(profile => [profile.id, profile]));
+    return json(origin, { ok: true, events: data.map(({ actor_user_id, ...event }) => ({
+      ...event, actor: actors.get(actor_user_id)?.display_name ?? "—",
+      current_role: actors.get(actor_user_id)?.role_key ?? "—",
+    })) });
+  }
+  if (action === "securitySessions") {
+    await require("FORCE_LOGOUT");
+    const now = Date.now();
+    const { data, error } = await admin.from("app_sessions")
+      .select("id,user_id,branch_id,device_label,created_at,last_activity_at")
+      .not("branch_id", "is", null).is("revoked_at", null)
+      .gt("expires_at", new Date(now).toISOString())
+      .gt("last_activity_at", new Date(now - 30 * 60 * 1000).toISOString())
+      .order("last_activity_at", { ascending: false }).limit(500);
+    if (error) throw new Error("SECURITY_READ_FAILED");
+    const ids = [...new Set(data.map(row => row.user_id))];
+    const profiles = ids.length ? await admin.from("user_profiles").select("id,display_name").in("id", ids) : null;
+    if (profiles?.error) throw new Error("SECURITY_READ_FAILED");
+    const names = new Map(profiles?.data?.map(profile => [profile.id, profile.display_name]));
+    return json(origin, { ok: true, sessions: data.map(({ user_id, ...row }) => ({ ...row, account: names.get(user_id) ?? "—" })) });
+  }
+  if (action === "securityRevokeSession") {
+    await require("FORCE_LOGOUT", "EXECUTE");
+    const { data, error } = await admin.from("app_sessions")
+      .update({ revoked_at: new Date().toISOString(), revoke_reason: "SYSTEM_ADMIN_LOGOUT" })
+      .eq("id", clean(body.sessionId, 50)).not("branch_id", "is", null).is("revoked_at", null)
+      .select("branch_id,user_id").maybeSingle();
+    if (error) throw new Error("SECURITY_WRITE_FAILED");
+    if (data) await audit(session, data.branch_id, "FORCE_LOGOUT", await usernameFor(data.user_id), "Revoked one branch session.");
+    return json(origin, { ok: true });
+  }
+  if (action === "securityControl") {
+    const key = body.key;
+    if ((key !== "MASTER_SYSTEM" && key !== "MAINTENANCE_MODE") || typeof body.enabled !== "boolean") throw new Error("SECURITY_INPUT");
+    await require(key === "MASTER_SYSTEM" ? "MASTER_SYSTEM_CONTROL" : "MAINTENANCE_CONTROL", "EXECUTE");
+    const { error } = await admin.from("system_controls").upsert({
+      control_key: key, enabled: body.enabled, updated_by: session.userId, updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error("SECURITY_WRITE_FAILED");
+    await audit(session, null, key, key, body.enabled ? "Turned on." : "Turned off.");
+    return json(origin, { ok: true });
+  }
+  if (action === "securityBranch") {
+    const command = body.command;
+    if (command === "add") {
+      await require("BRANCH_EDIT", "EXECUTE");
+      const branchCode = clean(body.code, 20).toUpperCase();
+      const name = clean(body.name, 120);
+      if (!/^[A-Z0-9]{2,12}$/.test(branchCode) || !name) throw new Error("SECURITY_INPUT");
+      const { data, error } = await admin.from("branches").insert({
+        branch_code: branchCode, branch_name: name, status: "ACTIVE", operational_status: "ON",
+      }).select("id").single();
+      if (error?.code === "23505") return json(origin, { ok: false, message: "That branch code already exists." }, 409);
+      if (error) throw new Error("SECURITY_WRITE_FAILED");
+      await audit(session, data.id, "BRANCH_ADD", branchCode, "Added branch.");
+    } else {
+      if (command !== "on" && command !== "off" && command !== "deactivate" && command !== "reactivate") throw new Error("SECURITY_INPUT");
+      await require(command === "deactivate" || command === "reactivate" ? "BRANCH_EDIT" : "BRANCH_CONTROL", "EXECUTE");
+      const patch = command === "deactivate" ? { status: "INACTIVE", operational_status: "OFF" }
+        : command === "reactivate" ? { status: "ACTIVE", operational_status: "ON" }
+        : { operational_status: command === "on" ? "ON" : "OFF" };
+      const { data, error } = await admin.from("branches").update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", clean(body.branchId, 50)).eq("status", command === "reactivate" ? "INACTIVE" : "ACTIVE").select("id,branch_code").single();
+      if (error) throw new Error("SECURITY_WRITE_FAILED");
+      await audit(session, data.id, "BRANCH_CONTROL", data.branch_code, "Branch action: " + command);
+    }
+    return json(origin, { ok: true });
+  }
+  if (action === "securityImportSrp") {
+    await require("IMPORT_SRP", "EXECUTE");
+    const { rows, verified } = body;
+    const source = clean(body.source, 250);
+    if (!source || verified !== true || !Array.isArray(rows) || !rows.length || rows.length > 10000) throw new Error("SECURITY_INPUT");
+    const importDate = new Date().toISOString();
+    const records = new Map();
+    for (const row of rows) {
+      const barcode = clean(row?.barcode, 100);
+      const description = clean(row?.description, 1000);
+      const srp = row?.srp;
+      if (!barcode || !description || typeof srp !== "number" || !Number.isFinite(srp) || srp < 0 || records.has(barcode)) throw new Error("SECURITY_INPUT");
+      records.set(barcode, { barcode, model_description: description, srp, source_file: source, import_date: importDate });
+    }
+    const { error } = await admin.from("product_srp").upsert([...records.values()], { onConflict: "barcode" });
+    if (error) throw new Error("SECURITY_WRITE_FAILED");
+    await audit(session, null, "IMPORT_SRP", source, "Imported " + records.size + " SRP records.");
+    return json(origin, { ok: true, count: records.size });
+  }
+  return json(origin, { ok: false, message: "Unsupported security action." }, 400);
+}
+
 Deno.serve(async request => {
   const origin = request.headers.get("origin") ?? "";
   if (!origin || !allowedOrigins.has(origin)) return new Response(JSON.stringify({ ok: false, message: "Request origin is not allowed." }), { status: 403 });
@@ -387,6 +526,7 @@ Deno.serve(async request => {
     if (!session) throw new Error("AUTH_REQUIRED");
     if (action === "createAccount") return await createAccount(request, session, origin, body);
     if (action === "resendInvitation") return await resendInvitation(clean(body.userId, 100), session, origin);
+    if (action.startsWith("security")) return await securityAction(session, origin, body);
     return json(origin, { ok: false, message: "Unsupported account action." }, 400);
   } catch (error) {
     return respondError(origin, error);

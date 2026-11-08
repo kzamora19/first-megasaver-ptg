@@ -172,7 +172,13 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
   }).select("id").single();
   if (sessionError || !appSession) {
     await authClient.auth.signOut();
-    return json(origin, { ok: false, message: "Unable to establish a secure application session." }, 503);
+    const availabilityMessages: Record<string, string> = {
+      PTG_SYSTEM_OFF: "The Price Tag Generator is temporarily unavailable.",
+      PTG_MAINTENANCE: "The Price Tag Generator is temporarily unavailable for maintenance.",
+      PTG_BRANCH_OFF: "Your branch is currently offline.",
+    };
+    const availabilityMessage = availabilityMessages[sessionError?.message ?? ""];
+    return json(origin, { ok: false, message: availabilityMessage ?? "Unable to establish a secure application session." }, 503);
   }
 
   return json(origin, {
