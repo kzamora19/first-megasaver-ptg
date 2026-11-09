@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 export const usesEdgeAuth = process.env.NEXT_PUBLIC_PTG_USE_EDGE_AUTH === "true";
-const sessionStorageKey = "ptg_app_session_id";
+const appSessionKey = "ptg_app_session_id";
 
 export type EdgeAuthResponse = {
   ok?: boolean;
@@ -27,17 +27,23 @@ export type EdgeAuthResponse = {
 
 export function getPtgAppSessionId() {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(sessionStorageKey) ?? "";
+  return window.sessionStorage.getItem(appSessionKey) ?? window.localStorage.getItem(appSessionKey) ?? "";
 }
 
-export function setPtgAppSessionId(value: string) {
-  window.localStorage.setItem(sessionStorageKey, value);
+export function setPtgAppSessionId(value: string, rememberMe: boolean) {
+  const preferredStorage = rememberMe ? window.localStorage : window.sessionStorage;
+  const otherStorage = rememberMe ? window.sessionStorage : window.localStorage;
+  otherStorage.removeItem(appSessionKey);
+  preferredStorage.setItem(appSessionKey, value);
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `ptg_app_session=${encodeURIComponent(value)}; Path=/; Max-Age=28800; SameSite=Strict${secure}`;
+  document.cookie = rememberMe
+    ? `ptg_app_session=${encodeURIComponent(value)}; Path=/; Max-Age=28800; SameSite=Strict${secure}`
+    : `ptg_app_session=; Path=/; Max-Age=0; SameSite=Strict${secure}`;
 }
 
 export function clearPtgAppSessionId() {
-  window.localStorage.removeItem(sessionStorageKey);
+  window.sessionStorage.removeItem(appSessionKey);
+  window.localStorage.removeItem(appSessionKey);
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `ptg_app_session=; Path=/; Max-Age=0; SameSite=Strict${secure}`;
 }
@@ -77,7 +83,7 @@ export async function invokePtgAuth(action: string, fields: Record<string, unkno
   return result;
 }
 
-export async function establishPtgAuthSession(result: EdgeAuthResponse) {
+export async function establishPtgAuthSession(result: EdgeAuthResponse, rememberMe: boolean) {
   if (!result.appSessionId || !result.authSession?.accessToken || !result.authSession.refreshToken) {
     throw new Error("Authentication response did not include a complete PTG session.");
   }
@@ -87,7 +93,7 @@ export async function establishPtgAuthSession(result: EdgeAuthResponse) {
     refresh_token: result.authSession.refreshToken,
   });
   if (error) throw new Error("Could not establish the Supabase sign-in session.");
-  setPtgAppSessionId(result.appSessionId);
+  setPtgAppSessionId(result.appSessionId, rememberMe);
 }
 
 export function getAvailabilityNotice(error: unknown) {

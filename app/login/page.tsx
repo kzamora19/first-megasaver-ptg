@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [branchCode, setBranchCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [availabilityNotice, setAvailabilityNotice] = useState<ReturnType<typeof getAvailabilityNotice>>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +77,7 @@ export default function LoginPage() {
       let destination = "/dashboard";
       if (usesEdgeAuth) {
         const result = await invokePtgAuth("login", { username, password, branchCode });
-        await establishPtgAuthSession(result);
+        await establishPtgAuthSession(result, rememberMe);
         destination = result.account?.mustChangePassword ? "/change-password" : result.account?.role === "SYSTEM_ADMIN" ? "/dashboard" : "/products";
       } else {
         const response = await fetch("/api/auth/login", {
@@ -121,6 +122,10 @@ export default function LoginPage() {
               <input type="checkbox" checked={showPassword} onChange={(event) => setShowPassword(event.target.checked)} />
               <span>Show password</span>
             </label>
+            {usesEdgeAuth && <label className="legacy-show-password">
+              <input type="checkbox" checked={rememberMe} onChange={event => setRememberMe(event.target.checked)} />
+              <span>Remember me on this device</span>
+            </label>}
             <details className="legacy-branch-option">
               <summary>Branch code (optional)</summary>
               <input id="branchCode" autoComplete="organization" value={branchCode}
