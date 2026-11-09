@@ -2,7 +2,6 @@
 
 import LogoutButton from "@/app/dashboard/logout-button";
 import AppDialog from "@/components/app-dialog";
-import Link from "next/link";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
@@ -367,7 +366,7 @@ export default function ProductSearch({
         className="ptg-print-hide legacy-products-banner" />}
 
       {demo ? <section className="legacy-branch-tools ptg-print-hide" aria-label="Demo workspace">
-        <div className="legacy-tools-heading"><strong>DEMO · SAMPLE PRODUCTS ONLY</strong><Link href="/login/">Exit demo</Link></div>
+        <div className="legacy-tools-heading"><strong>DEMO · SAMPLE PRODUCTS ONLY</strong><a href={withBasePath("/login/")}>Exit demo</a></div>
         <p>Search fictional products, try the print formats, and print or save sample tags as PDF.</p>
       </section> : systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
