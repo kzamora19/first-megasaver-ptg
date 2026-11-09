@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import AppDialog from "@/components/app-dialog";
 import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
 import { useRouter } from "next/navigation";
@@ -141,7 +140,7 @@ export default function LoginPage() {
             <div><span className="legacy-security-dot" />Protected by System Security</div>
           </div>
           {notice && <p className="legacy-recovery-notice" role="status">{notice}</p>}
-          <Link className="legacy-demo-link" href="/demo/">Explore the sample demo instead</Link>
+          <a className="legacy-demo-link" href={withBasePath("/demo/")}>Explore the sample demo instead</a>
         </div>
       </section>
       {availabilityNotice && <AppDialog title={availabilityNotice.title} busy={false} closeIcon onClose={() => setAvailabilityNotice(null)}>
