@@ -14,7 +14,7 @@ type MemoInfo = {
   memo_type: string;
   created_at?: string;
 };
-type Product = {
+export type Product = {
   id: string;
   memo_id: string;
   brand: string;
@@ -158,13 +158,16 @@ export default function ProductSearch({
   username = "",
   legacyRole = "",
   systemRole = "",
+  demoProducts,
 }: {
   branchCode: string;
   branchName?: string;
   username?: string;
   legacyRole?: string;
   systemRole?: string;
+  demoProducts?: readonly Product[];
 }) {
+  const demo = demoProducts !== undefined;
   useEffect(() => {
     if (window.location.hash === "#print-price-tags") {
       document.getElementById("print-price-tags")?.scrollIntoView();
@@ -186,7 +189,11 @@ export default function ProductSearch({
   const [refreshingLogos, setRefreshingLogos] = useState(false);
   const [logoMessage, setLogoMessage] = useState("");
   const [logoVersion, setLogoVersion] = useState(0);
-  const [logos, setLogos] = useState<LogoMap>({});
+  const [logos, setLogos] = useState<LogoMap>(() => demo ? {
+    appHeader: { url: withBasePath("/legacy-ptg/app-header.png"), originalFileName: "app-header.png", updatedAt: "" },
+    header: { url: withBasePath("/legacy-ptg/price-tag-header.png"), originalFileName: "price-tag-header.png", updatedAt: "" },
+    social: { url: withBasePath("/legacy-ptg/price-tag-footer.png"), originalFileName: "price-tag-footer.png", updatedAt: "" },
+  } : {});
 
   const refreshLogos = useCallback(async () => {
     try {
@@ -202,7 +209,9 @@ export default function ProductSearch({
     }
   }, []);
 
-  useEffect(() => { void refreshLogos(); }, [refreshLogos]);
+  useEffect(() => {
+    if (!demo) void refreshLogos();
+  }, [demo, refreshLogos]);
 
   async function refreshArtwork() {
     setRefreshingLogos(true);
@@ -223,7 +232,13 @@ export default function ProductSearch({
     setLoading(true);
     try {
       let payload: { ok: boolean; products: Product[]; total: number; page: number };
-      if (usesEdgeData) {
+      if (demoProducts) {
+        const term = query.trim().toLowerCase();
+        const matches = demoProducts.filter(product =>
+          [product.brand, product.model, product.barcode, product.description].some(value => value.toLowerCase().includes(term)));
+        const start = (requestedPage - 1) * pageSize;
+        payload = { ok: true, products: matches.slice(start, start + pageSize), total: matches.length, page: requestedPage };
+      } else if (usesEdgeData) {
         payload = await invokePtgData("ptg-products", {
           action: "search",
           q: query.trim(),
@@ -252,7 +267,7 @@ export default function ProductSearch({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [demoProducts]);
 
   useEffect(() => { void loadProducts("", 1); }, [loadProducts]);
 
@@ -320,7 +335,7 @@ export default function ProductSearch({
       return;
     }
     const date = new Date();
-    document.title = "FIRST_MEGASAVER_PRICE_TAGS_" + date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+    document.title = (demo ? "DEMO_" : "") + "FIRST_MEGASAVER_PRICE_TAGS_" + date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
     window.print();
   }
 
@@ -346,11 +361,14 @@ export default function ProductSearch({
   const currentBranchLabel = branchName || ({ CAU: "Cauayan", ILA: "Ilagan", STG: "Santiago", TUG: "Tuguegarao" } as Record<string, string>)[branchCode.toUpperCase()] || branchCode;
 
   return (
-    <main className="ptg-main legacy-ptg-main">
+    <main className="ptg-main legacy-ptg-main" data-demo={demo || undefined}>
       {logos.appHeader && <img src={artworkUrl("appHeader")} alt="Interface header artwork"
         className="ptg-print-hide legacy-products-banner" />}
 
-{systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
+      {demo ? <section className="legacy-branch-tools ptg-print-hide" aria-label="Demo workspace">
+        <div className="legacy-tools-heading"><strong>DEMO · SAMPLE PRODUCTS ONLY</strong><a href={withBasePath("/login/")}>Exit demo</a></div>
+        <p>Search fictional products, try the print formats, and print or save sample tags as PDF.</p>
+      </section> : systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
           {canManageBranch && <a href={withBasePath("/admin/accounts")}>CHANGE PASSWORD</a>}
@@ -432,7 +450,7 @@ export default function ProductSearch({
         </div>}
         {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
         <div className="legacy-output-buttons ptg-print-hide">
-          <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>
+          {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
           <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
           <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print Price Tags</button>
         </div>
@@ -665,6 +683,8 @@ export default function ProductSearch({
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34}
         @media(max-width:1050px){.legacy-search-workflow{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "results" "queue" "print"}}
         @media print{
+          [data-demo] .legacy-print-sheet{position:relative}
+          [data-demo] .legacy-print-sheet::after{content:"DEMO ONLY • SAMPLE PRICES";position:absolute;bottom:.2in;left:0;right:0;text-align:center;color:#222;font:bold 12pt sans-serif}
           @page{size:letter ${format === "TWO" || format === "AIRCON" ? "landscape" : "portrait"};margin:0}
           html,body{margin:0!important;padding:0!important;background:#fff!important}
           body *{visibility:hidden!important}
