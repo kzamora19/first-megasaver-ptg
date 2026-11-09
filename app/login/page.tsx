@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import AppDialog from "@/components/app-dialog";
 import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
 import { useRouter } from "next/navigation";
@@ -140,6 +141,7 @@ export default function LoginPage() {
             <div><span className="legacy-security-dot" />Protected by System Security</div>
           </div>
           {notice && <p className="legacy-recovery-notice" role="status">{notice}</p>}
+          <Link className="legacy-demo-link" href="/demo/">Explore the sample demo instead</Link>
         </div>
       </section>
       {availabilityNotice && <AppDialog title={availabilityNotice.title} busy={false} closeIcon onClose={() => setAvailabilityNotice(null)}>
@@ -186,6 +188,7 @@ export default function LoginPage() {
         .legacy-login-security>div{display:flex;align-items:center;gap:9px;color:#123b72;font-size:11px;font-weight:700}
         .legacy-security-dot{width:9px;height:9px;border-radius:50%;background:#00c96b;box-shadow:0 0 9px rgba(0,201,107,.5)}
         .legacy-recovery-notice{margin:14px 0 0;color:#17643c;font-size:12px;text-align:center}
+        .legacy-demo-link{display:block;margin-top:20px;padding-top:15px;border-top:1px solid #e1e8f2;color:#125cb6;font-size:12px;font-weight:800;text-align:center;text-transform:uppercase}
         @media(max-width:520px){.legacy-login-card{border-radius:15px!important}.legacy-login-body{padding:23px 20px 25px}}
       `}</style>
     </main>
