@@ -11,7 +11,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [branchCode, setBranchCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [availabilityNotice, setAvailabilityNotice] = useState<ReturnType<typeof getAvailabilityNotice>>(null);
@@ -76,7 +75,7 @@ export default function LoginPage() {
     try {
       let destination = "/dashboard";
       if (usesEdgeAuth) {
-        const result = await invokePtgAuth("login", { username, password, branchCode });
+        const result = await invokePtgAuth("login", { username, password });
         await establishPtgAuthSession(result, rememberMe);
         destination = result.account?.mustChangePassword ? "/change-password" : result.account?.role === "SYSTEM_ADMIN" ? "/dashboard" : "/products";
       } else {
@@ -84,7 +83,7 @@ export default function LoginPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
-          body: JSON.stringify({ username, password, branchCode }),
+          body: JSON.stringify({ username, password }),
         });
         const result = await response.json();
         if (!response.ok || result.ok !== true) {
@@ -126,12 +125,6 @@ export default function LoginPage() {
               <input type="checkbox" checked={rememberMe} onChange={event => setRememberMe(event.target.checked)} />
               <span>Remember me on this device</span>
             </label>}
-            <details className="legacy-branch-option">
-              <summary>Branch code (optional)</summary>
-              <input id="branchCode" autoComplete="organization" value={branchCode}
-                onChange={(event) => setBranchCode(event.target.value.toUpperCase())}
-                placeholder="e.g. STG01" maxLength={30} aria-label="Branch code" />
-            </details>
             <button type="submit" disabled={busy}>{busy ? "AUTHENTICATING…" : "🔒 SIGN IN"}</button>
           </form>
           <p className="legacy-login-message" role="status">{message}</p>
@@ -158,7 +151,7 @@ export default function LoginPage() {
             <label htmlFor="recovery-username">Username</label>
             <input id="recovery-username" name="username" autoComplete="username" defaultValue={username} maxLength={120} required />
             <label htmlFor="recovery-branch">Branch code (optional)</label>
-            <input id="recovery-branch" name="branchCode" defaultValue={branchCode} maxLength={30} />
+            <input id="recovery-branch" name="branchCode" maxLength={30} />
           </>}
           <button type="submit" disabled={recoveryBusy}>{recoveryBusy ? "Please wait…" : resetToken ? "Update password" : "Request password recovery"}</button>
         </form>}
@@ -176,9 +169,6 @@ export default function LoginPage() {
         .legacy-login-form>input:focus{border-color:#3078d6;background:#fff;box-shadow:0 0 0 3px rgba(48,120,214,.14)}
         .legacy-show-password{display:flex;align-items:center;gap:7px;color:#65728a;font-size:12px;font-weight:600}
         .legacy-show-password input{width:14px;height:14px;margin:0;accent-color:#1263c7}
-        .legacy-branch-option{display:grid;gap:7px;color:#758398;font-size:11px}
-        .legacy-branch-option summary{cursor:pointer}
-        .legacy-branch-option input{width:100%;height:40px;padding:0 12px;border:1px solid #cfdaea;border-radius:8px;font:inherit}
         .legacy-login-form button{height:48px;margin-top:10px;border:0;border-radius:10px;background:linear-gradient(100deg,#0866d4,#153d7d);color:#fff;font-size:16px;font-weight:900;letter-spacing:.02em;box-shadow:0 7px 14px rgba(18,66,132,.18);cursor:pointer}
         .legacy-login-form button:disabled{opacity:.65;cursor:wait}
         .legacy-login-message{min-height:20px;margin:10px 0 0;color:#b3261e;font-size:12px;line-height:1.4;text-align:center}
