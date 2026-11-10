@@ -6,7 +6,7 @@ import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import { parsePriceMemo } from "@/lib/price-memos/parse-price-memo";
 import { buildBatchPlan, loadBatchEngine, runBatch, salesOperations, sourceDivisions,
-  type BatchJob, type Branch, type Issue, type Operation, type SalesOperation, type Sheet, type Source } from "@/lib/ptg/batch-import";
+  type BatchJob, type Branch, type DeskSalesTool, type Issue, type Operation, type SalesOperation, type Sheet, type Source } from "@/lib/ptg/batch-import";
 
 const writes = process.env.NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES === "true";
 const labels: Record<Operation, string> = {
@@ -17,7 +17,7 @@ const formatDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", y
 type Scope = { userId: string; branches: Branch[] };
 type Access = { scope: Scope; client: SupabaseClient };
 type Review = { jobs: BatchJob[]; issues: Issue[]; scope?: Scope; inventory: boolean };
-type Props = { verifyPtg: (id: string) => Promise<void>; verifySales: () => Promise<Access> };
+type Props = { tool?: DeskSalesTool; verifyPtg: (id: string) => Promise<void>; verifySales: () => Promise<Access> };
 const message = (error: unknown) => error instanceof Error ? error.message : "The batch could not be processed.";
 
 async function readScope(client: SupabaseClient, table: string, columns: string, branches: Branch[]) {
@@ -32,12 +32,13 @@ async function readScope(client: SupabaseClient, table: string, columns: string,
   }
 }
 
-export default function BatchImport({ verifyPtg, verifySales }: Props) {
+export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   const [sessionId] = useState(getPtgAppSessionId);
   const [sources, setSources] = useState<Source[]>([]);
   const [disabledSources, setDisabledSources] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<string[]>([]);
-  const [operations, setOperations] = useState<Operation[]>([]);
+  const [selectedOperations, setOperations] = useState<Operation[]>([]);
+  const operations = tool?.operation ? [tool.operation] : selectedOperations;
   const [branches, setBranches] = useState<Branch[]>([]);
   const [locationMap, setLocationMap] = useState<Record<string, string>>({});
   const [divisionMap, setDivisionMap] = useState<Record<string, string>>({});
@@ -94,6 +95,10 @@ export default function BatchImport({ verifyPtg, verifySales }: Props) {
         } catch (failure) { next.push({ file, sheets: [], error: message(failure) }); }
       }
       setSources(next);
+      if (tool?.operation && !branches.length && next.some(source => source.sheets.length)) {
+        setProgress("Checking Sales Tracker permissions…");
+        setBranches((await verifySales()).scope.branches);
+      }
     } catch (failure) { setError(message(failure)); }
     finally { busy.current = false; setProgress(""); }
   }
@@ -129,6 +134,13 @@ export default function BatchImport({ verifyPtg, verifySales }: Props) {
       const selectedSales = operations.filter(operation => salesOperations.includes(operation as SalesOperation)) as SalesOperation[];
       const access = selectedSales.length ? await verifySales() : undefined;
       const branchList = access?.scope.branches ?? [];
+      if (access && !branches.length) {
+        setBranches(branchList);
+        if (locations.length || divisions.length || operations.includes("daily")) {
+          setError("Sales Tracker access verified. Finish the branch settings below, then choose Extract and review again.");
+          return;
+        }
+      }
       const needed = [...new Set([...selectedSales, ...(operations.includes("ptg-catalog") ? ["catalog" as const] : [])])];
       const [knownProducts, knownStock] = await Promise.all([
         access && selectedSales.includes("catalog")
@@ -198,21 +210,27 @@ export default function BatchImport({ verifyPtg, verifySales }: Props) {
   const branchSelect = (value: string, onChange: (id: string) => void) => <select value={value} onChange={event => onChange(event.target.value)}>
     <option value="">Choose a branch</option>{branchOptions}
   </select>;
-  const list = [...salesOperations, "ptg-catalog", "ptg-memos"] as Operation[];
+  const list: readonly Operation[] = tool ? salesOperations : [...salesOperations, "ptg-catalog", "ptg-memos"];
   return <main className="ptg-main">
-    <h1>Unified Import</h1>
-    <p>Inspect the original Excel or CSV downloads together, then review the extracted records for both apps.</p>
-    {!writes && <p role="status"><strong>Dry run only.</strong> This build prepares the import without saving to either app.</p>}
+    <h1>{tool?.label ?? "Unified Import"}</h1>
+    <p>{tool
+      ? "Choose your original Excel or CSV downloads and review the extracted records for Sales Tracker here in Data Desk. A Sales Tracker administrator session is required."
+      : "Inspect the original Excel or CSV downloads together, then review the extracted records for both apps."}</p>
+    {!writes && <p role="status"><strong>Dry run only.</strong> {tool
+      ? "This build prepares the import without saving to Sales Tracker."
+      : "This build prepares the import without saving to either app."}</p>}
     <section className="admin-card"><fieldset disabled={!!progress || started}>
       <legend>Source files and destinations</legend>
       <label className="upload-drop"><input type="file" multiple accept=".xlsx,.xls,.xlsm,.csv"
         onChange={event => void inspect(Array.from(event.target.files ?? []))} /><strong>Choose original source files</strong>
         <span>Up to 80 files · 20 MB each · 160 MB combined</span></label>
       {sources.length > 0 && <>
-        <h2>What should this batch import?</h2>
-        {list.map(operation => <p key={operation}><label><input type="checkbox" checked={operations.includes(operation)}
-          onChange={event => void selectOperation(operation, event.target.checked)} /> {labels[operation]}</label></p>)}
-        <label>Pricing as of <input type="date" value={asOf} onChange={event => { setAsOf(event.target.value); invalidate(); }} /></label>
+        {!tool?.operation && <>
+          <h2>What should this batch import?</h2>
+          {list.map(operation => <p key={operation}><label><input type="checkbox" checked={operations.includes(operation)}
+            onChange={event => void selectOperation(operation, event.target.checked)} /> {labels[operation]}</label></p>)}
+          <label>Pricing as of <input type="date" value={asOf} onChange={event => { setAsOf(event.target.value); invalidate(); }} /></label>
+        </>}
         <details><summary>{sources.length} source files · {sheets.length} included worksheets</summary>
           {sources.map(source => <div key={source.file.name}>
             <p><label><input type="checkbox" checked={!disabledSources.includes(source.file.name)} onChange={event => {

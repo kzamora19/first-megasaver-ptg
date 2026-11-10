@@ -3,6 +3,7 @@ import { Suspense, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSecuritySection, securitySections } from "@/lib/ptg/security-sections";
 import { withBasePath } from "@/lib/base-path";
+import { deskSalesTools } from "@/lib/ptg/batch-import";
 
 function SecurityLinks({ onNavigate }: { onNavigate: () => void }) {
   const selected = getSecuritySection(useSearchParams().get("section"));
@@ -18,32 +19,29 @@ const deskPtgTools = [
   ["/product-master", "Product Master"],
   ["/admin/logos", "Logo Manager"],
 ];
-const deskSalesTools = [
-  ["inventory", "Inventory Counts & Serials"],
-  ["sales-history", "Sales Database"],
-  ["daily-history", "Daily Monitoring"],
-  ["unified", "Sales Tracker Import Center"],
-];
-
 export default function WorkspaceNav({ role, active, desk = false, onNavigate }: {
   role: string; active: string; desk?: boolean; onNavigate: () => void;
 }) {
   const system = role === "SYSTEM_ADMIN";
-  const catalog = useSearchParams().get("mode") === "catalog";
+  const query = useSearchParams();
+  const onDesk = active === "/data-desk";
+  const catalog = onDesk && query.get("mode") === "catalog";
+  const salesTool = onDesk && !catalog ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
+  const unified = onDesk && !catalog && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
-      className={"ptg-nav-item" + (active === "/data-desk" && !catalog ? " active" : "")}
-      aria-current={active === "/data-desk" && !catalog ? "page" : undefined}>Unified Import</a>
+      className={"ptg-nav-item" + (unified ? " active" : "")}
+      aria-current={unified ? "page" : undefined}>Unified Import</a>
     <a href={withBasePath("/data-desk/?mode=catalog")} onClick={onNavigate}
-      className={"ptg-nav-item" + (active === "/data-desk" && catalog ? " active" : "")}
-      aria-current={active === "/data-desk" && catalog ? "page" : undefined}>Cross-App Catalog Review</a>
+      className={"ptg-nav-item" + (catalog ? " active" : "")}
+      aria-current={catalog ? "page" : undefined}>Cross-App Catalog Review</a>
     {deskPtgTools.map(([path, label]) => <a key={path} href={withBasePath(path + "/") + "?workspace=data-desk"}
       onClick={onNavigate} className={"ptg-nav-item" + (active === path ? " active" : "")}
       aria-current={active === path ? "page" : undefined}>{label}</a>)}
     <div className="ptg-nav-label">SALES TRACKER</div>
-    {deskSalesTools.map(([tool, label]) => <a key={tool} className="ptg-nav-item"
-      href={"https://kzamora19.github.io/branchline/?workspace-import=" + tool}
-      target="_blank" rel="noopener noreferrer" onClick={onNavigate}>{label}</a>)}
+    {deskSalesTools.map(tool => <a key={tool.id} href={withBasePath("/data-desk/?tool=" + tool.id)}
+      onClick={onNavigate} className={"ptg-nav-item" + (tool === salesTool ? " active" : "")}
+      aria-current={tool === salesTool ? "page" : undefined}>{tool.label}</a>)}
   </nav>;
   const admin = system || role === "BRANCH_ADMIN";
   const items = [

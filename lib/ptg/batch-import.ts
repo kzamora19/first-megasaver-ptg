@@ -4,6 +4,13 @@ import type { ParsedMemo } from "../price-memos/parse-price-memo";
 export const salesOperations = ["catalog", "sales", "daily", "inventory"] as const;
 export type SalesOperation = typeof salesOperations[number];
 export type Operation = SalesOperation | "ptg-catalog" | "ptg-memos";
+export const deskSalesTools = [
+  { id: "inventory", label: "Inventory Counts & Serials", operation: "inventory" },
+  { id: "sales", label: "Sales Database", operation: "sales" },
+  { id: "daily", label: "Daily Monitoring", operation: "daily" },
+  { id: "sales-center", label: "Sales Tracker Import Center", operation: null },
+] as const;
+export type DeskSalesTool = typeof deskSalesTools[number];
 export type Branch = { id: string; name: string; code: string };
 export type Sheet = {
   id: string; file: string; name: string; rows: unknown[][];
