@@ -1,10 +1,24 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createCookieClient, withPtgAuthStorage } from "@/lib/supabase/client";
 
 export const usesEdgeAuth = process.env.NEXT_PUBLIC_PTG_USE_EDGE_AUTH === "true";
 const appSessionKey = "ptg_app_session_id";
 const rememberedLoginKey = "ptg_remembered_login";
+let migratedSession: { id: string; request: ReturnType<typeof migrateCookieSession> } | undefined;
+
+function retryableAuthFailure(error: { status?: number }) {
+  return !error.status || error.status >= 500 || error.status === 429;
+}
+
+async function migrateCookieSession(id: string) {
+  const { data, error } = await createCookieClient().auth.getSession();
+  if (error && retryableAuthFailure(error)) throw error;
+  if (!data.session || getPtgAppSessionId() !== id) return null;
+  const { data: restored, error: restoreError } = await createClient().auth.setSession(data.session);
+  if (restoreError) throw restoreError;
+  return restored.session;
+}
 
 export type EdgeAuthResponse = {
   ok?: boolean;
@@ -72,13 +86,25 @@ export async function invokePtgAuth(action: string, fields: Record<string, unkno
   if (!url || !publicKey) throw new Error("Supabase public environment variables are not configured.");
 
   const client = createClient();
-  const { data: authData } = await client.auth.getSession();
+  const { data: authData, error: authError } = await client.auth.getSession();
   const appSessionId = getPtgAppSessionId();
+  if (authError && action !== "login" && retryableAuthFailure(authError)) throw authError;
+  let authSession = authData.session;
+  if (!authSession && appSessionId && action !== "login") {
+    if (migratedSession?.id !== appSessionId) {
+      const request = migrateCookieSession(appSessionId).catch(error => {
+        if (migratedSession?.id === appSessionId) migratedSession = undefined;
+        throw error;
+      });
+      migratedSession = { id: appSessionId, request };
+    }
+    authSession = await migratedSession.request;
+  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     apikey: publicKey,
   };
-  if (authData.session?.access_token) headers.Authorization = `Bearer ${authData.session.access_token}`;
+  if (authSession?.access_token) headers.Authorization = `Bearer ${authSession.access_token}`;
   if (appSessionId) headers["x-ptg-session-id"] = appSessionId;
 
   const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/ptg-auth`, {
@@ -97,16 +123,17 @@ export async function invokePtgAuth(action: string, fields: Record<string, unkno
 }
 
 export async function establishPtgAuthSession(result: EdgeAuthResponse, rememberMe: boolean) {
-  if (!result.appSessionId || !result.authSession?.accessToken || !result.authSession.refreshToken) {
+  const { appSessionId, authSession } = result;
+  if (!appSessionId || !authSession?.accessToken || !authSession.refreshToken) {
     throw new Error("Authentication response did not include a complete PTG session.");
   }
   const client = createClient();
-  const { error } = await client.auth.setSession({
-    access_token: result.authSession.accessToken,
-    refresh_token: result.authSession.refreshToken,
-  });
+  const { error } = await withPtgAuthStorage(rememberMe, () => client.auth.setSession({
+    access_token: authSession.accessToken,
+    refresh_token: authSession.refreshToken,
+  }));
   if (error) throw new Error("Could not establish the Supabase sign-in session.");
-  setPtgAppSessionId(result.appSessionId, rememberMe);
+  setPtgAppSessionId(appSessionId, rememberMe);
 }
 
 export function getAvailabilityNotice(error: unknown) {
