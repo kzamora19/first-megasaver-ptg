@@ -13,7 +13,7 @@ import { withBasePath } from "@/lib/base-path";
 
 function accountDestination(account: EdgeAuthResponse["account"]) {
   return account?.mustChangePassword ? "/change-password/" :
-    account?.role === "SYSTEM_ADMIN" ? "/dashboard/" : "/products/";
+    account?.role === "SYSTEM_ADMIN" ? "/admin/accounts/" : "/products/";
 }
 
 export default function LoginPage() {
@@ -208,10 +208,10 @@ export default function LoginPage() {
       </AppDialog>}
       <style jsx global>{`
         .legacy-login-shell{background:radial-gradient(ellipse at 50% 0,#f7fbff 0,#eaf2fb 70%,#e5edf7 100%)!important}
-        .legacy-login-card{width:min(510px,100%)!important;padding:0!important;overflow:hidden;border-radius:20px!important;box-shadow:0 22px 54px rgba(27,61,103,.16)!important}
+        .legacy-login-card{width:min(460px,100%)!important;padding:0!important;overflow:hidden;border-radius:20px!important;box-shadow:0 22px 54px rgba(27,61,103,.16)!important}
         .legacy-login-header{position:relative;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#075fc6 0%,#075fc6 35%,#123b7a 100%);overflow:hidden}
         .legacy-login-header img{position:relative;z-index:1;display:block;width:100%;height:auto;object-fit:contain}
-        .legacy-login-body{padding:29px 32px 27px;background:#fff}
+        .legacy-login-body{padding:23px 27px;background:#fff}
         .legacy-login-form{display:grid;gap:8px}
         .legacy-login-form>label:not(.legacy-show-password){margin-top:2px;color:#123b72;font-size:11px;font-weight:900;letter-spacing:.03em}
         .legacy-login-form>input{width:100%;height:46px;padding:0 13px;border:1px solid #cfdaea;border-radius:9px;background:#e8f0fc;color:#172033;font:inherit;font-size:14px;outline:none}
@@ -223,8 +223,9 @@ export default function LoginPage() {
         .legacy-branch-option input{width:100%;height:40px;padding:0 12px;border:1px solid #cfdaea;border-radius:8px;font:inherit}
         .legacy-login-form button{height:48px;margin-top:10px;border:0;border-radius:10px;background:linear-gradient(100deg,#0866d4,#153d7d);color:#fff;font-size:16px;font-weight:900;letter-spacing:.02em;box-shadow:0 7px 14px rgba(18,66,132,.18);cursor:pointer}
         .legacy-login-form button:disabled{opacity:.65;cursor:wait}
-        .legacy-login-message{min-height:20px;margin:10px 0 0;color:#b3261e;font-size:12px;line-height:1.4;text-align:center}
-        .legacy-login-security{display:grid;justify-items:center;gap:13px;margin:22px 0 0}
+        .legacy-login-message{margin:10px 0 0;color:#b3261e;font-size:12px;line-height:1.4;text-align:center}
+        .legacy-login-message:empty{display:none}
+        .legacy-login-security{display:grid;justify-items:center;gap:9px;margin:16px 0 0}
         .legacy-forgot-button{border:0;background:transparent;color:#123b72;font:inherit;font-size:12px;font-weight:800;text-decoration:underline;cursor:pointer}
         .legacy-login-security>div{display:flex;align-items:center;gap:9px;color:#123b72;font-size:11px;font-weight:700}
         .legacy-security-dot{width:9px;height:9px;border-radius:50%;background:#00c96b;box-shadow:0 0 9px rgba(0,201,107,.5)}
