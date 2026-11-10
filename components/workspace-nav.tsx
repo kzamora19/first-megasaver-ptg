@@ -13,8 +13,32 @@ function SecurityLinks({ onNavigate }: { onNavigate: () => void }) {
   </div>;
 }
 
-export default function WorkspaceNav({ role, active, onNavigate }: { role: string; active: string; onNavigate: () => void }) {
+const deskPtgTools = [
+  ["/data-desk", "Cross-App Catalog Review"],
+  ["/price-memos/import", "Price Memo Import"],
+  ["/product-master", "Product Master"],
+  ["/admin/logos", "Logo Manager"],
+];
+const deskSalesTools = [
+  ["inventory", "Inventory Counts & Serials"],
+  ["sales-history", "Sales Database"],
+  ["daily-history", "Daily Monitoring"],
+  ["unified", "Sales Tracker Import Center"],
+];
+
+export default function WorkspaceNav({ role, active, desk = false, onNavigate }: {
+  role: string; active: string; desk?: boolean; onNavigate: () => void;
+}) {
   const system = role === "SYSTEM_ADMIN";
+  if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
+    {deskPtgTools.map(([path, label]) => <a key={path} href={withBasePath(path + "/") + (path === "/data-desk" ? "" : "?workspace=data-desk")}
+      onClick={onNavigate} className={"ptg-nav-item" + (active === path ? " active" : "")}
+      aria-current={active === path ? "page" : undefined}>{label}</a>)}
+    <div className="ptg-nav-label">SALES TRACKER</div>
+    {deskSalesTools.map(([tool, label]) => <a key={tool} className="ptg-nav-item"
+      href={"https://kzamora19.github.io/branchline/?workspace-import=" + tool}
+      target="_blank" rel="noopener noreferrer" onClick={onNavigate}>{label}</a>)}
+  </nav>;
   const admin = system || role === "BRANCH_ADMIN";
   const items = [
     ...(system ? [["/dashboard", "Dashboard"]] : []),
@@ -28,8 +52,8 @@ export default function WorkspaceNav({ role, active, onNavigate }: { role: strin
       aria-current={active === path ? "page" : undefined}>{label}</Link>
       {system && active === path && path === "/admin/accounts" && <Suspense><SecurityLinks onNavigate={onNavigate} /></Suspense>}
     </Fragment>)}
-    {system && <a href={withBasePath("/data-desk/")} onClick={onNavigate}
+    {system && <a href={withBasePath("/data-desk/")} data-branchline-catalog-review onClick={onNavigate}
       className={"ptg-nav-item" + (active === "/data-desk" ? " active" : "")}
-      aria-current={active === "/data-desk" ? "page" : undefined}>Data Desk Pilot</a>}
+      aria-current={active === "/data-desk" ? "page" : undefined}>Cross-App Catalog Review</a>}
   </nav>;
 }
