@@ -26,7 +26,8 @@ function trackerClient() {
       storage: {
         getItem: name => sessionStorage.getItem(name) ?? localStorage.getItem(name),
         setItem: (name, value) => {
-          const remember = localStorage.getItem("branchline-remember") !== "0";
+          const remember = sessionStorage.getItem(name) === null &&
+            (localStorage.getItem(name) !== null || localStorage.getItem("branchline-remember") !== "0");
           (remember ? localStorage : sessionStorage).setItem(name, value);
           (remember ? sessionStorage : localStorage).removeItem(name);
         },
