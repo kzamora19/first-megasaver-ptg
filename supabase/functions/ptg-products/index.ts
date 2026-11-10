@@ -86,66 +86,15 @@ function clean(value: unknown, max: number) {
 async function searchMemoProducts(origin: string, session: ActiveSession, body: Record<string, unknown>) {
   if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
   if (!["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) return respond(origin, fail("PTG access is not enabled for this account."), 403);
-  const q = clean(body.q, 100);
   const page = Math.min(1_000_000, Math.max(1, Math.trunc(Number(body.page || 1)) || 1));
-  const pageSize = 5;
-  let query = admin.from("memo_products")
-    .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,eligible_for_price_tag,price_tag_status,price_memos!inner(branch_id,memo_id,period,memo_type,created_at:imported_at)", { count: "exact" })
-    .order("brand", { ascending: true })
-    .order("model", { ascending: true })
-    .order("id", { ascending: true });
-  if (q.length >= 2) {
-    const safeQ = q.replace(/[,%()]/g, "");
-    const matches = ["barcode.ilike.%" + safeQ + "%", "model.ilike.%" + safeQ + "%", "brand.ilike.%" + safeQ + "%"];
-    const masterMatches = await admin.from("product_master").select("barcode").ilike("description", "%" + safeQ + "%").limit(100);
-    if (masterMatches.error) return respond(origin, fail("Could not search product descriptions."), 500);
-    const matchingBarcodes = [...new Set((masterMatches.data ?? []).map(row => String(row.barcode || "").trim()).filter(Boolean))];
-    if (matchingBarcodes.length) matches.push("barcode.in.(" + matchingBarcodes.join(",") + ")");
-    query = query.or(matches.join(","));
-  }
-  if (session.role !== "SYSTEM_ADMIN") {
-    query = session.branchId
-      ? query.or("branch_id.is.null,branch_id.eq." + session.branchId, { referencedTable: "price_memos" })
-      : query.is("price_memos.branch_id", null);
-  }
-  const from = (page - 1) * pageSize;
-  const { data, error, count } = await query.range(from, from + pageSize - 1);
-  if (error) return respond(origin, fail("Could not search imported memo products."), 500);
-  const rows = data ?? [];
-  const barcodes = [...new Set(rows.map(row => row.barcode).filter(Boolean))];
-  const barcodeVariants = (barcode: string) => {
-    if (!/^\d+$/.test(barcode)) return [barcode];
-    const unpadded = barcode.replace(/^0+(?=\d)/, "");
-    return [...new Set([barcode, unpadded, unpadded.padStart(8, "0")])];
-  };
-  const lookupBarcodes = [...new Set(barcodes.flatMap(barcodeVariants))];
-  const descriptions = lookupBarcodes.length
-    ? await admin.from("product_master").select("barcode,description,sub_category").in("barcode", lookupBarcodes)
-    : { data: [], error: null };
-  if (descriptions.error) return respond(origin, fail("Could not load product descriptions."), 500);
-  const detail = new Map((descriptions.data ?? []).map(item => [item.barcode, item]));
-  const products = rows.map(row => {
-    const match = barcodeVariants(row.barcode ?? "").map(barcode => detail.get(barcode)).find(Boolean);
-    return {
-      ...row,
-      description: match?.description?.trim() || row.model,
-      sub_category: match?.sub_category ?? "",
-    };
+  const { data, error } = await admin.rpc("ptg_ordered_product_search", {
+    p_query: clean(body.q, 100),
+    p_branch_id: session.branchId ?? null,
+    p_system_admin: session.role === "SYSTEM_ADMIN",
+    p_page: page,
   });
-  const memoCount = count ?? products.length;
-  const fallbackFrom = Math.max(0, from - memoCount);
-  const remaining = pageSize - products.length;
-  const fallback = await admin.rpc("ptg_search_srp_fallback", {
-    p_query: q, p_branch_id: session.branchId ?? null, p_system_admin: session.role === "SYSTEM_ADMIN",
-  }, { count: "exact" }).order("brand").order("model").order("id")
-    .range(fallbackFrom, fallbackFrom + Math.max(1, remaining) - 1);
-  if (fallback.error) return respond(origin, fail("Could not search the product SRP register."), 500);
-  const srpProducts = (fallback.data ?? []).slice(0, remaining).map(row => ({
-    ...row, description: row.model, cash_payment: row.srp, tag_this: row.srp,
-    eligible_for_price_tag: false, price_tag_status: "SRP ONLY", price_memos: null,
-  }));
-  return respond(origin, { ok: true, products: [...products, ...srpProducts],
-    total: memoCount + (fallback.count ?? srpProducts.length), page, pageSize });
+  if (error || !data) return respond(origin, fail("Could not search imported memo products."), 500);
+  return respond(origin, { ok: true, products: data.products, total: data.total, page, pageSize: 5 });
 }
 
 async function searchProductMaster(origin: string, session: ActiveSession, body: Record<string, unknown>) {
