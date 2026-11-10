@@ -1,6 +1,7 @@
 import type * as XLSX from "xlsx";
 
 export const pilotLimit = 25;
+export const workbookLimit = 10;
 export const destinations = ["sales", "ptg"] as const;
 export type Destination = typeof destinations[number];
 const fields = ["barcode", "description", "brand", "category", "sub_category"] as const;
@@ -10,6 +11,7 @@ export type ImportResults = Partial<Record<Destination, ImportResult>>;
 
 const header = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
 const limits = [100, 500, 100, 160, 160];
+const barcodeKey = (value: string) => (/^\d{1,7}$/.test(value) ? value.padStart(8, "0") : value).toLowerCase();
 
 export function readCatalog(book: XLSX.WorkBook, xlsx: typeof XLSX): CatalogRow[] {
   const manifest = book.Sheets["Import Manifest"];
@@ -34,12 +36,28 @@ export function readCatalog(book: XLSX.WorkBook, xlsx: typeof XLSX): CatalogRow[
       throw new Error("Fill in all five catalog fields using valid lengths on Products row " + (index + 2) + ".");
     }
     // Match Sales Tracker's padding while preserving the supplied barcode for PTG.
-    const key = (/^\d{1,7}$/.test(values[0]) ? values[0].padStart(8, "0") : values[0]).toLowerCase();
+    const key = barcodeKey(values[0]);
     if (seen.has(key)) throw new Error("Resolve the duplicate barcode on Products row " + (index + 2) + ".");
     seen.add(key);
     return [Object.fromEntries(fields.map((field, i) => [field, values[i]])) as CatalogRow];
   });
   if (!rows.length || rows.length > pilotLimit) throw new Error("Use 1–" + pilotLimit + " reviewed products for the catalog pilot.");
+  return rows;
+}
+
+export function combineCatalogs(batches: { name: string; rows: CatalogRow[] }[]) {
+  const seen = new Map<string, string>();
+  const rows: CatalogRow[] = [];
+  for (const batch of batches) {
+    for (const row of batch.rows) {
+      const key = barcodeKey(row.barcode);
+      const previous = seen.get(key);
+      if (previous) throw new Error("Barcode " + row.barcode + " appears in both " + previous + " and " + batch.name + ".");
+      seen.set(key, batch.name);
+      rows.push(row);
+    }
+  }
+  if (!rows.length || rows.length > pilotLimit) throw new Error("Review 1–" + pilotLimit + " products across all selected workbooks.");
   return rows;
 }
 
