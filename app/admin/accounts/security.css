@@ -49,6 +49,7 @@
 .security-rocker button[aria-pressed="true"]:focus-visible { outline-color: #133b66; }
 .security-rocker:has(button:disabled) { box-shadow: none; opacity: 0.65; }
 .security-rocker button:disabled { cursor: default; }
+.security-panel:has(> .security-branch-registry) { grid-template-columns: minmax(0, 1fr); }
 .security-branch-registry { container-type: inline-size; padding: clamp(0.75rem, 2vw, 1.25rem); min-width: 0; }
 .security-branch-registry .security-card-heading { margin-bottom: 0.85rem; }
 .security-branch-registry .security-card-heading h3 { margin: 0; }
