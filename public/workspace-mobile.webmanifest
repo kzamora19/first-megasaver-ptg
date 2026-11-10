@@ -1,0 +1,14 @@
+{
+  "id": "./workspace/mobile/",
+  "name": "Branchline Workspace",
+  "short_name": "Branchline",
+  "start_url": "./workspace/mobile/",
+  "scope": "./workspace/mobile/",
+  "display": "standalone",
+  "theme_color": "#102b4d",
+  "background_color": "#f2f6fa",
+  "icons": [
+    { "src": "/branchline/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/branchline/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
