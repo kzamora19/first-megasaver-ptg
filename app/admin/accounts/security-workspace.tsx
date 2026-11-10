@@ -60,7 +60,7 @@ function Rocker({ label, enabled, disabled, onChange }: {
   disabled: boolean;
   onChange: (enabled: boolean) => void;
 }) {
-  return <div className="security-rocker" role="group" aria-label={label}>
+  return <div className="security-rocker" data-enabled={enabled} role="group" aria-label={label}>
     {[true, false].map(value => <button type="button" key={String(value)} data-on={value}
       aria-pressed={value === enabled} disabled={disabled}
       onClick={() => { if (value !== enabled) onChange(value); }}>{value ? "ON" : "OFF"}</button>)}
@@ -68,6 +68,7 @@ function Rocker({ label, enabled, disabled, onChange }: {
 }
 
 const PAGE_SIZE = 10;
+const BRANCH_PAGE_SIZE = 20;
 
 function SecurityTable({ label, headers, rows, empty }: {
   label: string;
@@ -113,6 +114,8 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
   const [accountRefresh, setAccountRefresh] = useState(0);
   const [auditRefresh, setAuditRefresh] = useState(0);
   const [branchDialog, setBranchDialog] = useState<"add" | Branch | null>(null);
+  const [branchSearch, setBranchSearch] = useState("");
+  const [selectedBranchPage, setBranchPage] = useState(1);
   const [permissionKey, setPermissionKey] = useState("");
   const [mode, setMode] = useState("VIEW");
 
@@ -219,6 +222,14 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
   }
 
   const branches = data?.branches ?? [];
+  const branchQuery = branchSearch.trim().toLowerCase();
+  const matchingBranches = section === "branches" ? branches
+    .filter(branch => `${branch.branch_code} ${branch.branch_name}`.toLowerCase().includes(branchQuery))
+    .sort((first, second) => first.branch_code.localeCompare(second.branch_code)) : [];
+  const lastBranchPage = Math.max(1, Math.ceil(matchingBranches.length / BRANCH_PAGE_SIZE));
+  const branchPage = Math.min(selectedBranchPage, lastBranchPage);
+  const branchOffset = (branchPage - 1) * BRANCH_PAGE_SIZE;
+  const visibleBranches = matchingBranches.slice(branchOffset, branchOffset + BRANCH_PAGE_SIZE);
   const masterOn = data?.controls?.find(row => row.control_key === "MASTER_SYSTEM")?.enabled ?? true;
   const maintenanceOn = data?.controls?.find(row => row.control_key === "MAINTENANCE_MODE")?.enabled ?? false;
   const status = !masterOn ? "System offline" : maintenanceOn ? "Maintenance active" : "System accessible";
@@ -266,29 +277,57 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
       </section>
     </>}
     {section === "branches" && data && <>
-      <section className="admin-card">
+      <section className="admin-card security-branch-registry">
         <div className="security-card-heading">
           <h3>Branch registry</h3>
+          <input type="search" className="security-branch-search" aria-label="Search branches"
+            placeholder="Search by branch code or name" value={branchSearch} onChange={event => {
+              setBranchSearch(event.target.value);
+              setBranchPage(1);
+            }} />
           <button className="admin-button" type="button" disabled={busy} onClick={() => { setError(""); setBranchDialog("add"); }}>Add branch</button>
         </div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Code</th><th>Branch</th><th>Status</th><th>Access</th><th>Actions</th></tr></thead>
-          <tbody>{branches.map(branch => <tr key={branch.id}><td>{branch.branch_code}</td><td>{branch.branch_name}</td><td>{branch.status}</td><td>
-            <Rocker label={branch.branch_name + " access"} enabled={branch.operational_status === "ON"} disabled={busy || branch.status !== "ACTIVE"} onChange={async enabled => {
-              if (await confirm({
-                title: "Turn " + branch.branch_code + (enabled ? " on?" : " off?"),
-                message: enabled ? "Branch users can sign in once system-wide restrictions are lifted." : "PTG will become unavailable for this branch and its users will be signed out.",
-                label: enabled ? "Turn on" : "Turn off", danger: !enabled,
-              })) {
-                mutate("securityBranch", { command: enabled ? "on" : "off", branchId: branch.id }, "Branch updated.");
-              }
-            }} />
-          </td><td>
-            {branch.status === "ACTIVE"
-              ? <button type="button" className="admin-button small secondary" disabled={busy} onClick={() => { setError(""); setBranchDialog(branch); }}>Deactivate</button>
-              : <button type="button" className="admin-button small secondary" disabled={busy} onClick={async () => {
-                if (await confirm({ title: "Reactivate " + branch.branch_code + "?", label: "Reactivate" })) mutate("securityBranch", { command: "reactivate", branchId: branch.id }, "Branch reactivated.");
-              }}>Reactivate</button>}
-          </td></tr>)}</tbody></table></div>
+        <div className="security-branch-grid">
+          {visibleBranches.map(branch => {
+            const active = branch.status === "ACTIVE";
+            const enabled = branch.operational_status === "ON";
+            const status = !active ? "Inactive" : masterOn && !maintenanceOn && enabled ? "Online" : "Offline";
+            return <article className="security-branch-tile" key={branch.id} aria-label={branch.branch_code + " " + branch.branch_name}>
+              <div className="security-branch-name">
+                <strong>{branch.branch_code}</strong>
+                <span title={branch.branch_name}>{branch.branch_name}</span>
+              </div>
+              <Rocker label={branch.branch_code + " access"} enabled={enabled} disabled={busy || !active} onChange={async enabled => {
+                if (await confirm({
+                  title: "Turn " + branch.branch_code + (enabled ? " on?" : " off?"),
+                  message: enabled ? "Branch users can sign in once system-wide restrictions are lifted." : "PTG will become unavailable for this branch and its users will be signed out.",
+                  label: enabled ? "Turn on" : "Turn off", danger: !enabled,
+                })) {
+                  mutate("securityBranch", { command: enabled ? "on" : "off", branchId: branch.id }, "Branch updated.");
+                }
+              }} />
+              <span className="security-branch-status" data-status={status}>{status}</span>
+              {active
+                ? <button type="button" className="security-branch-action" aria-label={"Deactivate " + branch.branch_code} disabled={busy} onClick={() => { setError(""); setBranchDialog(branch); }}>Deactivate</button>
+                : <button type="button" className="security-branch-action" aria-label={"Reactivate " + branch.branch_code} disabled={busy} onClick={async () => {
+                  if (await confirm({ title: "Reactivate " + branch.branch_code + "?", label: "Reactivate" })) mutate("securityBranch", { command: "reactivate", branchId: branch.id }, "Branch reactivated.");
+                }}>Reactivate</button>}
+            </article>;
+          })}
+          {!branchQuery && Array.from({ length: BRANCH_PAGE_SIZE - visibleBranches.length }, (_, index) =>
+            <button type="button" className="security-branch-tile security-branch-empty" key={index}
+              tabIndex={-1} disabled={busy} onClick={() => { setError(""); setBranchDialog("add"); }}>
+              <strong>+ Add branch</strong><span>Available slot</span>
+            </button>)}
+        </div>
+        {branchQuery && !matchingBranches.length && <p role="status">No branches match your search.</p>}
+        <nav className="security-pagination" aria-label="Branch pagination">
+          <button className="admin-button small secondary" type="button" disabled={branchPage === 1}
+            onClick={() => setBranchPage(branchPage - 1)}>Previous</button>
+          <span role="status">Page {branchPage} of {lastBranchPage} · {matchingBranches.length} {matchingBranches.length === 1 ? "branch" : "branches"}</span>
+          <button className="admin-button small secondary" type="button" disabled={branchPage === lastBranchPage}
+            onClick={() => setBranchPage(branchPage + 1)}>Next</button>
+        </nav>
       </section>
       {branchDialog && <AppDialog title={branchDialog === "add" ? "Add branch" : "Deactivate " + branchDialog.branch_code}
         busy={busy} onClose={() => { setBranchDialog(null); setError(""); }}>
