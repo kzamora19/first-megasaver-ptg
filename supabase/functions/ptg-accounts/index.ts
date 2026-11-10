@@ -129,16 +129,18 @@ async function sendEmail(input: { to: string; subject: string; text: string; htm
 }
 function inviteEmail(name: string, username: string, password: string, acceptUrl: string, managed: boolean) {
   const safeName = escapeHtml(name), safeUser = escapeHtml(username), safePass = escapeHtml(password), safeUrl = escapeHtml(acceptUrl);
-  const login = appUrl + "/login";
-  const instructions = managed ? "After accepting, sign in with the password above. Your administrator manages password changes." : "After accepting, sign in and change your temporary password.";
+  const workspaceUrl = "https://kzamora19.github.io/first-megasaver-ptg/workspace/";
+  const instructions = "After accepting, open Branchline Workspace and choose Price Tag Generator. " +
+    (managed ? "Sign in with the password above. Your administrator manages password changes." :
+      "Sign in with your temporary password and choose a new password.");
   const passwordLabel = managed ? "Password" : "Temporary password";
   const text = "Hello " + name + ",\n\nYour First Megasaver PTG account has been created.\n\nUsername: " + username +
     "\n" + passwordLabel + ": " + password + "\n\nAccept your invitation: " + acceptUrl +
-    "\n\n" + instructions + "\n\nLogin: " + login + "\n\nThis invitation expires in 48 hours.";
+    "\n\n" + instructions + "\n\nGet Branchline Workspace: " + workspaceUrl + "\n\nThis invitation expires in 48 hours.";
   const html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#172033;line-height:1.6"><h2>First Megasaver · Price Tag Generator</h2><p>Hello ' +
     safeName + ', your account has been created.</p><p><b>Username:</b> ' + safeUser + '<br><b>' + passwordLabel + ':</b> <code>' + safePass +
     '</code></p><p><a href="' + safeUrl + '">Accept invitation</a></p><p>' + instructions + '</p><p><a href="' +
-    escapeHtml(login) + '">Open PTG</a></p><p>This invitation expires in 48 hours.</p></div>';
+    escapeHtml(workspaceUrl) + '">Get Branchline Workspace</a></p><p>This invitation expires in 48 hours.</p></div>';
   return { to: "", subject: "Your First Megasaver PTG account invitation", text, html };
 }
 async function sendInvitation(email: string, displayName: string, username: string, password: string, token: string, managed: boolean) {
