@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import ClientSessionGate from "@/components/client-session-gate";
 import { getPtgAppSessionId, invokePtgAuth } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
-import { destinations, publishCatalog, readCatalog, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
+import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
 
 const writes = process.env.NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES === "true";
 const names = { sales: "Sales Tracker", ptg: "PTG" };
@@ -60,11 +60,11 @@ async function verifySales() {
   return { scope: { userId: data.user.id, branches: branches as { id: string; name: string }[] }, client };
 }
 
-type Review = { fileName: string; rows: CatalogRow[]; sales?: Awaited<ReturnType<typeof verifySales>>["scope"] };
+type Review = { sourceNames: string[]; rows: CatalogRow[]; sales?: Awaited<ReturnType<typeof verifySales>>["scope"] };
 
 function CatalogPilot() {
   const router = useRouter();
-  const [file, setFile] = useState<File>();
+  const [files, setFiles] = useState<File[]>([]);
   const [selected, setSelected] = useState<Destination[]>([]);
   const [review, setReview] = useState<Review>();
   const [results, setResults] = useState<ImportResults>({});
@@ -101,19 +101,29 @@ function CatalogPilot() {
   }
 
   async function reviewCatalog() {
-    if (!file || !selected.length || running.current) return;
+    if (!files.length || !selected.length || running.current) return;
     running.current = true;
     setBusy(true);
     clearReview();
     try {
-      if (!/\.xlsx$/i.test(file.name) || file.size > 15 * 1024 * 1024 || file.name.length > 240) {
-        throw new Error("Choose an .xlsx workbook up to 15 MB with a file name of 240 characters or fewer.");
+      if (files.length > workbookLimit || files.reduce((total, file) => total + file.size, 0) > 15 * 1024 * 1024) {
+        throw new Error("Choose up to " + workbookLimit + " workbooks totaling 15 MB or less.");
       }
       await verifyPtg(sessionId);
       const xlsx = await import("xlsx");
-      const rows = readCatalog(xlsx.read(await file.arrayBuffer(), { type: "array" }), xlsx);
+      const batches = [];
+      for (const file of files) {
+        try {
+          if (!/\.xlsx$/i.test(file.name) || file.name.length > 240) throw new Error("Choose an .xlsx file with a name of 240 characters or fewer.");
+          const rows = readCatalog(xlsx.read(await file.arrayBuffer(), { type: "array" }), xlsx);
+          batches.push({ name: file.name, rows });
+        } catch (reason) {
+          throw new Error(file.name + ": " + (reason instanceof Error ? reason.message : "Unable to read workbook."));
+        }
+      }
+      const rows = combineCatalogs(batches);
       const sales = selected.includes("sales") ? (await verifySales()).scope : undefined;
-      setReview({ fileName: file.name, rows, sales });
+      setReview({ sourceNames: files.map(file => file.name), rows, sales });
       setResults(Object.fromEntries(selected.map(destination => [destination, { state: "pending" }])));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The import review could not be completed.");
@@ -140,7 +150,9 @@ function CatalogPilot() {
       }, async destination => {
         if (destination === "ptg") {
           try {
-            await invokePtgData("ptg-products", { action: "master-import", sourceFile: review.fileName, rows: review.rows });
+            await invokePtgData("ptg-products", { action: "master-import",
+              sourceFile: review.sourceNames.length === 1 ? review.sourceNames[0] : "Data Desk · " + review.sourceNames.length + " reviewed workbooks",
+              rows: review.rows });
           } catch (reason) {
             if (reason instanceof Error && "status" in reason && [400, 401, 403, 429].includes(Number(reason.status))) {
               return { state: "blocked", detail: reason.message };
@@ -168,27 +180,29 @@ function CatalogPilot() {
   const started = Object.values(results).some(result => result.state !== "pending");
   const uncertain = Object.values(results).some(result => result.state === "verify");
   return <main className="ptg-main">
-    <h1>Data Desk catalog pilot</h1>
-    <p>Review up to 25 products for Sales Tracker and PTG. This pilot updates catalog details only.</p>
+    <h1>Cross-App Catalog Review</h1>
+    <p>Review up to {pilotLimit} products across multiple workbooks for Sales Tracker, PTG, or both. This review covers product details only.</p>
     {!writes && <p role="status"><strong>Dry run only.</strong> Live saving is disabled in this build.</p>}
     <section className="admin-card">
       <fieldset disabled={busy || uncertain}>
-        <legend>Workbook and destinations</legend>
-        <label>Products workbook <input type="file" accept=".xlsx" onChange={event => {
-          setFile(event.target.files?.[0]); clearReview();
-        }} /></label>
+        <legend>Workbooks and destinations</legend>
+        <label className="upload-drop"><input type="file" multiple accept=".xlsx" onChange={event => {
+          setFiles(Array.from(event.target.files ?? [])); clearReview();
+        }} /><strong>Choose Products workbooks</strong><span>Up to {workbookLimit} Excel workbooks, 15 MB combined</span></label>
+        {files.length > 0 && <p>{files.length} selected · {files.map(file => file.name).join(", ")}</p>}
         {destinations.map(destination => <p key={destination}><label><input type="checkbox" checked={selected.includes(destination)}
           onChange={event => {
             setSelected(event.target.checked ? [...selected, destination] : selected.filter(value => value !== destination));
             clearReview();
           }} /> {names[destination]}</label></p>)}
         <button className="admin-button" type="button" onClick={() => void reviewCatalog()}
-          disabled={!file || !selected.length || started}>{busy && !review ? "Checking…" : "Review catalog"}</button>
+          disabled={!files.length || !selected.length || started}>{busy && !review ? "Checking…" : "Review catalog"}</button>
       </fieldset>
       {error && <p role="alert">{error}</p>}
     </section>
     {review && <section className="admin-card">
       <h2>Review {review.rows.length} products</h2>
+      <p>Source workbooks: {review.sourceNames.join(", ")}</p>
       <ul aria-live="polite">{destinations.filter(destination => results[destination]).map(destination => {
         const result = results[destination]!;
         return <li key={destination}><strong>{names[destination]}</strong> · {destination === "sales"
