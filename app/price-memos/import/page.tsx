@@ -1,17 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import ClientSessionGate from "@/components/client-session-gate";
+import { withBasePath } from "@/lib/base-path";
 import PriceMemoImporter from "./price-memo-importer";
 
 function ImportBackLink({ systemAdmin }: { systemAdmin: boolean }) {
   const workspace = useSearchParams().get("workspace");
   const fromDataDesk = systemAdmin && workspace === "data-desk";
-  return <Link className="admin-back" href={fromDataDesk ? "/data-desk/" : "/products/"}>
+  return <a className="admin-back" href={withBasePath(fromDataDesk ? "/data-desk/" : "/products/")}>
     <span aria-hidden="true">← </span>{fromDataDesk ? "Back to Data Desk" : "Back to Product Search"}
-  </Link>;
+  </a>;
 }
 
 export default function PriceMemoImportPage() {
