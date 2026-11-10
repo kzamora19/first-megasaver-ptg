@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSecuritySection, securitySections } from "@/lib/ptg/security-sections";
+import { withBasePath } from "@/lib/base-path";
 
 function SecurityLinks({ onNavigate }: { onNavigate: () => void }) {
   const selected = getSecuritySection(useSearchParams().get("section"));
@@ -27,5 +28,8 @@ export default function WorkspaceNav({ role, active, onNavigate }: { role: strin
       aria-current={active === path ? "page" : undefined}>{label}</Link>
       {system && active === path && path === "/admin/accounts" && <Suspense><SecurityLinks onNavigate={onNavigate} /></Suspense>}
     </Fragment>)}
+    {system && <a href={withBasePath("/data-desk/")} onClick={onNavigate}
+      className={"ptg-nav-item" + (active === "/data-desk" ? " active" : "")}
+      aria-current={active === "/data-desk" ? "page" : undefined}>Data Desk Pilot</a>}
   </nav>;
 }
