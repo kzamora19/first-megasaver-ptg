@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export const usesEdgeAuth = process.env.NEXT_PUBLIC_PTG_USE_EDGE_AUTH === "true";
 const appSessionKey = "ptg_app_session_id";
+const rememberedLoginKey = "ptg_remembered_login";
 
 export type EdgeAuthResponse = {
   ok?: boolean;
@@ -28,6 +29,18 @@ export type EdgeAuthResponse = {
 export function getPtgAppSessionId() {
   if (typeof window === "undefined") return "";
   return window.sessionStorage.getItem(appSessionKey) ?? window.localStorage.getItem(appSessionKey) ?? "";
+}
+
+export function getRememberedPtgSignIn() {
+  return {
+    login: window.localStorage.getItem(rememberedLoginKey) ?? "",
+    sessionId: window.localStorage.getItem(appSessionKey) ?? "",
+  };
+}
+
+export function setRememberedPtgLogin(login: string, remember: boolean) {
+  if (remember) window.localStorage.setItem(rememberedLoginKey, login.trim());
+  else window.localStorage.removeItem(rememberedLoginKey);
 }
 
 export function setPtgAppSessionId(value: string, rememberMe: boolean) {
