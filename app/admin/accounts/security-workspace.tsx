@@ -8,6 +8,8 @@ import { getSecuritySection, securitySections, type SecuritySection } from "@/li
 import AppDialog from "@/components/app-dialog";
 import { useAppConfirm } from "@/components/app-confirm";
 import AccountAdministration from "./account-administration";
+import { withBasePath } from "@/lib/base-path";
+import "./security.css";
 
 type Branch = { id: string; branch_code: string; branch_name: string; status: string; operational_status: string };
 type Control = { control_key: string; enabled: boolean };
@@ -34,15 +36,21 @@ async function request(action: string, input: Record<string, unknown> = {}): Pro
   return result;
 }
 
-export default function SecurityWorkspace() {
-  const section = getSecuritySection(useSearchParams().get("section"));
+export default function SecurityWorkspace({ desk = false }: { desk?: boolean }) {
+  const query = useSearchParams();
+  const section = desk ? "srp" : getSecuritySection(query.get("section"));
   return <main className="shell admin-shell">
     <section className="hero admin-hero">
-      <p className="eyebrow">ACCOUNT ADMINISTRATION · SYSTEM ADMIN</p>
-      <h1>System Security</h1>
+      <p className="eyebrow">{desk ? "DATA DESK" : "ACCOUNT ADMINISTRATION"} · SYSTEM ADMIN</p>
+      <h1>{desk ? "Product SRP Import" : "System Security"}</h1>
       <p className="intro">{descriptions[section]}</p>
     </section>
-    <SecurityPanel key={section} section={section} />
+    {!desk && <nav className="security-page-nav" aria-label="Account Administration sections">
+      {securitySections.filter(([key]) => key !== "srp").map(([key, label]) =>
+        <Link key={key} href={"/admin/accounts/?section=" + key} aria-current={key === section ? "page" : undefined}>{label}</Link>)}
+      <a href={withBasePath("/data-desk/")}>Open Data Desk →</a>
+    </nav>}
+    <SecurityPanel key={section} section={section} desk={desk} />
   </main>;
 }
 
@@ -92,7 +100,7 @@ function SecurityTable({ label, headers, rows, empty }: {
   </>;
 }
 
-function SecurityPanel({ section }: { section: SecuritySection }) {
+function SecurityPanel({ section, desk }: { section: SecuritySection; desk: boolean }) {
   const confirm = useAppConfirm();
   const [data, setData] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -219,7 +227,7 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
   if (!usesEdgeAccounts) return <AccountAdministration role="SYSTEM_ADMIN" />;
 
   return <div className="security-panel">
-    <h2>{securitySections.find(([key]) => key === section)?.[1]}</h2>
+    {!desk && <h2>{securitySections.find(([key]) => key === section)?.[1]}</h2>}
     {error && !branchDialog && <p role="alert" className="security-error">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {needsData && !data && !error && <p role="status">Loading security information…</p>}
@@ -371,7 +379,7 @@ function SecurityPanel({ section }: { section: SecuritySection }) {
       <section className="admin-card">
       <h3>Verify the source workbook</h3>
       <p>Use the current Head Office workbook or Product Data Extractor export. Import time records when PTG received the workbook. It cannot establish when the prices took effect.</p>
-      <p>For product names, barcodes, and categories, open <Link className="admin-link" href="/product-master/">Product Master</Link>.</p>
+      <p>For product names, barcodes, and categories, open <Link className="admin-link" href={desk ? "/product-master/?workspace=data-desk" : "/product-master/"}>Product Master</Link>.</p>
       <form className="security-form" onReset={() => { setFile(null); setVerified(false); }} onSubmit={event => {
         event.preventDefault();
         if (file && verified) void run(() => importSrp(file));

@@ -1,18 +1,7 @@
 import Link from "next/link";
-import { Suspense, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
-import { getSecuritySection, securitySections } from "@/lib/ptg/security-sections";
 import { withBasePath } from "@/lib/base-path";
 import { deskSalesTools } from "@/lib/ptg/batch-import";
-
-function SecurityLinks({ onNavigate }: { onNavigate: () => void }) {
-  const selected = getSecuritySection(useSearchParams().get("section"));
-  return <div className="ptg-security-nav" aria-label="System Security">
-    {securitySections.map(([key, label]) => <Link key={key} href={"/admin/accounts/?section=" + key}
-      onClick={onNavigate} className={"ptg-nav-item" + (key === selected ? " active" : "")}
-      aria-current={key === selected ? "page" : undefined}>{label}</Link>)}
-  </div>;
-}
 
 const deskPtgTools = [
   ["/price-memos/import", "Price Memo Import"],
@@ -26,8 +15,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const query = useSearchParams();
   const onDesk = active === "/data-desk";
   const catalog = onDesk && query.get("mode") === "catalog";
-  const salesTool = onDesk && !catalog ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
-  const unified = onDesk && !catalog && !salesTool;
+  const srp = onDesk && query.get("mode") === "srp";
+  const salesTool = onDesk && !catalog && !srp ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
+  const unified = onDesk && !catalog && !srp && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
       className={"ptg-nav-item" + (unified ? " active" : "")}
@@ -38,6 +28,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     {deskPtgTools.map(([path, label]) => <a key={path} href={withBasePath(path + "/") + "?workspace=data-desk"}
       onClick={onNavigate} className={"ptg-nav-item" + (active === path ? " active" : "")}
       aria-current={active === path ? "page" : undefined}>{label}</a>)}
+    <a href={withBasePath("/data-desk/?mode=srp")} onClick={onNavigate}
+      className={"ptg-nav-item" + (srp ? " active" : "")}
+      aria-current={srp ? "page" : undefined}>Product SRP Import</a>
     <div className="ptg-nav-label">SALES TRACKER</div>
     {deskSalesTools.map(tool => <a key={tool.id} href={withBasePath("/data-desk/?tool=" + tool.id)}
       onClick={onNavigate} className={"ptg-nav-item" + (tool === salesTool ? " active" : "")}
@@ -45,19 +38,13 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   </nav>;
   const admin = system || role === "BRANCH_ADMIN";
   const items = [
-    ...(system ? [["/dashboard", "Dashboard"]] : []),
     ["/products", "Product Search & Queue"],
-    ...(admin ? [["/price-memos/import", "Price Memo Import"], ["/admin/accounts", "Account Administration"]] : []),
-    ...(system ? [["/admin/logos", "Logo Manager"], ["/product-master", "Product Master"]] : []),
+    ...(admin ? [["/admin/accounts", "Account Administration"]] : []),
   ];
   return <nav aria-label="Workspace">
-    {items.map(([path, label]) => <Fragment key={path}><Link href={path + "/"} onClick={onNavigate}
+    {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate}
       className={"ptg-nav-item" + (active === path ? " active" : "")}
-      aria-current={active === path ? "page" : undefined}>{label}</Link>
-      {system && active === path && path === "/admin/accounts" && <Suspense><SecurityLinks onNavigate={onNavigate} /></Suspense>}
-    </Fragment>)}
-    {system && <a href={withBasePath("/data-desk/")} data-branchline-catalog-review onClick={onNavigate}
-      className={"ptg-nav-item" + (active === "/data-desk" ? " active" : "")}
-      aria-current={active === "/data-desk" ? "page" : undefined}>Data Desk</a>}
+      aria-current={active === path ? "page" : undefined}>{label}</Link>)}
+    {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }

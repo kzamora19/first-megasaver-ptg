@@ -18,7 +18,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   const router = useRouter();
   const desk = path === "/data-desk" || (deskTools.has(path) && query.get("workspace") === "data-desk");
   const open = openOnPath === path;
-  const home = session.role === "SYSTEM_ADMIN" ? "/dashboard/" : "/products/";
+  const home = session.role === "SYSTEM_ADMIN" ? "/admin/accounts/" : "/products/";
   const BrandLink = desk ? "a" : Link;
 
   useEffect(() => {

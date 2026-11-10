@@ -162,7 +162,7 @@ export default function LogoManager() {
   return (
     <main className="logo-manager">
       <header className="manager-top">
-        <a href={withBasePath("/dashboard")}>← Dashboard</a>
+        <a href={withBasePath("/data-desk/")}>← Data Desk</a>
         <span>ASSETS / BRANDING</span>
       </header>
       <section className="manager-intro">
