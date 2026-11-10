@@ -1,13 +1,25 @@
 "use client";
 
-
-
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import ClientSessionGate from "@/components/client-session-gate";
+import { withBasePath } from "@/lib/base-path";
 import PriceMemoImporter from "./price-memo-importer";
+
+function ImportBackLink({ systemAdmin }: { systemAdmin: boolean }) {
+  const workspace = useSearchParams().get("workspace");
+  const fromDataDesk = systemAdmin && workspace === "data-desk";
+  return <a className="admin-back" href={withBasePath(fromDataDesk ? "/data-desk/" : "/products/")}>
+    <span aria-hidden="true">← </span>{fromDataDesk ? "Back to Data Desk" : "Back to Product Search"}
+  </a>;
+}
 
 export default function PriceMemoImportPage() {
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN", "BRANCH_ADMIN"]}>
     {session => <main className="shell admin-shell">
+      <Suspense fallback={null}>
+        <ImportBackLink systemAdmin={session.role === "SYSTEM_ADMIN"} />
+      </Suspense>
       <section className="hero admin-hero">
         <p className="eyebrow">PRICE MEMO MANAGEMENT</p>
         <h1>Import Price Memo</h1>
