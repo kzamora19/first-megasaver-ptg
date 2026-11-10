@@ -3,7 +3,7 @@
 import LogoutButton from "@/app/dashboard/logout-button";
 import AppDialog from "@/components/app-dialog";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 import { withBasePath } from "@/lib/base-path";
@@ -150,7 +150,7 @@ const displayStatus = (product: Product) => {
   if (product.eligible_for_price_tag === false || product.price_tag_status) return "NO";
   return "NO";
 };
-const shortText = (value: string, max = 40) => value.length > max ? value.slice(0, max - 1) + "…" : value;
+const modelLabel = (product: Product) => product.description?.trim() || product.model || "View details";
 
 export default function ProductSearch({
   branchCode,
@@ -181,6 +181,7 @@ export default function ProductSearch({
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const searchRequest = useRef(0);
   const [queuePage, setQueuePage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -229,6 +230,7 @@ export default function ProductSearch({
   }
 
   const loadProducts = useCallback(async (query: string, requestedPage: number) => {
+    const request = ++searchRequest.current;
     setLoading(true);
     try {
       let payload: { ok: boolean; products: Product[]; total: number; page: number };
@@ -252,7 +254,8 @@ export default function ProductSearch({
         if (!response.ok || !result.ok) throw new Error(result.message || "Search failed.");
         payload = result;
       }
-      if (!payload.ok) throw new Error("Search failed.");
+      if (!payload.ok || !Array.isArray(payload.products)) throw new Error("Search failed.");
+      if (request !== searchRequest.current) return;
       setSearchQuery(query);
       setResults(payload.products as Product[]);
       setTotal(Number(payload.total || 0));
@@ -261,11 +264,9 @@ export default function ProductSearch({
         ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
         : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
     } catch (error) {
-      setResults([]);
-      setTotal(0);
-      setMessage(error instanceof Error ? error.message : "Search failed.");
+      if (request === searchRequest.current) setMessage(error instanceof Error ? error.message : "Search failed.");
     } finally {
-      setLoading(false);
+      if (request === searchRequest.current) setLoading(false);
     }
   }, [demoProducts]);
 
@@ -398,14 +399,14 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all visible products" checked={results.length > 0 && results.every(item => queue.some(queued => queued.id === item.id))} onChange={event => toggleVisible(event.target.checked)} /></th>
-              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
               {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
-                <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
+                <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               <BlankRows used={Math.max(1, results.length)} />
             </tbody>
@@ -421,14 +422,14 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setQueuePage(1); setActiveProduct(null); } }} /></th>
-              <th>Brand</th><th>Model</th><th>Barcode</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
               {queueRows.length ? queueRows.map(product => <tr key={product.id}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
-                <td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
+                <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  title={product.model} onClick={() => openProductDetails(product)}>{shortText(product.model || "View details", 25)}</button></td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
               <BlankRows used={Math.max(1, queueRows.length)} />
             </tbody>
@@ -616,13 +617,14 @@ export default function ProductSearch({
         .legacy-products-table{width:100%;border-collapse:collapse;table-layout:fixed}
         .legacy-results-panel{padding:8px}
         .legacy-status-message{min-height:0;margin:0;padding:0 2px 5px;color:#536781;font-size:9px}
-        .legacy-table-frame{border:1px solid #d6d6d6}
-        .legacy-products-table{font-size:9px;table-layout:fixed;width:100%}
+        .legacy-table-frame{border:1px solid #d6d6d6;overflow-x:auto}
+        .legacy-products-table{font-size:9px;table-layout:fixed;width:100%;min-width:640px}
         .legacy-products-table thead{background:#0647a7;color:#fff}
         .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
         .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
-        .legacy-products-table th:nth-child(2){width:17%}.legacy-products-table th:nth-child(3){width:18%}.legacy-products-table th:nth-child(4){width:11%}.legacy-products-table th:nth-child(5){width:30%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:9%}.legacy-products-table th:nth-child(8){width:7%}
+        .legacy-products-table th:nth-child(2){width:10%}.legacy-products-table th:nth-child(3){width:9%}.legacy-products-table th:nth-child(4){width:33%}.legacy-products-table th:nth-child(5){width:23%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:8%}.legacy-products-table th:nth-child(8){width:6%}
         .legacy-products-table td{height:38px;padding:4px 6px;border-bottom:1px solid #d6d6d6;color:#143d75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5),.legacy-products-table .legacy-product-detail-link{white-space:normal;overflow-wrap:anywhere}
         .legacy-products-table tbody tr:not(.legacy-blank-row){cursor:pointer}
         .legacy-products-table tbody tr:hover:not(.legacy-blank-row){background:#f5f8fc}
         .legacy-products-table td strong{font-weight:800}
@@ -683,6 +685,7 @@ export default function ProductSearch({
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34}
         @media(max-width:1050px){.legacy-search-workflow{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "results" "queue" "print"}}
         @media print{
+          .ptg-print-preview,.ptg-print-preview *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
           [data-demo] .legacy-print-sheet{position:relative}
           [data-demo] .legacy-print-sheet::after{content:"DEMO ONLY • SAMPLE PRICES";position:absolute;bottom:.2in;left:0;right:0;text-align:center;color:#222;font:bold 12pt sans-serif}
           @page{size:letter ${format === "TWO" || format === "AIRCON" ? "landscape" : "portrait"};margin:0}
