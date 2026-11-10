@@ -8,7 +8,7 @@ import ClientSessionGate, { type PtgClientSession } from "@/components/client-se
 import WorkspaceNav from "@/components/workspace-nav";
 import { withBasePath } from "@/lib/base-path";
 
-const workspacePaths = new Set(["/dashboard", "/products", "/price-memos/import", "/admin/accounts", "/admin/logos", "/product-master"]);
+const workspacePaths = new Set(["/dashboard", "/products", "/price-memos/import", "/admin/accounts", "/admin/logos", "/product-master", "/data-desk"]);
 
 function WorkspaceFrame({ session, path, children }: { session: PtgClientSession; path: string; children: ReactNode }) {
   const [openOnPath, setOpenOnPath] = useState<string | null>(null);
