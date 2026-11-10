@@ -14,7 +14,6 @@ function SecurityLinks({ onNavigate }: { onNavigate: () => void }) {
 }
 
 const deskPtgTools = [
-  ["/data-desk", "Cross-App Catalog Review"],
   ["/price-memos/import", "Price Memo Import"],
   ["/product-master", "Product Master"],
   ["/admin/logos", "Logo Manager"],
@@ -30,8 +29,15 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   role: string; active: string; desk?: boolean; onNavigate: () => void;
 }) {
   const system = role === "SYSTEM_ADMIN";
+  const catalog = useSearchParams().get("mode") === "catalog";
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
-    {deskPtgTools.map(([path, label]) => <a key={path} href={withBasePath(path + "/") + (path === "/data-desk" ? "" : "?workspace=data-desk")}
+    <a href={withBasePath("/data-desk/")} onClick={onNavigate}
+      className={"ptg-nav-item" + (active === "/data-desk" && !catalog ? " active" : "")}
+      aria-current={active === "/data-desk" && !catalog ? "page" : undefined}>Unified Import</a>
+    <a href={withBasePath("/data-desk/?mode=catalog")} onClick={onNavigate}
+      className={"ptg-nav-item" + (active === "/data-desk" && catalog ? " active" : "")}
+      aria-current={active === "/data-desk" && catalog ? "page" : undefined}>Cross-App Catalog Review</a>
+    {deskPtgTools.map(([path, label]) => <a key={path} href={withBasePath(path + "/") + "?workspace=data-desk"}
       onClick={onNavigate} className={"ptg-nav-item" + (active === path ? " active" : "")}
       aria-current={active === path ? "page" : undefined}>{label}</a>)}
     <div className="ptg-nav-label">SALES TRACKER</div>
@@ -54,6 +60,6 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     </Fragment>)}
     {system && <a href={withBasePath("/data-desk/")} data-branchline-catalog-review onClick={onNavigate}
       className={"ptg-nav-item" + (active === "/data-desk" ? " active" : "")}
-      aria-current={active === "/data-desk" ? "page" : undefined}>Cross-App Catalog Review</a>}
+      aria-current={active === "/data-desk" ? "page" : undefined}>Data Desk</a>}
   </nav>;
 }
