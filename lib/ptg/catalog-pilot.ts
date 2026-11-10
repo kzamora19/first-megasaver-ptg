@@ -1,7 +1,8 @@
 import type * as XLSX from "xlsx";
 
 export const pilotLimit = 25;
-export const workbookLimit = 10;
+export const workbookLimit = 80;
+export const reviewRowLimit = 50_000;
 export const destinations = ["sales", "ptg"] as const;
 export type Destination = typeof destinations[number];
 const fields = ["barcode", "description", "brand", "category", "sub_category"] as const;
@@ -41,7 +42,7 @@ export function readCatalog(book: XLSX.WorkBook, xlsx: typeof XLSX): CatalogRow[
     seen.add(key);
     return [Object.fromEntries(fields.map((field, i) => [field, values[i]])) as CatalogRow];
   });
-  if (!rows.length || rows.length > pilotLimit) throw new Error("Use 1–" + pilotLimit + " reviewed products for the catalog pilot.");
+  if (!rows.length || rows.length > reviewRowLimit) throw new Error("Each Products sheet must contain 1–" + reviewRowLimit.toLocaleString() + " products.");
   return rows;
 }
 
@@ -57,7 +58,7 @@ export function combineCatalogs(batches: { name: string; rows: CatalogRow[] }[])
       rows.push(row);
     }
   }
-  if (!rows.length || rows.length > pilotLimit) throw new Error("Review 1–" + pilotLimit + " products across all selected workbooks.");
+  if (!rows.length || rows.length > reviewRowLimit) throw new Error("Review 1–" + reviewRowLimit.toLocaleString() + " products across all selected workbooks.");
   return rows;
 }
 
