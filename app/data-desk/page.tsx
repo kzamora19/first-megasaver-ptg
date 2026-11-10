@@ -6,10 +6,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import ClientSessionGate from "@/components/client-session-gate";
 import { getPtgAppSessionId, invokePtgAuth } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
-import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
+import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, reviewRowLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
 
 const writes = process.env.NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES === "true";
 const names = { sales: "Sales Tracker", ptg: "PTG" };
+const megabyte = 1024 * 1024;
+const previewLimit = 100;
 let tracker: SupabaseClient | undefined;
 
 function trackerClient() {
@@ -70,6 +72,7 @@ function CatalogPilot() {
   const [results, setResults] = useState<ImportResults>({});
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const running = useRef(false);
   const [sessionId] = useState(getPtgAppSessionId);
@@ -106,15 +109,18 @@ function CatalogPilot() {
     setBusy(true);
     clearReview();
     try {
-      if (files.length > workbookLimit || files.reduce((total, file) => total + file.size, 0) > 15 * 1024 * 1024) {
-        throw new Error("Choose up to " + workbookLimit + " workbooks totaling 15 MB or less.");
+      if (files.length > workbookLimit || files.reduce((total, file) => total + file.size, 0) > 160 * megabyte) {
+        throw new Error("Choose up to " + workbookLimit + " workbooks totaling 160 MB or less.");
       }
       await verifyPtg(sessionId);
       const xlsx = await import("xlsx");
       const batches = [];
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
         try {
-          if (!/\.xlsx$/i.test(file.name) || file.name.length > 240) throw new Error("Choose an .xlsx file with a name of 240 characters or fewer.");
+          setProgress("Reading workbook " + (index + 1) + " of " + files.length + "…");
+          if (!/\.xlsx$/i.test(file.name) || file.name.length > 240 || file.size > 20 * megabyte) {
+            throw new Error("Choose an .xlsx file up to 20 MB with a name of 240 characters or fewer.");
+          }
           const rows = readCatalog(xlsx.read(await file.arrayBuffer(), { type: "array" }), xlsx);
           batches.push({ name: file.name, rows });
         } catch (reason) {
@@ -129,12 +135,13 @@ function CatalogPilot() {
       setError(reason instanceof Error ? reason.message : "The import review could not be completed.");
     } finally {
       running.current = false;
+      setProgress("");
       setBusy(false);
     }
   }
 
   async function save() {
-    if (!writes || !review || !confirmed || running.current) return;
+    if (!writes || !review || review.rows.length > pilotLimit || !confirmed || running.current) return;
     running.current = true;
     setBusy(true);
     let approvedSalesClient: SupabaseClient | undefined;
@@ -181,15 +188,17 @@ function CatalogPilot() {
   const uncertain = Object.values(results).some(result => result.state === "verify");
   return <main className="ptg-main">
     <h1>Cross-App Catalog Review</h1>
-    <p>Review up to {pilotLimit} products across multiple workbooks for Sales Tracker, PTG, or both. This review covers product details only.</p>
+    <p>Check product details and barcodes before sending a catalog to Sales Tracker, PTG, or both. This review reads the Products sheet and checks for missing fields and duplicate barcodes across workbooks.</p>
     {!writes && <p role="status"><strong>Dry run only.</strong> Live saving is disabled in this build.</p>}
     <section className="admin-card">
       <fieldset disabled={busy || uncertain}>
         <legend>Workbooks and destinations</legend>
         <label className="upload-drop"><input type="file" multiple accept=".xlsx" onChange={event => {
           setFiles(Array.from(event.target.files ?? [])); clearReview();
-        }} /><strong>Choose Products workbooks</strong><span>Up to {workbookLimit} Excel workbooks, 15 MB combined</span></label>
-        {files.length > 0 && <p>{files.length} selected · {files.map(file => file.name).join(", ")}</p>}
+        }} /><strong>Choose Products workbooks</strong><span>Up to {workbookLimit} Excel workbooks · 20 MB each · 160 MB combined</span></label>
+        <p className="admin-muted">Up to {reviewRowLimit.toLocaleString("en-US")} product rows per review.</p>
+        {files.length > 0 && <details><summary>{files.length} workbooks selected</summary>
+          <ul>{files.map((file, index) => <li key={index}>{file.name}</li>)}</ul></details>}
         {destinations.map(destination => <p key={destination}><label><input type="checkbox" checked={selected.includes(destination)}
           onChange={event => {
             setSelected(event.target.checked ? [...selected, destination] : selected.filter(value => value !== destination));
@@ -198,11 +207,12 @@ function CatalogPilot() {
         <button className="admin-button" type="button" onClick={() => void reviewCatalog()}
           disabled={!files.length || !selected.length || started}>{busy && !review ? "Checking…" : "Review catalog"}</button>
       </fieldset>
+      {progress && <p role="status">{progress}</p>}
       {error && <p role="alert">{error}</p>}
     </section>
     {review && <section className="admin-card">
       <h2>Review {review.rows.length} products</h2>
-      <p>Source workbooks: {review.sourceNames.join(", ")}</p>
+      <p>Source workbooks: {review.sourceNames.length}</p>
       <ul aria-live="polite">{destinations.filter(destination => results[destination]).map(destination => {
         const result = results[destination]!;
         return <li key={destination}><strong>{names[destination]}</strong> · {destination === "sales"
@@ -213,11 +223,13 @@ function CatalogPilot() {
       })}</ul>
       <div className="admin-table-wrap"><table className="admin-table">
         <thead><tr><th>Barcode</th><th>Description</th><th>Brand</th><th>Category</th><th>Subcategory</th></tr></thead>
-        <tbody>{review.rows.map(row => <tr key={row.barcode}>
+        <tbody>{review.rows.slice(0, previewLimit).map(row => <tr key={row.barcode}>
           <td>{row.barcode}</td><td>{row.description}</td><td>{row.brand}</td><td>{row.category}</td><td>{row.sub_category}</td>
         </tr>)}</tbody>
       </table></div>
-      {writes && canSave && <p><label><input type="checkbox" checked={confirmed} disabled={busy}
+      {review.rows.length > previewLimit && <p className="admin-muted">Showing the first {previewLimit} products. All {review.rows.length.toLocaleString("en-US")} were checked.</p>}
+      {writes && review.rows.length > pilotLimit && <p>Live pilot saving is limited to {pilotLimit} products at a time.</p>}
+      {writes && review.rows.length <= pilotLimit && canSave && <p><label><input type="checkbox" checked={confirmed} disabled={busy}
         onChange={event => setConfirmed(event.target.checked)} /> I reviewed the records and destination scope.</label>{" "}
         <button className="admin-button" type="button" onClick={() => void save()} disabled={!confirmed || busy}>
           {busy ? "Saving…" : started ? "Retry blocked destinations" : "Save reviewed catalog"}
