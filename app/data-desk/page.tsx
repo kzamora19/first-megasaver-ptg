@@ -7,6 +7,7 @@ import ClientSessionGate from "@/components/client-session-gate";
 import { getPtgAppSessionId, invokePtgAuth } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import BatchImport from "./batch-import";
+import SecurityWorkspace from "@/app/admin/accounts/security-workspace";
 import { deskSalesTools } from "@/lib/ptg/batch-import";
 import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, reviewRowLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
 
@@ -23,6 +24,7 @@ function trackerClient() {
   return tracker ??= createClient(url, key, {
     auth: {
       detectSessionInUrl: false,
+      autoRefreshToken: false,
       storage: {
         getItem: name => sessionStorage.getItem(name) ?? localStorage.getItem(name),
         setItem: (name, value) => {
@@ -244,8 +246,9 @@ function CatalogPilot() {
 function DataDeskView() {
   const query = useSearchParams();
   const catalog = query.get("mode") === "catalog";
+  const srp = query.get("mode") === "srp";
   const tool = deskSalesTools.find(item => item.id === query.get("tool"));
-  return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => catalog ? <CatalogPilot /> :
+  return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => srp ? <SecurityWorkspace desk /> : catalog ? <CatalogPilot /> :
     <BatchImport key={tool?.id ?? "unified"} tool={tool} verifyPtg={verifyPtg} verifySales={verifySales} />}</ClientSessionGate>;
 }
 
