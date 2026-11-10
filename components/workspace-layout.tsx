@@ -26,7 +26,11 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
     let active = true;
     async function verify() {
       try { await invokePtgAuth("session-status"); }
-      catch { if (active) router.replace("/login/"); }
+      catch (error) {
+        if (active && typeof error === "object" && error !== null && "status" in error && error.status === 401) {
+          router.replace("/login/");
+        }
+      }
     }
     const timer = window.setInterval(() => void verify(), 30_000);
     return () => { active = false; window.clearInterval(timer); };
