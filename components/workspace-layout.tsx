@@ -19,6 +19,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   const desk = path === "/data-desk" || (deskTools.has(path) && query.get("workspace") === "data-desk");
   const open = openOnPath === path;
   const home = session.role === "SYSTEM_ADMIN" ? "/dashboard/" : "/products/";
+  const BrandLink = desk ? "a" : Link;
 
   useEffect(() => {
     if (!desk || !usesEdgeAuth) return;
@@ -34,12 +35,12 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   return <div className="ptg-app">
     <aside className="ptg-sidebar ptg-print-hide" data-menu-open={open}>
       <div className="ptg-sidebar-header">
-        <Link className="ptg-brand" href={desk ? "/data-desk/" : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
+        <BrandLink className="ptg-brand" href={desk ? withBasePath("/data-desk/") : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
           <span className="ptg-brand-lockup">
             <img src={withBasePath("/branchline-logo.png")} alt="" />
             <small>{desk ? "DATA DESK" : "PRICE TAG GENERATOR"}</small>
           </span>
-        </Link>
+        </BrandLink>
         <button className="ptg-menu-toggle" type="button" aria-label={open ? "Close workspace menu" : "Open workspace menu"}
           aria-expanded={open} aria-controls="ptg-workspace-links" onClick={() => setOpenOnPath(open ? null : path)}>
           <span aria-hidden="true">☰</span>
