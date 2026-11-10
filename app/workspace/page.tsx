@@ -1,29 +1,38 @@
 import { withBasePath } from "@/lib/base-path";
 
 export const metadata = {
-  title: "Branchline Workspace for Windows",
-  description: "Download one portable workspace for Sales Tracker and Price Tag Generator.",
+  title: "Get Branchline Workspace",
+  description: "Open Sales Tracker and Price Tag Generator in Branchline Workspace on Windows, Android or iPhone.",
 };
 
 export default function WorkspaceDownloadPage() {
   return (
     <main className="shell">
       <section className="hero">
-        <p className="eyebrow">BRANCHLINE · WINDOWS WORKSPACE</p>
+        <p className="eyebrow">BRANCHLINE · INSTALLATION</p>
         <h1>Branchline Workspace</h1>
         <p className="intro">Open Sales Tracker and Price Tag Generator in one window using the account details for each app.</p>
       </section>
       <section className="panel install-panel">
-        <h2>Get the portable workspace</h2>
-        <p><a className="admin-link" href={withBasePath("/branchline-workspace-windows.zip")} download>
-          Download Branchline Workspace for Windows
+        <h2>Android and iPhone</h2>
+        <p>Open the mobile workspace to use Sales Tracker and Price Tag Generator from one home-screen icon.</p>
+        <p><a className="admin-link" href={withBasePath("/workspace/mobile/")}>Open Branchline Workspace on mobile →</a></p>
+        <ol>
+          <li>On Android, open the mobile workspace in Chrome and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+          <li>On iPhone, open it in Safari, then choose <strong>Share → Add to Home Screen</strong>.</li>
+        </ol>
+      </section>
+      <section className="panel install-panel">
+        <h2>Install on Windows</h2>
+        <p><a className="admin-link" href={withBasePath("/branchline-workspace-setup.exe")} download="Branchline Workspace Setup.exe">
+          Download Branchline Workspace Setup.exe
         </a></p>
         <ol>
-          <li>Extract all files from the ZIP into one folder.</li>
-          <li>Open <strong>Branchline Workspace.exe</strong>. If you already have it, open your existing copy.</li>
+          <li>Run <strong>Branchline Workspace Setup.exe</strong>.</li>
+          <li>Open <strong>Branchline Workspace</strong> from the Start menu.</li>
           <li>Choose <strong>Sales Tracker</strong> or <strong>Price Tag Generator</strong> and sign in with the details for that app.</li>
         </ol>
-        <p className="admin-muted">Requires Windows, an internet connection, and the Microsoft Edge WebView2 Runtime.</p>
+        <p className="admin-muted">Requires x64 Windows, an internet connection, and the Microsoft Edge WebView2 Runtime. Setup links to Microsoft’s download if the runtime is missing.</p>
       </section>
       <section className="panel">
         <h2>Signing in on another device?</h2>
