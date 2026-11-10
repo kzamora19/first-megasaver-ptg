@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import ClientSessionGate from "@/components/client-session-gate";
 import { getPtgAppSessionId, invokePtgAuth } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
+import BatchImport from "./batch-import";
 import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, reviewRowLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
 
 const writes = process.env.NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES === "true";
@@ -57,9 +58,9 @@ async function verifySales() {
   }
   const { data: capabilities, error: capabilityError } = await client.rpc("unified_import_capabilities");
   if (capabilityError || capabilities?.version !== 1) throw new Error("Sales Tracker's catalog import is unavailable.");
-  const { data: branches, error: branchError } = await client.from("branches").select("id,name").eq("dealer_id", profile.dealer_id).order("id");
+  const { data: branches, error: branchError } = await client.from("branches").select("id,name,code").eq("dealer_id", profile.dealer_id).order("id");
   if (branchError || !branches?.length) throw new Error("Could not verify the Sales Tracker branch scope.");
-  return { scope: { userId: data.user.id, branches: branches as { id: string; name: string }[] }, client };
+  return { scope: { userId: data.user.id, branches: branches as { id: string; name: string; code: string }[] }, client };
 }
 
 type Review = { sourceNames: string[]; rows: CatalogRow[]; sales?: Awaited<ReturnType<typeof verifySales>>["scope"] };
@@ -238,6 +239,12 @@ function CatalogPilot() {
   </main>;
 }
 
+function DataDeskView() {
+  const catalog = useSearchParams().get("mode") === "catalog";
+  return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => catalog ? <CatalogPilot /> :
+    <BatchImport verifyPtg={verifyPtg} verifySales={verifySales} />}</ClientSessionGate>;
+}
+
 export default function DataDeskPage() {
-  return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => <CatalogPilot />}</ClientSessionGate>;
+  return <Suspense fallback={null}><DataDeskView /></Suspense>;
 }
