@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import AppDialog from "@/components/app-dialog";
 import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import { runBatch, type Branch, type BatchJob } from "@/lib/ptg/batch-import";
@@ -26,6 +27,7 @@ export default function PromotionImport({ verifyPtg, verifySales }: Props) {
   const [scope, setScope] = useState<Access["scope"]>();
   const [products, setProducts] = useState<Product[]>([]);
   const [detail, setDetail] = useState<string>();
+  const [sourcePreview, setSourcePreview] = useState<{ url: string; name: string; page: number }>();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -179,7 +181,10 @@ export default function PromotionImport({ verifyPtg, verifySales }: Props) {
           }} /></td>
           <td><button type="button" className="admin-link" onClick={() => setDetail(row.id)}>{row.barcode}</button></td>
           <td>{row.description}</td><td>{money(row.tagPrice)}</td><td>{row.remarks || row.category || "—"}</td>
-          <td><a href={sources.find(source => source.name === row.sourceName)!.url + "#page=" + row.sourcePage} target="_blank" rel="noreferrer">{row.sourceName} · p. {row.sourcePage}</a></td>
+          <td><button type="button" className="admin-link" onClick={() => setSourcePreview({
+            url: sources.find(source => source.name === row.sourceName)!.url,
+            name: row.sourceName, page: row.sourcePage,
+          })}>{row.sourceName} · p. {row.sourcePage}</button></td>
         </tr>)}</tbody>
       </table></div>
       <nav className="security-pagination" aria-label="Promotion rows">
@@ -225,5 +230,10 @@ export default function PromotionImport({ verifyPtg, verifySales }: Props) {
       </fieldset>}
       {uncertain && <p role="alert">A destination response was lost. Check that destination before starting another import.</p>}
     </section>}
+    {sourcePreview && <AppDialog title={sourcePreview.name + " · Page " + sourcePreview.page}
+      closeIcon busy={false} onClose={() => setSourcePreview(undefined)}>
+      <iframe title="Original promotion PDF" src={sourcePreview.url + "#page=" + sourcePreview.page}
+        style={{ width: "100%", height: "65vh", border: 0 }} />
+    </AppDialog>}
   </main>;
 }
