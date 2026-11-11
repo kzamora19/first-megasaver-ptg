@@ -57,6 +57,11 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   const divisions = operations.includes("sales") ? sourceDivisions(sheets) : [];
   const started = review?.jobs.some(job => job.state !== "pending") ?? false;
   const uncertain = review?.jobs.some(job => job.state === "verify") ?? false;
+  const blockingIssues = review?.issues.filter(issue => issue.severity === "ERROR") ?? [];
+  const otherIssues = review?.issues.filter(issue => issue.severity !== "ERROR") ?? [];
+  const savedCount = review?.jobs.filter(job => job.state === "saved").length ?? 0;
+  const skippedCount = review?.jobs.filter(job => job.state === "skipped").length ?? 0;
+  const finished = !!review?.jobs.length && savedCount + skippedCount === review.jobs.length;
 
   function invalidate() {
     setReview(undefined);
@@ -274,14 +279,21 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
     </section>
     {review && <section className="admin-card">
       <h2>Review destination and scope</h2>
-      {review.issues.length > 0 && <details open={review.issues.some(issue => issue.severity === "ERROR")}><summary>{review.issues.length} review issues</summary>
-        <ul>{review.issues.slice(0, 100).map((issue, index) => <li key={index}>{issue.severity} · {issue.source_file ? issue.source_file + " · " : ""}{issue.message}</li>)}</ul>
-        {review.issues.length > 100 && <p>Showing the first 100 issues. All blocking issues must be resolved.</p>}</details>}
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>App</th><th>Data and count</th><th>Scope</th><th>Result</th></tr></thead>
+      {!started && <p role="status">{blockingIssues.length
+        ? "Nothing saved. Resolve the blocking issues and review again."
+        : review.jobs.length ? "Review ready. Nothing has been saved." : "Nothing saved. No import jobs were prepared."}</p>}
+      {started && <p role="status">{finished ? "Import complete." : "Import results so far."} Saved: {savedCount}. Skipped: {skippedCount}.</p>}
+      {blockingIssues.length > 0 && <details open><summary>{blockingIssues.length} blocking issues</summary>
+        <ul>{blockingIssues.slice(0, 100).map((issue, index) => <li key={index}>{issue.source_file ? issue.source_file + " · " : ""}{issue.message}</li>)}</ul>
+        {blockingIssues.length > 100 && <p>Showing the first 100 blocking issues.</p>}</details>}
+      {otherIssues.length > 0 && <details><summary>{otherIssues.length} review notes</summary>
+        <ul>{otherIssues.slice(0, 100).map((issue, index) => <li key={index}>{issue.severity} · {issue.source_file ? issue.source_file + " · " : ""}{issue.message}</li>)}</ul>
+        {otherIssues.length > 100 && <p>Showing the first 100 review notes.</p>}</details>}
+      {review.jobs.length > 0 && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>App</th><th>Data and count</th><th>Scope</th><th>Result</th></tr></thead>
         <tbody>{review.jobs.map(job => <tr key={job.key}><td>{job.target === "sales" ? "Sales Tracker" : "PTG"}</td>
           <td>{job.label}</td><td>{job.scope}</td><td>{job.state === "verify" ? "Check destination before retrying" : job.state}
-            {job.detail && " · " + job.detail}</td></tr>)}</tbody></table></div>
-      {writes && !uncertain && review.jobs.some(job => job.state === "pending" || job.state === "blocked") && !review.issues.some(issue => issue.severity === "ERROR") && <fieldset disabled={!!progress}>
+            {job.detail && " · " + job.detail}</td></tr>)}</tbody></table></div>}
+      {writes && !uncertain && review.jobs.some(job => job.state === "pending" || job.state === "blocked") && !blockingIssues.length && <fieldset disabled={!!progress}>
         <legend>Confirm import</legend>
         <p><label><input type="checkbox" checked={confirm} onChange={event => setConfirm(event.target.checked)} /> I reviewed the counts and destinations.</label></p>
         {review.inventory && <p><label><input type="checkbox" checked={inventoryConfirm} onChange={event => setInventoryConfirm(event.target.checked)} /> Replace stock only for the reviewed branches and snapshot times.</label></p>}
