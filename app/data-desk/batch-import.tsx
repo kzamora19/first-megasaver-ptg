@@ -1,5 +1,7 @@
 "use client";
 
+import { withBasePath } from "@/lib/base-path";
+
 import { useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
@@ -227,6 +229,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   const list: readonly Operation[] = tool ? salesOperations : [...salesOperations, "ptg-catalog", "ptg-memos"];
   return <main className="ptg-main">
     <h1>{tool?.label ?? "Unified Import"}</h1>
+      {!tool && <p><a className="admin-link" href={withBasePath("/data-desk/") + "?mode=promotion-pdf"}>Convert promotion PDFs to Excel</a></p>}
     <p>{tool
       ? "Choose your original Excel or CSV downloads and review the extracted records for Sales Tracker here in Data Desk. A Sales Tracker administrator session is required."
       : "Inspect the original Excel or CSV downloads together, then review the extracted records for both apps."}</p>
