@@ -13,6 +13,7 @@ type MemoInfo = {
   period: string;
   memo_type: string;
   created_at?: string;
+  source_file?: string;
 };
 export type Product = {
   id: string;
@@ -555,6 +556,7 @@ export default function ProductSearch({
           <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
+            {detailMemo.source_file && <><dt>Source file</dt><dd>{detailMemo.source_file}</dd></>}
             <dt>Memo ID</dt><dd>{detailMemo.memo_id || "—"}</dd>
             <dt>Period</dt><dd>{detailMemo.period || "—"}</dd>
             <dt>Import date</dt><dd>{detailMemo.created_at ? new Date(detailMemo.created_at).toLocaleDateString("en-US") : "—"}</dd>
