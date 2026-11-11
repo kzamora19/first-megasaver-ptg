@@ -14,6 +14,7 @@ const labels: Record<Operation, string> = {
   inventory: "Inventory counts and serials", "ptg-catalog": "PTG Product Master", "ptg-memos": "PTG price memos",
 };
 const formatDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" });
+const snapshotTime = (value: string) => value ? value + (value.length === 16 ? ":00" : "") + "+08:00" : "";
 type Scope = { userId: string; branches: Branch[] };
 type Access = { scope: Scope; client: SupabaseClient };
 type Review = { jobs: BatchJob[]; issues: Issue[]; scope?: Scope; inventory: boolean };
@@ -54,6 +55,13 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   const included = sources.filter(source => !disabledSources.includes(source.file.name));
   const sheets = included.flatMap(source => source.sheets).filter(sheet => !excluded.includes(sheet.id));
   const locations = operations.includes("inventory") ? parsers?.engine.sourceLocations(sheets) ?? [] : [];
+  const inventorySheets = operations.includes("inventory")
+    ? sheets.filter(sheet => ["inventory", "serials"].includes(sheet.config.role)) : [];
+  const singlePair = inventorySheets.length === 2 &&
+    new Set(inventorySheets.map(sheet => sheet.config.role)).size === 2 &&
+    inventorySheets.every(sheet => parsers?.engine.sourceLocations([sheet]).length === 1);
+  const inventoryDates = new Set(inventorySheets.map(sheet => sheet.config.reportDate));
+  const sharedSnapshot = inventoryDates.size === 1 ? inventorySheets[0].config.reportDate : "";
   const divisions = operations.includes("sales") ? sourceDivisions(sheets) : [];
   const started = review?.jobs.some(job => job.state !== "pending") ?? false;
   const uncertain = review?.jobs.some(job => job.state === "verify") ?? false;
@@ -119,10 +127,11 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
     finally { busy.current = false; setProgress(""); }
   }
 
-  function configure(id: string, patch: Partial<Sheet["config"]>) {
+  function configure(id: string | string[], patch: Partial<Sheet["config"]>) {
     invalidate();
+    const ids = typeof id === "string" ? [id] : id;
     setSources(current => current.map(source => ({ ...source, sheets: source.sheets.map(sheet =>
-      sheet.id === id ? { ...sheet, config: { ...sheet.config, ...patch } } : sheet) })));
+      ids.includes(sheet.id) ? { ...sheet, config: { ...sheet.config, ...patch } } : sheet) })));
   }
 
   async function prepare() {
@@ -254,8 +263,6 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
               {sheet.config.role === "forecast" && <p><label>Forecast year <input type="number" value={sheet.config.forecastYear}
                 onChange={event => configure(sheet.id, { forecastYear: event.target.value })} /></label></p>}
               {operations.includes("inventory") && ["inventory", "serials"].includes(sheet.config.role) && <div>
-                <p><label>Snapshot time, ISO with +08:00 <input value={sheet.config.reportDate} onChange={event => configure(sheet.id, { reportDate: event.target.value })} /></label></p>
-                <p><label><input type="checkbox" checked={sheet.config.complete} onChange={event => configure(sheet.id, { complete: event.target.checked })} /> Report is complete for its included branches</label></p>
                 {sheet.config.role === "inventory" && <p><label><input type="checkbox" checked={sheet.config.blankZero}
                   onChange={event => configure(sheet.id, { blankZero: event.target.checked })} /> Blank quantities mean zero in this source</label></p>}
                 {sheet.config.role === "serials" && <p><label>Received-date order <select value={sheet.config.dateOrder} onChange={event => configure(sheet.id, { dateOrder: event.target.value })}>
@@ -271,6 +278,24 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
         {divisions.map(division => <p key={division}><label>Sales division {division} {branchSelect(divisionMap[division] ?? "", id => {
           setDivisionMap(current => ({ ...current, [division]: id })); invalidate();
         })}</label></p>)}
+        {inventorySheets.length > 0 && <fieldset>
+          <legend>Inventory snapshot and coverage</legend>
+          {singlePair ? <>
+            <ul>{inventorySheets.map(sheet => <li key={sheet.id}>
+              {sheet.file} · Printed timestamp {sheet.reportDate ? sheet.reportDate.slice(0, 19).replace("T", " ") : "unavailable"}
+            </li>)}</ul>
+            <p>Confirm the cutoff both reports represent. If stock changed between reports, use a fresh pair.</p>
+            <p><label>Snapshot time (Philippine time) <input type="datetime-local" step="1" value={sharedSnapshot.slice(0, 19)}
+              onChange={event => configure(inventorySheets.map(sheet => sheet.id), { reportDate: snapshotTime(event.target.value) })} /></label></p>
+            <p><label><input type="checkbox" checked={inventorySheets.every(sheet => sheet.config.complete)}
+              onChange={event => configure(inventorySheets.map(sheet => sheet.id), { complete: event.target.checked })} /> Both reports are complete for the selected branch</label></p>
+          </> : inventorySheets.map(sheet => <div key={sheet.id}>
+            <p><strong>{sheet.file} · {sheet.name}</strong></p>
+            <p><label>Snapshot time (Philippine time) <input type="datetime-local" step="1" value={sheet.config.reportDate.slice(0, 19)}
+              onChange={event => configure(sheet.id, { reportDate: snapshotTime(event.target.value) })} /></label></p>
+            <p><label><input type="checkbox" checked={sheet.config.complete} onChange={event => configure(sheet.id, { complete: event.target.checked })} /> Report is complete for its included branches</label></p>
+          </div>)}
+        </fieldset>}
         <p><button className="admin-button" type="button" disabled={!operations.length} onClick={() => void prepare()}>Extract and review</button></p>
       </>}
     </fieldset>

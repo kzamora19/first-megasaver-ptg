@@ -13,7 +13,7 @@ export const deskSalesTools = [
 export type DeskSalesTool = typeof deskSalesTools[number];
 export type Branch = { id: string; name: string; code: string };
 export type Sheet = {
-  id: string; file: string; name: string; rows: unknown[][];
+  id: string; file: string; name: string; rows: unknown[][]; reportDate?: string;
   config: {
     role: string; header: number; cols: Record<string, number>; reportDate: string;
     year: number | string; forecastYear: number | string; branch: string; cutoff: string;
