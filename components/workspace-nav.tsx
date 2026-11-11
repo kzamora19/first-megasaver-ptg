@@ -16,16 +16,12 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const onDesk = active === "/data-desk";
   const catalog = onDesk && query.get("mode") === "catalog";
   const srp = onDesk && query.get("mode") === "srp";
-  const promotions = onDesk && query.get("mode") === "promotions";
-  const salesTool = onDesk && !catalog && !srp && !promotions ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
-  const unified = onDesk && !catalog && !srp && !promotions && !salesTool;
+  const salesTool = onDesk && !catalog && !srp ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
+  const unified = onDesk && !catalog && !srp && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
       className={"ptg-nav-item" + (unified ? " active" : "")}
       aria-current={unified ? "page" : undefined}>Unified Import</a>
-    <a href={withBasePath("/data-desk/?mode=promotions")} onClick={onNavigate}
-      className={"ptg-nav-item" + (promotions ? " active" : "")}
-      aria-current={promotions ? "page" : undefined}>Promotion PDF Import</a>
     <a href={withBasePath("/data-desk/?mode=catalog")} onClick={onNavigate}
       className={"ptg-nav-item" + (catalog ? " active" : "")}
       aria-current={catalog ? "page" : undefined}>Cross-App Catalog Review</a>
