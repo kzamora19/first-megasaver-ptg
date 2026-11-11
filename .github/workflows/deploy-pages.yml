@@ -30,6 +30,7 @@ jobs:
       NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL: https://psoopubvdpwztzkdyifa.supabase.co
       NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY: sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm
       NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES: "false"
+      NEXT_PUBLIC_PTG_ENABLE_PROMOTION_IMPORT_WRITES: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
