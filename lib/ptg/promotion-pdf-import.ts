@@ -6,7 +6,8 @@ export type CatalogProduct = { branch_id: string; barcode: string; brand: string
 export type SavedPromotion = { branch_id: string; barcode: string; source_name: string; source_page: number; source_excerpt: string };
 export type PromotionComponent = { id: string; barcode: string; quantity: number; free: boolean };
 type Selection = { sales: boolean; ptg: boolean; start: string; end: string; barcode?: string };
-type Exception = { destination: string; barcode: string; file: string; page: number; reason: string };
+type Exception = { destination: string; barcode: string; description: string; file: string; page: number; reason: string };
+type BranchCoverage = { branch: string; total: number; alreadyPresent: number; ready: number; needsReview: number };
 const code = (value: string) => /^\d{1,7}$/.test(value) ? value.padStart(8, "0") : value;
 const words = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
 const sourceKey = (branch: string, barcode: string, file: string, page: number, excerpt: string) =>
@@ -52,8 +53,10 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
   branches: Branch[], catalog: CatalogProduct[], brands: string[], saved: SavedPromotion[] = []) {
   const jobs: BatchJob[] = [];
   const exceptions: Exception[] = [];
+  const coverage: BranchCoverage[] = [];
   const addException = (destination: string, offer: PromotionPdfOffer, reason: string) =>
-    exceptions.push({ destination, barcode: code(offer.barcode), file: offer.sourceName, page: offer.sourcePage, reason });
+    exceptions.push({ destination, barcode: code(offer.barcode), description: offer.description,
+      file: offer.sourceName, page: offer.sourcePage, reason });
   const requestedBarcode = code(selection.barcode?.trim() ?? "").toUpperCase();
   const unique = new Map<string, PromotionPdfOffer>();
   for (const row of offers) {
@@ -89,6 +92,7 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
     rows.push(row);
   }
   const savedKeys = new Set(saved.map(row => sourceKey(row.branch_id, row.barcode, row.source_name, row.source_page, row.source_excerpt)));
+  const selectedCodes = new Set(rows.map(row => code(row.barcode)).filter(Boolean));
   let alreadySaved = 0;
   const issue = (row: PromotionPdfOffer) => row.warnings.length ? row.warnings.join(" ")
     : !row.validTo ? "Confirm the offer end date."
@@ -130,6 +134,8 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
 
   if (selection.sales) for (const branch of branches) {
     const available = catalog.filter(product => product.branch_id === branch.id);
+    const alreadyPresent = new Set(saved.filter(row => row.branch_id === branch.id)
+      .map(row => code(row.barcode)).filter(barcode => selectedCodes.has(barcode)));
     const pending = rows.filter(row => {
       if (!equivalents.get(row)!.some(source => savedKeys.has(sourceKey(branch.id, source.barcode, source.sourceName, source.sourcePage, source.sourceExcerpt)))) return true;
       alreadySaved++;
@@ -147,6 +153,9 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
         p_components: item.components, p_memo_srp: row.memoSrp, p_tag_price: row.tagPrice ?? row.cashPayment ?? null,
       });
     }
+    const ready = new Set(approved.map(offer => offer.p_barcode).filter(barcode => !alreadyPresent.has(barcode)));
+    coverage.push({ branch: branch.name, total: selectedCodes.size, alreadyPresent: alreadyPresent.size,
+      ready: ready.size, needsReview: selectedCodes.size - alreadyPresent.size - ready.size });
     for (let index = 0; index < approved.length; index += 500) {
       const group = approved.slice(index, index + 500);
       jobs.push({ key: branch.id + "-" + index, label: group.length + " promo offers", scope: "Sales Tracker · " + branch.name,
@@ -155,5 +164,5 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
         } });
     }
   }
-  return { jobs, exceptions, alreadySaved, repeatedRows: unique.size - rows.length };
+  return { jobs, exceptions, coverage, alreadySaved, repeatedRows: unique.size - rows.length };
 }

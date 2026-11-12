@@ -194,6 +194,10 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
     {review && <section className="admin-card">
       <h2>Confirm promotion import</h2>
       <p role="status">{started ? completed + " of " + review.jobs.length + " import batches confirmed." : "Review ready. Nothing saved yet."}</p>
+      {review.coverage.length > 0 && <div>
+        <h3>Sales Tracker barcode coverage</h3>
+        <ul>{review.coverage.map(row => <li key={row.branch}>{row.branch} · {row.total} barcodes · {row.alreadyPresent} already saved · {row.ready} ready to add · {row.needsReview} need a match</li>)}</ul>
+      </div>}
       {review.alreadySaved > 0 && <p>{review.alreadySaved} Sales Tracker offers already saved across the selected branches.</p>}
       {review.repeatedRows > 0 && <p>{review.repeatedRows} repeated bundle rows combined for this import.</p>}
       <ul>{review.jobs.map(job => <li key={job.key}>{job.scope} · {job.label} · {job.state}{job.detail ? " · " + job.detail : ""}</li>)}</ul>
@@ -208,7 +212,7 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
       {review.exceptions.length > 0 && <details open={!review.jobs.length}>
         <summary>{review.exceptions.length} destination exceptions</summary>
         <ul>{review.exceptions.map((item, index) => <li key={index}>
-          {item.destination} · {item.barcode} · {item.file}, page {item.page} · {item.reason}
+          {item.destination} · {item.barcode} · {item.description} · {item.file}, page {item.page} · {item.reason}
         </li>)}</ul>
       </details>}
     </section>}
