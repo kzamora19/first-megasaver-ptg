@@ -3,11 +3,27 @@ import type { BatchJob, Branch } from "./batch-import";
 import type { PromotionPdfOffer } from "./promotion-pdf-workbook";
 
 export type CatalogProduct = { branch_id: string; barcode: string; brand: string; model_description: string; srp: number | null };
+export type SavedPromotion = { branch_id: string; barcode: string; source_name: string; source_page: number; source_excerpt: string };
 export type PromotionComponent = { id: string; barcode: string; quantity: number; free: boolean };
 type Selection = { sales: boolean; ptg: boolean; start: string; end: string; barcode?: string };
 type Exception = { destination: string; barcode: string; file: string; page: number; reason: string };
 const code = (value: string) => /^\d{1,7}$/.test(value) ? value.padStart(8, "0") : value;
 const words = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+const sourceKey = (branch: string, barcode: string, file: string, page: number, excerpt: string) =>
+  JSON.stringify([branch, code(barcode), file, page, excerpt]);
+
+function printedBundleParts(description: string, knownBrands: string[]) {
+  if (!/^BUNDLE\s/i.test(description)) return null;
+  const parts = description.replace(/^BUNDLE\s+/i, "").toUpperCase().split("+").map(part => part.trim());
+  if (parts.length < 2) return null;
+  const parsed = parts.map(part => {
+    const brand = knownBrands.find(name => part.startsWith(name + " ")) ?? "";
+    const model = part.slice(brand.length).trim();
+    return { brand, model };
+  });
+  return parsed.every(({model}) => /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(model) && /[A-Z]/.test(model) && /\d/.test(model))
+    ? parsed : null;
+}
 
 function offerBrand(offer: PromotionPdfOffer, catalog: CatalogProduct[], brands: string[]) {
   if (offer.brand) return offer.brand;
@@ -33,7 +49,7 @@ export function competingPromotionPrices(offers: PromotionPdfOffer[]) {
 }
 
 export async function planPromotionPdfImport(offers: PromotionPdfOffer[], selection: Selection,
-  branches: Branch[], catalog: CatalogProduct[], brands: string[]) {
+  branches: Branch[], catalog: CatalogProduct[], brands: string[], saved: SavedPromotion[] = []) {
   const jobs: BatchJob[] = [];
   const exceptions: Exception[] = [];
   const addException = (destination: string, offer: PromotionPdfOffer, reason: string) =>
@@ -45,8 +61,35 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
     const key = JSON.stringify([row.fileDigest, code(row.barcode), row.sourceExcerpt]);
     if (!unique.has(key)) unique.set(key, { ...row, validFrom: row.validFrom || selection.start, validTo: row.validTo || selection.end });
   }
-  const rows = [...unique.values()];
-  if (requestedBarcode && !rows.length) throw new Error("No selected PDF offer matches barcode " + requestedBarcode + ".");
+  if (requestedBarcode && !unique.size) throw new Error("No selected PDF offer matches barcode " + requestedBarcode + ".");
+  const rows: PromotionPdfOffer[] = [];
+  const equivalents = new Map<PromotionPdfOffer, PromotionPdfOffer[]>();
+  const knownBrands = [...new Set([...brands, ...catalog.map(product => product.brand)]
+    .filter(Boolean).map(brand => brand.trim().toUpperCase()))].sort((a, b) => b.length - a.length);
+  const printedGroups = new Map<string, { row: PromotionPdfOffer; parts: NonNullable<ReturnType<typeof printedBundleParts>> }[]>();
+  for (const row of unique.values()) {
+    const parts = row.warnings.length ? null : printedBundleParts(row.description, knownBrands);
+    if (parts) {
+      const key = JSON.stringify([row.fileDigest, row.sourcePage, code(row.barcode), row.validFrom, row.validTo,
+        words(row.category), words(row.remarks), row.memoSrp, row.cashPayment, row.tagPrice,
+        row.installments.map(term => [term.months, term.amount, term.basis]), parts.map(part => part.model)]);
+      const group = printedGroups.get(key) ?? [];
+      const prior = group.find(item => item.parts.every((part, index) =>
+        !part.brand || !parts[index].brand || part.brand === parts[index].brand));
+      if (prior) {
+        equivalents.get(prior.row)!.push(row);
+        // Preserve explicit brand evidence when comparing another repeated row.
+        prior.parts = prior.parts.map((part, index) => part.brand ? part : parts[index]);
+        continue;
+      }
+      group.push({ row, parts });
+      printedGroups.set(key, group);
+    }
+    equivalents.set(row, [row]);
+    rows.push(row);
+  }
+  const savedKeys = new Set(saved.map(row => sourceKey(row.branch_id, row.barcode, row.source_name, row.source_page, row.source_excerpt)));
+  let alreadySaved = 0;
   const issue = (row: PromotionPdfOffer) => row.warnings.length ? row.warnings.join(" ")
     : !row.validTo ? "Confirm the offer end date."
     : row.validFrom && row.validTo < row.validFrom ? "The offer end date is earlier than its start date."
@@ -87,8 +130,13 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
 
   if (selection.sales) for (const branch of branches) {
     const available = catalog.filter(product => product.branch_id === branch.id);
+    const pending = rows.filter(row => {
+      if (!equivalents.get(row)!.some(source => savedKeys.has(sourceKey(branch.id, source.barcode, source.sourceName, source.sourcePage, source.sourceExcerpt)))) return true;
+      alreadySaved++;
+      return false;
+    });
     const approved = [];
-    for (const item of matchPromotionComponents(rows, available)) {
+    for (const item of matchPromotionComponents(pending, available)) {
       const row = item.row as PromotionPdfOffer;
       const reason = issue(row) || item.reasons.join(" ");
       if (reason) { addException("Sales Tracker · " + branch.name, row, reason); continue; }
@@ -107,5 +155,5 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
         } });
     }
   }
-  return { jobs, exceptions };
+  return { jobs, exceptions, alreadySaved, repeatedRows: unique.size - rows.length };
 }

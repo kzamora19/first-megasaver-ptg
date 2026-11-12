@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import { runBatch, type Branch } from "@/lib/ptg/batch-import";
-import { competingPromotionPrices, planPromotionPdfImport, type CatalogProduct } from "@/lib/ptg/promotion-pdf-import";
+import { competingPromotionPrices, planPromotionPdfImport, type CatalogProduct, type SavedPromotion } from "@/lib/ptg/promotion-pdf-import";
 import { downloadPromotionWorkbook, readPromotionPdfs } from "@/lib/ptg/promotion-pdf-workbook";
 
 const mb = 1024 * 1024;
@@ -69,6 +69,8 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
       await verifyPtg(sessionId);
       const access = destinations.sales ? await verifySales() : undefined;
       const catalog: CatalogProduct[] = [];
+      const saved: SavedPromotion[] = [];
+      const selectedOffers = result.offers.filter(offer => !excluded.has(offer.id));
       if (access) for (let first = 0; ; first += 1000) {
         const response = await access.client.from("products").select("branch_id,barcode,brand,model_description,srp")
           .in("branch_id", access.scope.branches.map(branch => branch.id)).eq("active", true)
@@ -77,12 +79,23 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
         catalog.push(...(response.data ?? []));
         if ((response.data?.length ?? 0) < 1000) break;
       }
+      if (access) {
+        const files = [...new Set(selectedOffers.map(offer => offer.sourceName))];
+        for (let index = 0; index < files.length; index += 10) {
+          for (let first = 0; ; first += 1000) {
+            const response = await access.client.from("reviewed_promotions").select("branch_id,barcode,source_name,source_page,source_excerpt")
+              .in("branch_id", access.scope.branches.map(branch => branch.id)).in("source_name", files.slice(index, index + 10))
+              .is("revoked_at", null).order("id").range(first, first + 999);
+            if (response.error) throw new Error("Could not check offers already saved in Sales Tracker.");
+            saved.push(...(response.data ?? []));
+            if ((response.data?.length ?? 0) < 1000) break;
+          }
+        }
+      }
       const brandsUrl = "/branchline/import-engine/brand-reference.mjs";
-      const brands = destinations.ptg
-        ? (await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ brandsUrl)).BRAND_REFERENCE.brands
-          .map((brand: { name: string }) => brand.name) as string[] : [];
-      const selectedOffers = result.offers.filter(offer => !excluded.has(offer.id));
-      const plan = await planPromotionPdfImport(selectedOffers, destinations, access?.scope.branches ?? [], catalog, brands);
+      const brands = (await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ brandsUrl)).BRAND_REFERENCE.brands
+        .map((brand: { name: string }) => brand.name) as string[];
+      const plan = await planPromotionPdfImport(selectedOffers, destinations, access?.scope.branches ?? [], catalog, brands, saved);
       setReview({ ...plan, scope: access?.scope });
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to check the promotion offers."); }
     finally { busy.current = false; setProgress(""); }
@@ -181,6 +194,8 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
     {review && <section className="admin-card">
       <h2>Confirm promotion import</h2>
       <p role="status">{started ? completed + " of " + review.jobs.length + " import batches confirmed." : "Review ready. Nothing saved yet."}</p>
+      {review.alreadySaved > 0 && <p>{review.alreadySaved} Sales Tracker offers already saved across the selected branches.</p>}
+      {review.repeatedRows > 0 && <p>{review.repeatedRows} repeated bundle rows combined for this import.</p>}
       <ul>{review.jobs.map(job => <li key={job.key}>{job.scope} · {job.label} · {job.state}{job.detail ? " · " + job.detail : ""}</li>)}</ul>
       {!review.jobs.length && <p>No offers are ready to import.</p>}
       {!live && <p>This build supports conversion and import review.</p>}
