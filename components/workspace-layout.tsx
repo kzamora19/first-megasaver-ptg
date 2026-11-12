@@ -51,8 +51,10 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         </button>
       </div>
       <div className="ptg-sidebar-content" id="ptg-workspace-links">
-        <div className="ptg-nav-label">{desk ? "IMPORT TOOLS" : "WORKSPACE"}</div>
-        <WorkspaceNav role={session.role} active={path} desk={desk} onNavigate={() => setOpenOnPath(null)} />
+        <div className="ptg-sidebar-menu">
+          <div className="ptg-nav-label">{desk ? "IMPORT TOOLS" : "WORKSPACE"}</div>
+          <WorkspaceNav role={session.role} active={path} desk={desk} onNavigate={() => setOpenOnPath(null)} />
+        </div>
         <div className="ptg-sidebar-bottom">
           <div className="ptg-user-chip">
             <span className="ptg-avatar">{session.username.slice(0, 1).toUpperCase()}</span>

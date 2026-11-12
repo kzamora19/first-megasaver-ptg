@@ -2,7 +2,6 @@
 .security-page-nav a { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #164a8a; font-size: 13px; font-weight: 700; text-decoration: none; }
 .security-page-nav a:hover, .security-page-nav a:focus-visible { text-decoration: underline; }
 .security-page-nav a[aria-current="page"] { background: #164a8a; color: white; }
-.ptg-sidebar-content { min-height: 0; overflow-y: auto; }
 .security-panel { display: grid; gap: 1rem; min-width: 0; }
 .security-panel > h2, .security-panel > p { margin: 0; }
 .security-panel .admin-table-wrap { margin-top: 0.75rem; }

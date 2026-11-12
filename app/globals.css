@@ -187,7 +187,7 @@ footer {
 .ptg-nav-item span{width:18px;text-align:center;font-size:16px}
 .ptg-nav-item:hover,.ptg-nav-item.active{background:#1e4771;color:#fff}
 .ptg-nav-item.active{box-shadow:inset 3px 0 #f4b544}
-.ptg-sidebar-bottom{margin-top:auto}
+.ptg-sidebar-bottom{flex:none}
 .ptg-user-chip{display:flex;align-items:center;gap:10px;margin:0 4px 12px;padding:13px 8px;border-top:1px solid #294663}
 .ptg-avatar{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#dce9f7;color:#173858;font-size:13px;font-weight:900}
 .ptg-user-chip strong{font-size:11px}.ptg-user-chip small{margin-top:4px;color:#9fb4ca;font-size:9px}
@@ -288,8 +288,10 @@ footer {
 @media(max-width:760px){.logo-manager{padding:20px 15px 36px}.slot-grid{grid-template-columns:1fr}.slot-actions{grid-template-columns:auto minmax(0,1fr)}.slot-actions button{grid-row:2}.slot-actions .remove-button{grid-column:2}}
 
 
-.ptg-sidebar{height:100dvh;overflow-y:auto}
+.ptg-sidebar{height:100dvh;overflow:hidden}
+.ptg-sidebar-header{flex:none}
 .ptg-sidebar-content{display:flex;flex:1;flex-direction:column;min-height:0}
+.ptg-sidebar-menu{flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
 .ptg-workspace-content{min-width:0}
 .ptg-menu-toggle{display:none}
 @media(max-width:720px){
