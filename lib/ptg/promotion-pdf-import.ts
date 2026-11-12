@@ -4,7 +4,7 @@ import type { PromotionPdfOffer } from "./promotion-pdf-workbook";
 
 export type CatalogProduct = { branch_id: string; barcode: string; brand: string; model_description: string; srp: number | null };
 export type PromotionComponent = { id: string; barcode: string; quantity: number; free: boolean };
-type Selection = { sales: boolean; ptg: boolean; start: string; end: string };
+type Selection = { sales: boolean; ptg: boolean; start: string; end: string; barcode?: string };
 type Exception = { destination: string; barcode: string; file: string; page: number; reason: string };
 const code = (value: string) => /^\d{1,7}$/.test(value) ? value.padStart(8, "0") : value;
 const words = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
@@ -38,12 +38,15 @@ export async function planPromotionPdfImport(offers: PromotionPdfOffer[], select
   const exceptions: Exception[] = [];
   const addException = (destination: string, offer: PromotionPdfOffer, reason: string) =>
     exceptions.push({ destination, barcode: code(offer.barcode), file: offer.sourceName, page: offer.sourcePage, reason });
+  const requestedBarcode = code(selection.barcode?.trim() ?? "").toUpperCase();
   const unique = new Map<string, PromotionPdfOffer>();
   for (const row of offers) {
+    if (requestedBarcode && code(row.barcode).toUpperCase() !== requestedBarcode) continue;
     const key = JSON.stringify([row.fileDigest, code(row.barcode), row.sourceExcerpt]);
     if (!unique.has(key)) unique.set(key, { ...row, validFrom: row.validFrom || selection.start, validTo: row.validTo || selection.end });
   }
   const rows = [...unique.values()];
+  if (requestedBarcode && !rows.length) throw new Error("No selected PDF offer matches barcode " + requestedBarcode + ".");
   const issue = (row: PromotionPdfOffer) => row.warnings.length ? row.warnings.join(" ")
     : !row.validTo ? "Confirm the offer end date."
     : row.validFrom && row.validTo < row.validFrom ? "The offer end date is earlier than its start date."

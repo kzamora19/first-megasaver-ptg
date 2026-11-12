@@ -24,7 +24,7 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
   const [result, setResult] = useState<Awaited<ReturnType<typeof readPromotionPdfs>>>();
   const [excluded, setExcluded] = useState(new Set<string>());
   const competingPrices = useMemo(() => result ? competingPromotionPrices(result.offers) : [], [result]);
-  const [destinations, setDestinations] = useState({ sales: true, ptg: true, start: "", end: "" });
+  const [destinations, setDestinations] = useState({ sales: true, ptg: true, start: "", end: "", barcode: "" });
   const [review, setReview] = useState<Awaited<ReturnType<typeof planPromotionPdfImport>> & { scope?: Scope }>();
   const [confirmed, setConfirmed] = useState(false);
   const started = review?.jobs.some(job => job.state !== "pending") ?? false;
@@ -151,6 +151,8 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
           <legend>Promotion destinations</legend>
           <p><label><input type="checkbox" checked={destinations.sales} onChange={event => changeSelection({ sales: event.target.checked })} /> Sales Tracker</label>{" "}
             <label><input type="checkbox" checked={destinations.ptg} onChange={event => changeSelection({ ptg: event.target.checked })} /> PTG</label></p>
+          <p><label>Only this barcode <input type="search" value={destinations.barcode} placeholder="Optional"
+            onChange={event => changeSelection({ barcode: event.target.value })} /></label></p>
           <p>Supply dates where the PDF leaves them blank.</p>
           <p><label>Start date <input type="date" value={destinations.start} onChange={event => changeSelection({ start: event.target.value })} /></label>{" "}
             <label>End date <input type="date" value={destinations.end} onChange={event => changeSelection({ end: event.target.value })} /></label></p>
