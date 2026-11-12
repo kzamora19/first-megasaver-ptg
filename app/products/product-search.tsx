@@ -555,6 +555,10 @@ export default function ProductSearch({
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
+            const term = amount(product.cash_payment) === 0
+              ? Number(/\b(6|9|12|18|24)-MONTH CREDIT CARD ONLY\b/i.exec(product.remarks || "")?.[1] || 0) : 0;
+            const termTotal = term ? amount(product["months_" + term as "months_6"]) : 0;
+            const priceCaption = termTotal ? `CREDIT CARD · ${term} MONTHS` : "CASH / STRAIGHT";
             if (compact) return <article className="ptg-compact-tag" key={product.id}>
               <header className="ptg-compact-header">
                 {logos.header && <img src={artworkUrl("header")} className="ptg-compact-main-logo" alt="Price tag header artwork" />}
@@ -564,8 +568,8 @@ export default function ProductSearch({
               <div>Brand: <strong>{product.brand}</strong></div>
               <div className="ptg-compact-model">MODEL: <strong>{modelDescription}</strong></div>
               {!srpOnly && <div>SRP: <strong>{peso(product.srp)}</strong></div>}
-              <div className="ptg-compact-cash">CASH / STRAIGHT</div>
-              <div className="ptg-compact-pay">PAY NOW: <strong>{peso(srpOnly ? product.srp : pay)}</strong></div>
+              <div className="ptg-compact-cash">{srpOnly ? "SRP" : priceCaption}</div>
+              <div className="ptg-compact-pay">{termTotal && !srpOnly ? "PER MONTH:" : "PAY NOW:"} <strong>{peso(srpOnly ? product.srp : termTotal ? termTotal / term : pay)}</strong></div>
               {!srpOnly && <div className="ptg-compact-summary">
                 <span>{endDate(memo?.period || "") ? "Valid Until: " + endDate(memo?.period || "") : ""}</span>
                 <strong>SAVE: {peso(savings)}</strong>
@@ -581,8 +585,8 @@ export default function ProductSearch({
                 <div className="legacy-brand-label">Brand:</div><div className="legacy-brand-value">{product.brand}</div>
                 <div className="legacy-model-label">MODEL:</div><div className="legacy-model-value" style={{ fontSize: modelDescription.length > 90 ? 24 : modelDescription.length > 55 ? 30 : 38 }}>{modelDescription}</div>
                 <div className="legacy-srp-label">SRP:</div><div className="legacy-srp">{peso(product.srp)}</div>
-                <div className="legacy-cash">CASH / STRAIGHT</div>
-                <div className="legacy-pay-label">PAY NOW:</div><div className="legacy-pay-value">{peso(pay)}</div>
+                <div className="legacy-cash">{priceCaption}</div>
+                <div className="legacy-pay-label">{termTotal ? "TOTAL:" : "PAY NOW:"}</div><div className="legacy-pay-value">{peso(termTotal || pay)}</div>
                 <div className="legacy-valid-until">{endDate(memo?.period || "") ? "Valid Until: " + endDate(memo?.period || "") : ""}</div>
                 <div className="legacy-save-label">SAVE:</div><div className="legacy-save-value">{savings < 0 ? "−" : ""}{peso(Math.abs(savings))}</div>
                 <div className="legacy-installment-logo"><span>FOR INSTALLMENT: CREDIT CARD</span></div>
