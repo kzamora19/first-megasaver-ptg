@@ -13,6 +13,7 @@ type MemoInfo = {
   period: string;
   memo_type: string;
   created_at?: string;
+  source_file?: string;
 };
 export type Product = {
   id: string;
@@ -34,11 +35,14 @@ export type Product = {
   remarks: string;
   eligible_for_price_tag?: boolean;
   price_tag_status?: string;
+  source_file?: string;
   price_memos: MemoInfo | MemoInfo[] | null;
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
 type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
 type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; updatedAt: string }>>;
+type StockInfo = { quantity: number; serialized: boolean; scope: string };
+type StockSerial = { serial: string; receivedOn: string | null; branch: string };
 
 const formats: { key: FormatKey; label: string }[] = [
   { key: "ONE", label: "1 WHOLE" },
@@ -120,6 +124,12 @@ const memoInfo = (product: Product | null): MemoInfo | null => {
   if (!product) return null;
   return Array.isArray(product.price_memos) ? product.price_memos[0] ?? null : product.price_memos;
 };
+const memoLabel = (memo: MemoInfo | null, product: Product | null) => {
+  const memoId = memo?.memo_id || "";
+  if (!/^PDF-[a-f0-9]{64}$/i.test(memoId)) return memoId;
+  const source = memo?.source_file || product?.source_file;
+  return source?.trim().replace(/\.pdf$/i, "") || memoId;
+};
 const endDate = (period: string) => {
   const raw = String(period || "").trim();
   let match = raw.match(/^([A-Za-z]+)\s+\d{1,2}\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})$/i);
@@ -179,6 +189,13 @@ export default function ProductSearch({
   const [queue, setQueue] = useState<Product[]>([]);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [inStock, setInStock] = useState(false);
+  const [stock, setStock] = useState<StockInfo | null>(null);
+  const [stockMessage, setStockMessage] = useState("");
+  const [showSerials, setShowSerials] = useState(false);
+  const [serials, setSerials] = useState<StockSerial[] | null>(null);
+  const [serialMessage, setSerialMessage] = useState("");
+  const inventoryEnabled = usesEdgeData && !demo;
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRequest = useRef(0);
@@ -229,7 +246,7 @@ export default function ProductSearch({
     }
   }
 
-  const loadProducts = useCallback(async (query: string, requestedPage: number) => {
+  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false) => {
     const request = ++searchRequest.current;
     setLoading(true);
     try {
@@ -245,6 +262,7 @@ export default function ProductSearch({
           action: "search",
           q: query.trim(),
           page: requestedPage,
+          in_stock: onlyStock,
         }) as typeof payload;
       } else {
         const params = new URLSearchParams({ page: String(requestedPage) });
@@ -264,13 +282,37 @@ export default function ProductSearch({
         ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
         : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
     } catch (error) {
-      if (request === searchRequest.current) setMessage(error instanceof Error ? error.message : "Search failed.");
+      if (request === searchRequest.current) {
+        setResults([]);
+        setTotal(0);
+        setPage(1);
+        setMessage(error instanceof Error ? error.message : "Search failed.");
+      }
     } finally {
       if (request === searchRequest.current) setLoading(false);
     }
   }, [demoProducts]);
 
   useEffect(() => { void loadProducts("", 1); }, [loadProducts]);
+
+  const detailBarcode = detailProduct?.barcode;
+  useEffect(() => {
+    if (!inventoryEnabled || !detailBarcode) return;
+    let current = true;
+    void invokePtgData("ptg-products", { action: "inventory", barcode: detailBarcode })
+      .then(value => { if (current) setStock(value as StockInfo); })
+      .catch(error => { if (current) setStockMessage(error instanceof Error ? error.message : "Inventory unavailable."); });
+    return () => { current = false; };
+  }, [inventoryEnabled, detailBarcode]);
+
+  useEffect(() => {
+    if (!inventoryEnabled || !detailBarcode || !showSerials) return;
+    let current = true;
+    void invokePtgData("ptg-products", { action: "inventory", barcode: detailBarcode, include_serials: true })
+      .then(value => { if (current) { setStock(value as StockInfo); setSerials((value.serials ?? []) as StockSerial[]); } })
+      .catch(error => { if (current) setSerialMessage(error instanceof Error ? error.message : "Serials unavailable."); });
+    return () => { current = false; };
+  }, [inventoryEnabled, detailBarcode, showSerials]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const queueTotalPages = Math.max(1, Math.ceil(queue.length / pageSize));
@@ -285,6 +327,13 @@ export default function ProductSearch({
     .filter(({ total }) => total > 0) : [];
 
   function openProductDetails(product: Product) {
+    if (!detailProduct || detailProduct.barcode !== product.barcode) {
+      setStock(null);
+      setStockMessage("");
+      setShowSerials(false);
+      setSerials(null);
+      setSerialMessage("");
+    }
     setActiveProduct(product);
     setDetailProduct(product);
   }
@@ -292,7 +341,7 @@ export default function ProductSearch({
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void loadProducts(term, 1);
+    void loadProducts(term, 1, inStock);
   }
 
   function toggleProduct(product: Product, checked: boolean) {
@@ -385,8 +434,12 @@ export default function ProductSearch({
               <label htmlFor="legacy-product-search">SEARCH PRODUCT</label>
               <div><input id="legacy-product-search" value={term} onChange={event => setTerm(event.target.value)} placeholder="Search brand, model, barcode, description..." aria-label="Search brand, model, barcode, description" /><button type="submit" disabled={loading}>{loading ? "SEARCHING…" : "SEARCH"}</button></div>
             </form>
+            {inventoryEnabled && <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
+              setInStock(event.target.checked);
+              void loadProducts(term, 1, event.target.checked);
+            }} /> In stock only</label>}
             <div className="legacy-memo-info">
-              <label>MEMO_ID<input readOnly value={currentMemo?.memo_id || ""} /></label>
+              <label>MEMO_ID<input readOnly value={memoLabel(currentMemo, activeProduct)} /></label>
               <label>PERIOD<input readOnly value={currentMemo?.period || ""} /></label>
               <label>IMPORT_DATE<input readOnly value={currentMemo?.created_at ? new Date(currentMemo.created_at).toLocaleDateString("en-US") : ""} /></label>
             </div>
@@ -402,7 +455,9 @@ export default function ProductSearch({
               <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}>
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => {
+                if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
+              }}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
@@ -413,7 +468,7 @@ export default function ProductSearch({
           </table>
         </div>
         <p className="legacy-result-count" role="status">{loading ? "Loading products…" : `Search Results ${firstResult}–${lastResult} of ${total}`}</p>
-        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next)} />
+        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock)} />
       </section>
 
       <section className="legacy-queue-panel ptg-print-hide">
@@ -425,7 +480,9 @@ export default function ProductSearch({
               <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {queueRows.length ? queueRows.map(product => <tr key={product.id}>
+              {queueRows.length ? queueRows.map(product => <tr key={product.id} onClick={event => {
+                if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
+              }}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
@@ -543,7 +600,22 @@ export default function ProductSearch({
           )}
           </div>)}
         </div>}
-      {detailProduct && <AppDialog title="Product details" closeIcon busy={false} onClose={() => setDetailProduct(null)}>
+      {detailProduct && <AppDialog title={showSerials ? "Available serial numbers" : "Product details"} closeIcon busy={false} onClose={() => setDetailProduct(null)}>
+        {showSerials ? <>
+          <p><button type="button" className="legacy-product-detail-link" onClick={() => setShowSerials(false)}>← Product details</button></p>
+          <p>{detailProduct.barcode} · {stock?.scope}</p>
+          {serialMessage ? <p role="alert">{serialMessage}</p> : serials === null ? <p role="status">Loading serial numbers…</p>
+            : serials.length ? <table className="legacy-product-installment-table">
+              <thead><tr><th>Serial number</th><th>Branch</th><th>Received</th></tr></thead>
+              <tbody>{serials.map(item => <tr key={item.branch + ":" + item.serial}><td>{item.serial}</td><td>{item.branch}</td><td>{item.receivedOn || "—"}</td></tr>)}</tbody>
+            </table> : <p>No serial numbers currently available.</p>}
+        </> : <>
+        {inventoryEnabled && <p className="legacy-product-stock">
+          <strong>Inventory quantity</strong>{" "}
+          {stock ? <>{stock.serialized ? <button type="button" className="legacy-product-detail-link" aria-label={stock.quantity + " units. Show available serial numbers"}
+            onClick={() => { setSerials(null); setSerialMessage(""); setShowSerials(true); }}>{stock.quantity}</button> : stock.quantity} · {stock.scope}</>
+            : <span role="status">{stockMessage || "Loading…"}</span>}
+        </p>}
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
           <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
@@ -555,7 +627,7 @@ export default function ProductSearch({
           <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
-            <dt>Memo ID</dt><dd>{detailMemo.memo_id || "—"}</dd>
+            <dt>Memo ID</dt><dd>{memoLabel(detailMemo, detailProduct) || "—"}</dd>
             <dt>Period</dt><dd>{detailMemo.period || "—"}</dd>
             <dt>Import date</dt><dd>{detailMemo.created_at ? new Date(detailMemo.created_at).toLocaleDateString("en-US") : "—"}</dd>
           </>}
@@ -570,8 +642,11 @@ export default function ProductSearch({
             {!detailInstallments.length && <tr><td colSpan={3}>No installment prices available.</td></tr>}
           </tbody>
         </table>
+        </>}
       </AppDialog>}
       <style jsx global>{`
+        .legacy-stock-filter{display:flex;align-items:center;gap:.4rem;color:#12366c;font-size:.85rem}
+        .legacy-product-stock{padding:.65rem .85rem;background:#eef5ff;border-radius:7px}
         .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
         .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
         .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}

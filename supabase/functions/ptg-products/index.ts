@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const projectUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const publicKey = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
+const salesInventoryUrl = "https://psoopubvdpwztzkdyifa.supabase.co/functions/v1/ptg-inventory";
+const salesPublicKey = "sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm";
 const allowedOrigins = new Set(
   (Deno.env.get("PTG_ALLOWED_ORIGINS") ?? "https://kzamora19.github.io,http://localhost:3000,http://127.0.0.1:3000")
     .split(",").map(value => value.trim()).filter(Boolean),
@@ -83,18 +85,47 @@ function clean(value: unknown, max: number) {
   return String(value ?? "").trim().slice(0, max);
 }
 
-async function searchMemoProducts(origin: string, session: ActiveSession, body: Record<string, unknown>) {
+async function readSalesInventory(request: Request, mode: string, barcode?: string) {
+  return fetch(salesInventoryUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: salesPublicKey, "x-ptg-public-key": publicKey,
+      Authorization: request.headers.get("authorization") ?? "", "x-ptg-session-id": request.headers.get("x-ptg-session-id") ?? "" },
+    body: JSON.stringify({ mode, barcode }),
+    signal: AbortSignal.timeout(20000),
+  });
+}
+
+async function searchMemoProducts(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
   if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
   if (!["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) return respond(origin, fail("PTG access is not enabled for this account."), 403);
   const page = Math.min(1_000_000, Math.max(1, Math.trunc(Number(body.page || 1)) || 1));
+  let stock = {};
+  if (body.in_stock === true) {
+    const response = await readSalesInventory(request, "codes");
+    const inventory = await response.json();
+    if (!response.ok || !Array.isArray(inventory.barcodes)) {
+      return respond(origin, fail(inventory.message || "Could not load the stock filter."), response.ok ? 502 : response.status);
+    }
+    stock = { p_stock_barcodes: inventory.barcodes.map((barcode: string) => /^\d+$/.test(barcode)
+      ? barcode.replace(/^0+(?=\d)/, "") : barcode) };
+  }
   const { data, error } = await admin.rpc("ptg_ordered_product_search", {
     p_query: clean(body.q, 100),
     p_branch_id: session.branchId ?? null,
     p_system_admin: session.role === "SYSTEM_ADMIN",
     p_page: page,
+    ...stock,
   });
   if (error || !data) return respond(origin, fail("Could not search imported memo products."), 500);
   return respond(origin, { ok: true, products: data.products, total: data.total, page, pageSize: 5 });
+}
+
+async function productInventory(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
+  if (session.mustChangePassword || !["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) {
+    return respond(origin, fail("PTG access is not enabled for this account."), 403);
+  }
+  const response = await readSalesInventory(request, body.include_serials === true ? "serials" : "stock", clean(body.barcode, 64));
+  return respond(origin, await response.json(), response.status);
 }
 
 async function searchProductMaster(origin: string, session: ActiveSession, body: Record<string, unknown>) {
@@ -184,7 +215,8 @@ Deno.serve(async request => {
     if (!session) return respond(origin, fail("Please sign in again."), 401);
     const body = await request.json() as Record<string, unknown>;
     switch (String(body.action ?? "")) {
-      case "search": return await searchMemoProducts(origin, session, body);
+      case "search": return await searchMemoProducts(origin, session, body, request);
+      case "inventory": return await productInventory(origin, session, body, request);
       case "master-search": return await searchProductMaster(origin, session, body);
       case "master-import": return await importProductMaster(origin, session, body);
       default: return respond(origin, fail("Unknown product action."), 400);
