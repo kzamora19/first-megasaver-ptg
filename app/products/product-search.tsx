@@ -525,7 +525,7 @@ export default function ProductSearch({
                   : <strong>{brand || "AIRCON"}</strong>}
               </header>
               <table className="ptg-aircon-products">
-                <thead><tr>{["BC#", "CAPACITY", "RECOMMENDED FLOOR AREA", "MODEL", "SRP", "NOW PAY ONLY", "SAVE"].map(label => <th key={label}>{label}</th>)}</tr></thead>
+                <thead><tr><th>BC#</th><th>CAPACITY</th><th className="ptg-aircon-area-heading">RECOMMENDED<br />FLOOR AREA</th><th>MODEL</th><th>SRP</th><th>NOW PAY ONLY</th><th>SAVE</th></tr></thead>
                 <tbody>{rows.map((product, index) => <tr key={airconSizes[index].hp}>
                   <td>{product?.barcode}</td><td>{airconSizes[index].hp.toFixed(1)} HP</td><td>{airconSizes[index].area}</td>
                   <td>{product && (product.description?.trim() || product.model)}</td>
@@ -800,7 +800,8 @@ export default function ProductSearch({
           .ptg-aircon th,.ptg-aircon td{border:1px solid #003da5;padding:4px;overflow-wrap:anywhere}
           .ptg-aircon th{background:#003da5;color:#fff;print-color-adjust:exact}
           .ptg-aircon-products tbody tr{height:.68in}
-          .ptg-aircon-products :is(th,td):nth-child(4){width:29%}
+          .ptg-aircon-products .ptg-aircon-area-heading{width:15%;white-space:nowrap;overflow-wrap:normal;font-size:.94em}
+          .ptg-aircon-products :is(th,td):nth-child(4){width:28%}
           .ptg-aircon-lower{display:grid;grid-template-columns:1fr 2fr;min-height:1.75in}
           .ptg-aircon-footer{display:grid;grid-template-rows:auto 1fr;place-items:center;border:1px solid #003da5;padding:8px}
           .ptg-aircon-footer img{max-width:100%;height:1.1in;object-fit:contain}
