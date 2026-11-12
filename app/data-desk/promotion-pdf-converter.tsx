@@ -129,7 +129,8 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
   }
 
   return <main className="ptg-main">
-    <h1>Promotion PDFs to Excel</h1>
+    <h1>Promotion PDF Import</h1>
+    <p>Upload the original PDFs, then review and import the offers here.</p>
     <section className="admin-card">
       <label className="upload-drop">
         <input type="file" accept=".pdf,application/pdf" multiple disabled={Boolean(progress) || started} onChange={event => {
@@ -145,7 +146,7 @@ export default function PromotionPdfConverter({ verifyPtg, verifySales }: Props)
       {result && <>
         <p role="status">{result.offerCount} offer rows converted · {result.reviewCount} review notes</p>
         {result.reviewCount > 0 && <p>Open the Review sheet for the PDF pages and rows that need attention.</p>}
-        <button type="button" className="admin-button" onClick={() => downloadPromotionWorkbook(result.book)}>Download Excel</button>
+        <button type="button" className="admin-button" onClick={() => downloadPromotionWorkbook(result.book)}>Download Excel for reference</button>
         {result.offerCount > 0 && <fieldset disabled={Boolean(progress) || started}>
           <legend>Promotion destinations</legend>
           <p><label><input type="checkbox" checked={destinations.sales} onChange={event => changeSelection({ sales: event.target.checked })} /> Sales Tracker</label>{" "}

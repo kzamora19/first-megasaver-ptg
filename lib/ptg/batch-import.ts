@@ -1,6 +1,12 @@
 import type * as XLSX from "xlsx";
 import type { ParsedMemo } from "../price-memos/parse-price-memo";
 
+export function isPromotionPdfWorkbook(book: XLSX.WorkBook) {
+  const index = book.Sheets["Source index"];
+  return index?.A1?.v === "Worksheet" && index.B1?.v === "PDF" &&
+    index.C1?.v === "Page" && index.D1?.v === "Offer rows";
+}
+
 export const salesOperations = ["catalog", "sales", "daily", "inventory"] as const;
 export type SalesOperation = typeof salesOperations[number];
 export type Operation = SalesOperation | "ptg-catalog" | "ptg-memos";

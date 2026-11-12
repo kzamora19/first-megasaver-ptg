@@ -1,13 +1,12 @@
 "use client";
 
-import { withBasePath } from "@/lib/base-path";
-
 import { useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
+import { withBasePath } from "@/lib/base-path";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import { parsePriceMemo } from "@/lib/price-memos/parse-price-memo";
-import { buildBatchPlan, loadBatchEngine, runBatch, salesOperations, sourceDivisions,
+import { buildBatchPlan, isPromotionPdfWorkbook, loadBatchEngine, runBatch, salesOperations, sourceDivisions,
   type BatchJob, type Branch, type DeskSalesTool, type Issue, type Operation, type SalesOperation, type Sheet, type Source } from "@/lib/ptg/batch-import";
 
 const writes = process.env.NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES === "true";
@@ -22,6 +21,7 @@ type Access = { scope: Scope; client: SupabaseClient };
 type Review = { jobs: BatchJob[]; issues: Issue[]; scope?: Scope; inventory: boolean };
 type Props = { tool?: DeskSalesTool; verifyPtg: (id: string) => Promise<void>; verifySales: () => Promise<Access> };
 const message = (error: unknown) => error instanceof Error ? error.message : "The batch could not be processed.";
+const promotionWorkbookMessage = "This Excel export is for review. Open Promotion PDF Import and upload the original PDFs to import the offers.";
 
 async function readScope(client: SupabaseClient, table: string, columns: string, branches: Branch[]) {
   const rows: unknown[] = [];
@@ -103,6 +103,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
             throw new Error("Use an original Excel or CSV source, up to 20 MB per file.");
           }
           const book = xlsx.read(await file.arrayBuffer(), { type: "array", raw: true });
+          if (isPromotionPdfWorkbook(book)) throw new Error(promotionWorkbookMessage);
           const detected = engine.engine.inspectWorkbook(book, file.name, String(index), xlsx)
             .filter(sheet => sheet.rows.some(row => row.some(value => String(value ?? "").trim())));
           if (!detected.length) throw new Error("No readable worksheet was found.");
@@ -110,6 +111,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
         } catch (failure) { next.push({ file, sheets: [], error: message(failure) }); }
       }
       setSources(next);
+      if (next.some(source => source.error === promotionWorkbookMessage)) setError(promotionWorkbookMessage);
       if (tool?.operation && !branches.length && next.some(source => source.sheets.length)) {
         setProgress("Checking Sales Tracker permissions…");
         setBranches((await verifySales()).scope.branches);
@@ -229,7 +231,6 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   const list: readonly Operation[] = tool ? salesOperations : [...salesOperations, "ptg-catalog", "ptg-memos"];
   return <main className="ptg-main">
     <h1>{tool?.label ?? "Unified Import"}</h1>
-      {!tool && <p><a className="admin-link" href={withBasePath("/data-desk/") + "?mode=promotion-pdf"}>Convert promotion PDFs to Excel</a></p>}
     <p>{tool
       ? "Choose your original Excel or CSV downloads and review the extracted records for Sales Tracker here in Data Desk. A Sales Tracker administrator session is required."
       : "Inspect the original Excel or CSV downloads together, then review the extracted records for both apps."}</p>
@@ -241,6 +242,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
       <label className="upload-drop"><input type="file" multiple accept=".xlsx,.xls,.xlsm,.csv"
         onChange={event => void inspect(Array.from(event.target.files ?? []))} /><strong>Choose original source files</strong>
         <span>Up to 80 files · 20 MB each · 160 MB combined</span></label>
+      {!tool && <p><a className="admin-link" href={withBasePath("/data-desk/?mode=promotion-pdf")}>Promotion PDF Import</a></p>}
       {sources.length > 0 && <>
         {!tool?.operation && <>
           <h2>What should this batch import?</h2>
@@ -299,7 +301,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
             <p><label><input type="checkbox" checked={sheet.config.complete} onChange={event => configure(sheet.id, { complete: event.target.checked })} /> Report is complete for its included branches</label></p>
           </div>)}
         </fieldset>}
-        <p><button className="admin-button" type="button" disabled={!operations.length} onClick={() => void prepare()}>Extract and review</button></p>
+        <p><button className="admin-button" type="button" disabled={!operations.length || !sheets.length} onClick={() => void prepare()}>Extract and review</button></p>
       </>}
     </fieldset>
     {progress && <p role="status">{progress}</p>}
