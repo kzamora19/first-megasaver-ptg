@@ -37,7 +37,10 @@ export default function MobileWorkspace() {
         <p>Choose an app and sign in with the account assigned to you.</p>
         <div className="mobile-workspace-choices">
           {apps.map(app => <button key={app.key} type="button" className="mobile-workspace-choice" onClick={() => open(app.key)}>
-            <span className="mobile-workspace-choice-icon" aria-hidden="true">{app.key === "sales" ? "↗" : "◇"}</span>
+            <span className={`mobile-workspace-choice-icon ${app.key}`} aria-hidden="true">
+              {app.key === "sales" ? <img src="/branchline/icons/icon-192.png" alt="" /> :
+                <svg viewBox="0 0 48 48" fill="none"><path d="M8 10h17l15 15-15 15L8 23V10Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round"/><circle cx="17" cy="18" r="2.7" fill="currentColor"/><path d="M22 24l7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>}
+            </span>
             <span><strong>{app.name}</strong><small>{app.key === "sales" ? "Track sales and review performance" : "Find products and prepare price tags"}</small></span>
             <span aria-hidden="true">→</span>
           </button>)}
@@ -49,3 +52,4 @@ export default function MobileWorkspace() {
     </div>
   </main>;
 }
+
