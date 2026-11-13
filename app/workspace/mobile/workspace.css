@@ -17,5 +17,9 @@
 .mobile-workspace-choice strong,.mobile-workspace-choice small { display: block; }
 .mobile-workspace-choice small { margin-top: 5px; color: #5a718b; line-height: 1.4; }
 .mobile-workspace-choice-icon { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 12px; background: #e7efff; color: #3159d7; font-size: 26px; font-weight: 700; }
+.mobile-workspace-choice-icon.sales { background: transparent; }
+.mobile-workspace-choice-icon img { width: 100%; height: 100%; border-radius: 12px; }
+.mobile-workspace-choice-icon.ptg { background: #254ac3; color: #fff; }
+.mobile-workspace-choice-icon svg { width: 34px; height: 34px; }
 .mobile-workspace-choice:focus-visible { outline: 3px solid #2b66dc; outline-offset: 3px; }
 
