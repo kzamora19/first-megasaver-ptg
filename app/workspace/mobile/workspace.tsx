@@ -26,15 +26,22 @@ export default function MobileWorkspace() {
         <img src="/branchline/icons/icon-192.png" width="28" height="28" alt="" />
         <span>Branchline Workspace</span>
       </button>
-      <nav aria-label="Workspace apps">
+      {current !== null && <nav aria-label="Workspace apps">
         {apps.map(app => <button key={app.key} type="button" aria-pressed={current === app.key}
           onClick={() => open(app.key)}>{app.name}</button>)}
-      </nav>
+      </nav>}
     </header>
     <div className="mobile-workspace-content">
       {current === null && <section className="mobile-workspace-home">
         <h1>Your apps</h1>
         <p>Choose an app and sign in with the account assigned to you.</p>
+        <div className="mobile-workspace-choices">
+          {apps.map(app => <button key={app.key} type="button" className="mobile-workspace-choice" onClick={() => open(app.key)}>
+            <span className="mobile-workspace-choice-icon" aria-hidden="true">{app.key === "sales" ? "↗" : "◇"}</span>
+            <span><strong>{app.name}</strong><small>{app.key === "sales" ? "Track sales and review performance" : "Find products and prepare price tags"}</small></span>
+            <span aria-hidden="true">→</span>
+          </button>)}
+        </div>
         <InstallApp name="Branchline Workspace" />
       </section>}
       {apps.filter(app => opened.includes(app.key)).map(app => <iframe key={app.key} title={app.name}
