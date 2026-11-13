@@ -10,3 +10,12 @@
 .mobile-workspace-content iframe[hidden] { display: none; }
 .mobile-workspace-home { max-width: 620px; margin: 0 auto; padding: 28px 20px; }
 .mobile-workspace-home h1 { margin: 0 0 8px; }
+.mobile-workspace-home p { color: #506984; line-height: 1.5; }
+.mobile-workspace-choices { display: grid; gap: 14px; margin: 30px 0; }
+.mobile-workspace-choice { display: flex; align-items: center; gap: 15px; width: 100%; padding: 20px; border: 1px solid #ccdef0; border-radius: 14px; background: white; color: #123154; text-align: left; font: inherit; box-shadow: 0 6px 18px #163b6012; cursor: pointer; }
+.mobile-workspace-choice > span:nth-child(2) { flex: 1; }
+.mobile-workspace-choice strong,.mobile-workspace-choice small { display: block; }
+.mobile-workspace-choice small { margin-top: 5px; color: #5a718b; line-height: 1.4; }
+.mobile-workspace-choice-icon { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 12px; background: #e7efff; color: #3159d7; font-size: 26px; font-weight: 700; }
+.mobile-workspace-choice:focus-visible { outline: 3px solid #2b66dc; outline-offset: 3px; }
+
