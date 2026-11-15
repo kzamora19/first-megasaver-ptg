@@ -25,7 +25,8 @@ export type Product = {
   description: string;
   sub_category: string;
   srp: number;
-  cash_payment: number;
+  cash_payment?: number;
+  has_cash_payment?: boolean;
   tag_this: number;
   months_6: number;
   months_9: number;
@@ -37,6 +38,9 @@ export type Product = {
   price_tag_status?: string;
   source_file?: string;
   campaign?: string | null;
+  selling_starts_on?: string | null;
+  selling_ends_on?: string | null;
+  early_print_only?: boolean;
   price_memos: MemoInfo | MemoInfo[] | null;
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
@@ -44,6 +48,7 @@ type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
 type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; updatedAt: string }>>;
 type StockInfo = { quantity: number; serialized: boolean; scope: string };
 type StockSerial = { serial: string; receivedOn: string | null; branch: string };
+type MemoFilter = "all" | "regular" | "promotion";
 
 const formats: { key: FormatKey; label: string }[] = [
   { key: "ONE", label: "1 WHOLE" },
@@ -114,13 +119,18 @@ function Pagination({ page, totalPages, label, busy = false, onPage }: {
 }
 
 function BlankRows({ used }: { used: number }) {
-  return Array.from({ length: pageSize - used }, (_, index) =>
+  return Array.from({ length: Math.max(0, pageSize - used) }, (_, index) =>
     <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={8}>&nbsp;</td></tr>
   );
 }
 const amount = (value: number | null | undefined) => Number(value || 0);
 const peso = (value: number | null | undefined) => "₱ " + amount(value).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const priceNow = (product: Product) => amount(product.tag_this);
+const offerDate = (date: string) => new Date(date + "T00:00:00Z")
+  .toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "UTC" });
+const installments = (product: Product) => ([6, 9, 12, 18, 24] as const)
+  .map(months => ({ months, total: amount(product[`months_${months}`]) }))
+  .filter(({ total }) => total > 0);
 const memoInfo = (product: Product | null): MemoInfo | null => {
   if (!product) return null;
   return Array.isArray(product.price_memos) ? product.price_memos[0] ?? null : product.price_memos;
@@ -137,6 +147,15 @@ function MemoSummary({ product }: { product: Product }) {
   if (!label) return null;
   return <><br /><small>{product.campaign && <strong>{product.campaign} · </strong>}{label}{memo?.period ? <> · {memo.period}</> : null}</small></>;
 }
+function SearchOfferLabel({ product }: { product: Product }) {
+  const memo = memoInfo(product);
+  if (!memo) return null;
+  const label = product.campaign
+    ? product.campaign + " PROMO"
+    : /^PDF-[a-f0-9]{64}$/i.test(memo.memo_id) ? "PROMO" : "REGULAR MONTHLY";
+  return <><br /><small><strong>{label}</strong></small></>;
+}
+
 const endDate = (period: string) => {
   const raw = String(period || "").trim();
   let match = raw.match(/^([A-Za-z]+)\s+\d{1,2}\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})$/i);
@@ -197,7 +216,7 @@ export default function ProductSearch({
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [inStock, setInStock] = useState(false);
-  const [promotionsOnly, setPromotionsOnly] = useState(false);
+  const [memoFilter, setMemoFilter] = useState<MemoFilter>("all");
   const [campaigns, setCampaigns] = useState<string[]>([]);
   const [campaign, setCampaign] = useState("");
   const [stock, setStock] = useState<StockInfo | null>(null);
@@ -256,7 +275,7 @@ export default function ProductSearch({
     }
   }
 
-  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false, filterPromotions = false, selectedCampaign = "") => {
+  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false, filter: MemoFilter = "all", selectedCampaign = "") => {
     const request = ++searchRequest.current;
     setLoading(true);
     try {
@@ -273,7 +292,8 @@ export default function ProductSearch({
           q: query.trim(),
           page: requestedPage,
           in_stock: onlyStock,
-          promotions_only: filterPromotions,
+          regular_only: filter === "regular",
+          promotions_only: filter === "promotion",
           campaign: selectedCampaign,
         }) as typeof payload;
       } else {
@@ -293,9 +313,11 @@ export default function ProductSearch({
       setPage(Number(payload.page || requestedPage));
       setMessage(query.trim()
         ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
-        : filterPromotions
+        : filter === "promotion"
           ? (payload.total ? "Promotion offers." : "No promotion offers found.")
-          : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
+          : filter === "regular"
+            ? (payload.total ? "Regular memo offers." : "No regular memo offers found.")
+            : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
     } catch (error) {
       if (request === searchRequest.current) {
         setResults([]);
@@ -337,9 +359,7 @@ export default function ProductSearch({
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
   const detailMemo = memoInfo(detailProduct);
-  const detailInstallments = detailProduct ? ([6, 9, 12, 18, 24] as const)
-    .map(months => ({ months, total: amount(detailProduct[`months_${months}`]) }))
-    .filter(({ total }) => total > 0) : [];
+  const detailInstallments = detailProduct ? installments(detailProduct) : [];
 
   function openProductDetails(product: Product) {
     if (!detailProduct || detailProduct.barcode !== product.barcode) {
@@ -353,10 +373,17 @@ export default function ProductSearch({
     setDetailProduct(product);
   }
   const canManageBranch = systemRole === "BRANCH_ADMIN";
+  const canSeeCashPrice = systemRole === "SYSTEM_ADMIN" ||
+    (canManageBranch && legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void loadProducts(term, 1, inStock, promotionsOnly, campaign);
+    void loadProducts(term, 1, inStock, memoFilter, campaign);
+  }
+
+  function changeMemoFilter(filter: MemoFilter) {
+    setMemoFilter(filter);
+    void loadProducts(term, 1, inStock, filter, campaign);
   }
 
   function toggleProduct(product: Product, checked: boolean) {
@@ -449,17 +476,19 @@ export default function ProductSearch({
               <label htmlFor="legacy-product-search">SEARCH PRODUCT</label>
               <div><input id="legacy-product-search" value={term} onChange={event => setTerm(event.target.value)} placeholder="Search brand, model, barcode, description..." aria-label="Search brand, model, barcode, description" /><button type="submit" disabled={loading}>{loading ? "SEARCHING…" : "SEARCH"}</button></div>
             </form>
-            {inventoryEnabled && <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
-              setInStock(event.target.checked);
-              void loadProducts(term, 1, event.target.checked, promotionsOnly, campaign);
-            }} /> In stock only</label>}
-            {!demo && usesEdgeData && <label className="legacy-stock-filter"><input type="checkbox" checked={promotionsOnly} onChange={event => {
-              setPromotionsOnly(event.target.checked);
-              void loadProducts(term, 1, inStock, event.target.checked, campaign);
-            }} /> Promotion memos only</label>}
-            {!demo && usesEdgeData && promotionsOnly && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
+            {inventoryEnabled && <div className="legacy-search-filters">
+              <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
+                setInStock(event.target.checked);
+                void loadProducts(term, 1, event.target.checked, memoFilter, campaign);
+              }} /> In stock only</label>
+              <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "regular"}
+                onChange={event => changeMemoFilter(event.target.checked ? "regular" : "all")} /> Regular memos only</label>
+              <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "promotion"}
+                onChange={event => changeMemoFilter(event.target.checked ? "promotion" : "all")} /> Promotion memos only</label>
+            </div>}
+            {!demo && usesEdgeData && memoFilter === "promotion" && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
               setCampaign(event.target.value);
-              void loadProducts(term, 1, inStock, true, event.target.value);
+              void loadProducts(term, 1, inStock, "promotion", event.target.value);
             }}><option value="">All promotions</option>{campaigns.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
             <div className="legacy-memo-info">
               <label>MEMO_ID<input readOnly value={memoLabel(currentMemo, activeProduct)} /></label>
@@ -478,20 +507,25 @@ export default function ProductSearch({
               <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => {
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
+                className={product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
                 if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
               }}>
-                <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
+                <td><input type="checkbox" aria-label={["Select", product.brand, product.model, memoInfo(product)?.memo_id].filter(Boolean).join(" ")} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><SearchOfferLabel product={product} /></td>
+                <td>{product.remarks || "N/A"}</td>
+                <td className="ptg-srp-amount"><span className="ptg-search-offer-amount">{peso(product.srp)}</span></td>
+                <td className="ptg-tag-this-amount"><span className="ptg-search-offer-amount">{peso(priceNow(product))}</span></td>
+                <td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               <BlankRows used={Math.max(1, results.length)} />
             </tbody>
           </table>
         </div>
         <p className="legacy-result-count" role="status">{loading ? "Loading products…" : `Search Results ${firstResult}–${lastResult} of ${total}`}</p>
-        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock, promotionsOnly, campaign)} />
+        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock, memoFilter, campaign)} />
       </section>
 
       <section className="legacy-queue-panel ptg-print-hide">
@@ -578,7 +612,8 @@ export default function ProductSearch({
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
-            const term = amount(product.cash_payment) === 0
+            const hasCashPayment = product.has_cash_payment ?? (amount(product.cash_payment) !== 0);
+            const term = !hasCashPayment
               ? Number(/\b(6|9|12|18|24)-MONTH CREDIT CARD ONLY\b/i.exec(product.remarks || "")?.[1] || 0) : 0;
             const termTotal = term ? amount(product["months_" + term as "months_6"]) : 0;
             const priceCaption = termTotal ? `CREDIT CARD · ${term} MONTHS` : "CASH / STRAIGHT";
@@ -652,11 +687,19 @@ export default function ProductSearch({
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
           <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
           <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
+          {canSeeCashPrice && amount(detailProduct.cash_payment) > 0 && amount(detailProduct.cash_payment) !== priceNow(detailProduct) &&
+            <><dt>Cash price</dt><dd>{peso(detailProduct.cash_payment)}</dd></>}
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
             <dt>Memo ID</dt><dd>{memoLabel(detailMemo, detailProduct) || "—"}</dd>
             <dt>Period</dt><dd>{detailMemo.period || "—"}</dd>
             <dt>Import date</dt><dd>{detailMemo.created_at ? new Date(detailMemo.created_at).toLocaleDateString("en-US") : "—"}</dd>
+          </>}
+          {detailProduct.campaign === "7MBDS" && detailProduct.selling_starts_on && detailProduct.selling_ends_on && <>
+            <dt>Selling period</dt>
+            <dd>{offerDate(detailProduct.selling_starts_on)}–{offerDate(detailProduct.selling_ends_on)}
+              {detailProduct.early_print_only && <> · Early printing only</>}
+            </dd>
           </>}
         </dl>
         <table className="legacy-product-installment-table">
@@ -673,12 +716,16 @@ export default function ProductSearch({
       </AppDialog>}
       <style jsx global>{`
         .legacy-stock-filter{display:flex;align-items:center;gap:.4rem;color:#12366c;font-size:.85rem}
+        .legacy-search-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem}
+        .legacy-search-filters .legacy-stock-filter{white-space:nowrap}
         .legacy-product-stock{padding:.65rem .85rem;background:#eef5ff;border-radius:7px}
         .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
         .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
         .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}
         .legacy-product-details dt{font-weight:700}
         .legacy-products-table td.ptg-srp-amount,.legacy-product-details .ptg-srp-amount{color:#b42318}
+        .legacy-results-panel .ptg-search-promo .ptg-search-offer-amount{color:#DC2626;font-weight:700}
+        .legacy-results-panel .ptg-search-offer-amount{white-space:nowrap}
         .legacy-products-table td.ptg-tag-this-amount,.legacy-product-details .ptg-tag-this-amount{color:#12366c;font-weight:800}
         .legacy-product-details dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         .legacy-product-installment-table{width:100%;margin-top:1rem;border-collapse:collapse;font-size:.85rem;text-align:left}
@@ -725,6 +772,8 @@ export default function ProductSearch({
         .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
         .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
         .legacy-products-table th:nth-child(2){width:10%}.legacy-products-table th:nth-child(3){width:9%}.legacy-products-table th:nth-child(4){width:33%}.legacy-products-table th:nth-child(5){width:23%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:8%}.legacy-products-table th:nth-child(8){width:6%}
+        .legacy-results-panel .legacy-products-table th:nth-child(5){width:19%}
+        .legacy-results-panel .legacy-products-table :is(th:nth-child(6),th:nth-child(7)){width:10%}
         .legacy-products-table td{height:38px;padding:4px 6px;border-bottom:1px solid #d6d6d6;color:#143d75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5),.legacy-products-table .legacy-product-detail-link{white-space:normal;overflow-wrap:anywhere}
         .legacy-products-table tbody tr:not(.legacy-blank-row){cursor:pointer}

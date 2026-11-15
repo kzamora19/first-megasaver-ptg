@@ -29,6 +29,7 @@ type ActiveSession = {
   id: string;
   userId: string;
   role: string;
+  legacyRole: string;
   branchId: string | null;
   username: string;
   mustChangePassword: boolean;
@@ -53,7 +54,7 @@ async function getSession(request: Request): Promise<ActiveSession | null> {
   const idleExpired = now - new Date(row.last_activity_at).getTime() > 30 * 60 * 1000;
   const absoluteExpired = new Date(row.expires_at).getTime() <= now;
   const { data: profile, error: profileError } = await admin.from("user_profiles")
-    .select("role_key,is_active,session_version,must_change_password")
+    .select("role_key,legacy_role,is_active,session_version,must_change_password")
     .eq("id", authData.user.id).maybeSingle();
   if (profileError || !profile || !profile.is_active || Number(profile.session_version) !== Number(row.session_version) || idleExpired || absoluteExpired) {
     await admin.from("app_sessions").update({ revoked_at: new Date().toISOString(), revoke_reason: "EXPIRED_OR_INVALID" })
@@ -75,6 +76,7 @@ async function getSession(request: Request): Promise<ActiveSession | null> {
     id: row.id,
     userId: authData.user.id,
     role: profile.role_key,
+    legacyRole: profile.legacy_role ?? "",
     branchId: row.branch_id,
     username: typeof username === "string" ? username : "",
     mustChangePassword: profile.must_change_password === true,
@@ -114,12 +116,22 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
     p_branch_id: session.branchId ?? null,
     p_system_admin: session.role === "SYSTEM_ADMIN",
     p_page: page,
-    ...(body.promotions_only === true ? {
+    ...(body.regular_only === true ? {
+      p_stock_barcodes: null, ...stock, p_promotions_only: false, p_campaign: null, p_regular_only: true,
+    } : body.promotions_only === true ? {
       p_stock_barcodes: null, ...stock, p_promotions_only: true, p_campaign: clean(body.campaign, 80) || null,
     } : stock),
   });
   if (error || !data) return respond(origin, fail("Could not search imported memo products."), 500);
-  return respond(origin, { ok: true, products: data.products, total: data.total, campaigns: data.campaigns ?? [], page, pageSize: 5 });
+  const canSeeCashPrice = session.role === "SYSTEM_ADMIN" ||
+    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
+  const products = canSeeCashPrice ? data.products : data.products.map(
+    ({ cash_payment, ...product }: { cash_payment?: number } & Record<string, unknown>) => ({
+      ...product,
+      has_cash_payment: Number(cash_payment ?? 0) !== 0,
+    }),
+  );
+  return respond(origin, { ok: true, products, total: data.total, campaigns: data.campaigns ?? [], page, pageSize: 5 });
 }
 
 async function productInventory(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
