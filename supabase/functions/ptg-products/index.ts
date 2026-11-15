@@ -114,7 +114,9 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
     p_branch_id: session.branchId ?? null,
     p_system_admin: session.role === "SYSTEM_ADMIN",
     p_page: page,
-    ...(body.promotions_only === true ? {
+    ...(body.regular_only === true ? {
+      p_stock_barcodes: null, ...stock, p_promotions_only: false, p_campaign: null, p_regular_only: true,
+    } : body.promotions_only === true ? {
       p_stock_barcodes: null, ...stock, p_promotions_only: true, p_campaign: clean(body.campaign, 80) || null,
     } : stock),
   });
