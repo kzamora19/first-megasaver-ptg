@@ -730,7 +730,6 @@ export default function ProductSearch({
                 <tr><th scope="row">Cash price</th><td>{amount(detailProduct.cash_payment) > 0 ? peso(detailProduct.cash_payment) : "—"}</td><td>{amount(detailUnitOnly.cash_payment) > 0 ? peso(detailUnitOnly.cash_payment) : "—"}</td></tr>}
             </tbody>
           </table>
-          <p className="legacy-unit-only-remarks"><strong>Unit-only remarks:</strong> {detailUnitOnly.remarks || "N/A"}</p>
           <button type="button" className="legacy-unit-only-queue-button" disabled={queue.some(item => item.id === detailUnitOnly.id)}
             onClick={() => toggleProduct(detailUnitOnly, true)}>
             {queue.some(item => item.id === detailUnitOnly.id) ? "Unit-only offer added to print queue" : "Add unit-only offer to print queue"}
@@ -761,7 +760,6 @@ export default function ProductSearch({
         .legacy-price-comparison-table th,.legacy-price-comparison-table td{width:33.333%;white-space:normal}
         .legacy-price-comparison-table td.ptg-srp-amount{color:#b42318}
         .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
-        .legacy-unit-only-remarks{margin:.6rem 0 .45rem;font-size:.85rem}
         .legacy-unit-only-queue-button{border:1px solid #2465c3;border-radius:5px;background:#eef5ff;color:#124a9c;padding:7px 12px;font-weight:700;cursor:pointer}
         .legacy-unit-only-queue-button:disabled{opacity:.65;cursor:default}
         .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
