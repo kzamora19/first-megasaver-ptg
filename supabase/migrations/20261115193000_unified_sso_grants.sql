@@ -6,7 +6,7 @@ create table if not exists public.ptg_unified_sso_grants (
   sales_user_id uuid primary key,
   ptg_user_id uuid unique references auth.users(id),
   expected_email text not null check (expected_email = lower(btrim(expected_email))
-    and expected_email ~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+
+    and expected_email like '%@%.%' and expected_email !~ '[[:space:]]'),
   username text not null unique check (length(btrim(username)) between 3 and 120),
   display_name text not null check (length(btrim(display_name)) between 2 and 140),
   role_key text not null check (role_key in ('BRANCH_USER','BRANCH_ADMIN')),
