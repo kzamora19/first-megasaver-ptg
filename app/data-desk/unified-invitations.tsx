@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
+import { invokePtgData } from "@/lib/ptg/edge-api";
 import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
 import {
   matchUnifiedBranches, validateUnifiedInvitation,
@@ -33,6 +34,12 @@ export default function UnifiedInvitations({
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState("");
   const [review, setReview] = useState<Record<string, unknown> | null>(null);
+  const [sending, setSending] = useState(false);
+  const [pendingSalesId, setPendingSalesId] = useState("");
+  const [invitationStatus, setInvitationStatus] = useState("");
+  // Never enable live account creation until both projects' schema,
+  // identity broker, acceptance, and revocation tests have passed.
+  const enabled = process.env.NEXT_PUBLIC_UNIFIED_INVITATIONS_ENABLED === "true";
   const [fullName, setFullName] = useState("");
   const [login, setLogin] = useState("");
   const [email, setEmail] = useState("");
@@ -108,6 +115,73 @@ export default function UnifiedInvitations({
     }
   }
 
+  async function sendUnifiedInvitation() {
+    if (!review || !enabled || sending) return;
+    setProblem("");
+    setSending(true);
+    try {
+      await verifyPtg(getPtgAppSessionId());
+      const sales = await verifySales();
+      const { data: loginSession } = await sales.client.auth.getSession();
+      const token = loginSession.session?.access_token;
+      if (!token) throw Error("Your Sales Tracker admin session has expired.");
+      const url = process.env.NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL;
+      const apiKey = process.env.NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY;
+      if (!url || !apiKey) throw Error("Sales Tracker is not configured.");
+      async function salesAction(payload: Record<string, unknown>) {
+        const response = await fetch(url!.replace(/\\/$/, "") + "/functions/v1/admin-create-user", {
+          method: "POST", cache: "no-store",
+          headers: { apikey: apiKey!, Authorization: "Bearer " + token,
+            "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json().catch(() => ({})) as {
+          ok?: boolean; user_id?: string; error?: string; invitation_status?: string;
+        };
+        if (!response.ok) throw Error(result.error || "Sales Tracker unified invitation failed.");
+        return result;
+      }
+      // Once a Sales identity is staged, retry this exact ID; never create
+      // a duplicate because a later PTG or email step failed.
+      let userId = pendingSalesId;
+      if (!userId) {
+        const prepared = await salesAction({
+          unified: true, ptg_access: review.ptgRole ? ptgAccess : "NONE",
+          full_name: review.fullName, login: review.login,
+          email: review.email, role: review.salesRole,
+          district_id: review.salesDistrictId, branch_id: review.salesBranchId,
+          salesperson_code: review.salespersonCode,
+          brand: review.assignedBrand,
+        });
+        if (!prepared.user_id) throw Error("Sales Tracker did not return a staged identity.");
+        userId = prepared.user_id;
+        setPendingSalesId(userId);
+        setInvitationStatus("Sales account prepared. Linking PTG access…");
+      }
+      if (review.ptgRole) {
+        const provision = await invokePtgData("ptg-unified-provision", {
+          salesUserId: userId, salesAdminAccessToken: token,
+        }) as { ptgUserId?: string; created?: boolean };
+        if (!provision.ptgUserId) throw Error("PTG did not return a linked identity.");
+        await salesAction({
+          action: "unified_link", user_id: userId, ptg_user_id: provision.ptgUserId,
+        });
+        setInvitationStatus("Both application grants linked. Sending one invitation…");
+      }
+      await salesAction({ action: "unified_finalize", user_id: userId });
+      setInvitationStatus("One invitation was emailed. No PTG password was sent.");
+      setPendingSalesId("");
+      setReview(null);
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : "Unified invitation could not finish.");
+      setInvitationStatus(pendingSalesId
+        ? "The Sales account remains pending. Use Resume invitation; do not create another employee."
+        : "No invitation delivery was confirmed.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return <main className="ptg-main shell admin-shell">
     <section className="hero admin-hero">
       <p className="eyebrow">DATA DESK · PEOPLE & ACCESS</p>
@@ -116,11 +190,12 @@ export default function UnifiedInvitations({
     </section>
     <section className="admin-card">
       <h2>Invitation readiness review</h2>
-      <p className="admin-muted">Phase 1: verify both administrator sessions, branch codes, employee identity, and application permissions. No accounts are created and no email is sent from this screen yet. Existing accounts are unchanged.</p>
+      <p className="admin-muted">Verify both administrator sessions, branch codes, employee identity, and application permissions before inviting. Existing accounts are not migrated or modified.</p>
       <button type="button" className="admin-button secondary" disabled={loading || checking} onClick={() => void verifyConnections()}>
         {loading ? "Verifying…" : "Recheck both applications"}
       </button>
       {problem && <p role="alert" className="admin-alert error">{problem}</p>}
+      {invitationStatus && <p role="status" className="admin-alert">{invitationStatus}</p>}
       {!loading && branches.length > 0 && <form className="admin-form" onSubmit={event => void validate(event)}>
         <label>Full name<input required maxLength={120} value={fullName} onChange={event => setFullName(event.target.value)} autoComplete="name"/></label>
         <label>New login ID<input required maxLength={32} value={login} onChange={event => setLogin(event.target.value)} autoComplete="off"/></label>
@@ -160,7 +235,10 @@ export default function UnifiedInvitations({
           <tr><th>Sales Tracker</th><td>{String(review.salesRole)}</td></tr>
           <tr><th>PTG</th><td>{review.ptgRole ? String(review.ptgLegacyRole) : "No access"}</td></tr>
         </tbody></table>
-        <p role="status"><strong>Review complete.</strong> Invitation sending remains disabled until central sign-in, identity linking, and cross-app revocation pass end-to-end security tests.</p>
+        {enabled ? <button type="button" className="admin-button"
+          disabled={sending} onClick={() => void sendUnifiedInvitation()}>
+          {sending ? "Preparing invitation…" : pendingSalesId ? "Resume pending invitation" : "Send one unified invitation"}
+        </button> : <p role="status"><strong>Review complete.</strong> Sending is not enabled until both projects' shared sign-in and cross-app revocation tests pass.</p>}
       </div>}
     </section>
   </main>;
