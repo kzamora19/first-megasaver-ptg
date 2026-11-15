@@ -193,7 +193,10 @@ AS $function$
       coalesce(pm.sub_category, '') as sub_category, m.srp, m.cash_payment,
       m.tag_this, m.months_6, m.months_9, m.months_12, m.months_18, m.months_24,
       m.remarks, m.eligible_for_price_tag, m.price_tag_status,
-      campaign.campaign,
+      coalesce(campaign.campaign, case when
+        public.ptg_period_start(memo.period)=date '2026-11-14'
+        and public.ptg_period_end(memo.period)=date '2026-11-22'
+        then '7MBDS' end) as campaign,
       jsonb_build_object('branch_id', memo.branch_id, 'memo_id', memo.memo_id, 'period', memo.period,
         'memo_type', memo.memo_type, 'created_at', memo.imported_at, 'source_file', memo.source_file) as price_memos
     from public.memo_products m
@@ -210,15 +213,21 @@ AS $function$
     ) pm on true
     cross join input i
     where (p_system_admin or memo.branch_id is null or memo.branch_id = p_branch_id)
-      and (not p_promotions_only or (campaign.campaign is not null
+      and (not p_promotions_only or (coalesce(campaign.campaign,
+        case when public.ptg_period_start(memo.period)=date '2026-11-14'
+        and public.ptg_period_end(memo.period)=date '2026-11-22' then '7MBDS' end) is not null
         and (p_campaign is null or campaign.campaign = p_campaign)))
       and public.ptg_pdf_promotion_current(memo.memo_id, memo.period)
       and (memo.memo_id ~ '^PDF-[0-9a-f]{64}$'
-        or (campaign.campaign is null and public.ptg_period_start(memo.period)
-          <= (current_timestamp at time zone 'Asia/Manila')::date)
-        or (campaign.campaign is not null and
-          (current_timestamp at time zone 'Asia/Manila')::date
-          between public.ptg_period_start(memo.period) and public.ptg_period_end(memo.period)))
+        or (campaign.campaign is null
+          and not (public.ptg_period_start(memo.period)=date '2026-11-14'
+            and public.ptg_period_end(memo.period)=date '2026-11-22')
+          and public.ptg_period_start(memo.period)
+             <= (current_timestamp at time zone 'Asia/Manila')::date)
+        or ((campaign.campaign is not null or (public.ptg_period_start(memo.period)=date '2026-11-14'
+          and public.ptg_period_end(memo.period)=date '2026-11-22'))
+          and (current_timestamp at time zone 'Asia/Manila')::date
+             between public.ptg_period_start(memo.period) and public.ptg_period_end(memo.period)))
       and (length(i.needle) < 2 or strpos(lower(m.barcode), i.needle) > 0
         or strpos(lower(m.brand), i.needle) > 0 or strpos(lower(m.model), i.needle) > 0
         or strpos(lower(pm.description), i.needle) > 0
