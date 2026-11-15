@@ -499,24 +499,31 @@ export default function ProductSearch({
                 setInStock(event.target.checked);
                 void loadProducts(term, 1, event.target.checked, memoFilter, campaign, showSubdealer);
               }} /> In stock only</label>
-              <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "regular"}
+              <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "regular"} disabled={showSubdealer}
                 onChange={event => changeMemoFilter(event.target.checked ? "regular" : "all")} /> Regular memos only</label>
-              <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "promotion"}
+              <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "promotion"} disabled={showSubdealer}
                 onChange={event => changeMemoFilter(event.target.checked ? "promotion" : "all")} /> Promotion memos only</label>
               {canSeeCashPrice && <label className="legacy-stock-filter ptg-subdealer-filter">
                 <input type="checkbox" checked={showSubdealer} onChange={event => {
                   const enabled = event.target.checked;
                   setShowSubdealer(enabled);
+                  if (enabled) {
+                    // Subdealer is its own search mode rather than an
+                    // additional campaign mixed with regular memo prices.
+                    setMemoFilter("all");
+                    setCampaign("");
+                  }
                   if (!enabled) {
                     setQueue(items => items.filter(item => item.campaign !== "SUBDEALER"));
                     setActiveProduct(item => item?.campaign === "SUBDEALER" ? null : item);
                     setDetailProduct(item => item?.campaign === "SUBDEALER" ? null : item);
                   }
-                  void loadProducts(term, 1, inStock, memoFilter, campaign, enabled);
-                }} /> Subdealer prices <small>(restricted)</small>
+                  void loadProducts(term, 1, inStock,
+                    enabled ? "all" : memoFilter, enabled ? "" : campaign, enabled);
+                }} /> Subdealer prices
               </label>}
             </div>}
-            {!demo && usesEdgeData && memoFilter === "promotion" && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
+            {!demo && usesEdgeData && memoFilter === "promotion" && !showSubdealer && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
               setCampaign(event.target.value);
               void loadProducts(term, 1, inStock, "promotion", event.target.value, showSubdealer);
             }}><option value="">All promotions</option>{campaigns.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
