@@ -40,10 +40,12 @@ async function activeSession(request: Request): Promise<ActiveSession | null> {
   if (authError || !authData.user) return null;
   const id = request.headers.get("x-ptg-session-id");
   if (!id || id.length > 100) return null;
-  const { data: row, error } = await admin.from("app_sessions").select("id,user_id,branch_id,session_version,last_activity_at,expires_at,revoked_at")
+  const { data: row, error } = await admin.from("app_sessions").select("id,user_id,branch_id,session_version,remember_device,last_activity_at,expires_at,revoked_at")
     .eq("id", id).eq("user_id", authData.user.id).is("revoked_at", null).maybeSingle();
   if (error || !row) return null;
-  const expired = Date.now() - new Date(row.last_activity_at).getTime() > 30 * 60 * 1000 || new Date(row.expires_at).getTime() <= Date.now();
+  const idleLimitMs = row.remember_device === true ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
+  const expired = Date.now() - new Date(row.last_activity_at).getTime() > idleLimitMs ||
+    new Date(row.expires_at).getTime() <= Date.now();
   const { data: profile, error: profileError } = await admin.from("user_profiles").select("role_key,is_active,session_version,must_change_password")
     .eq("id", authData.user.id).maybeSingle();
   if (profileError || !profile || !profile.is_active || Number(profile.session_version) !== Number(row.session_version) || expired) {
