@@ -99,6 +99,8 @@ Deno.serve(async request => {
     const sourceFile = clean(body.sourceFile, 240);
     const memoType = clean(body.memoType, 40).toUpperCase();
     const period = clean(body.period, 120);
+    const campaign = typeof body.campaign === "string" ? body.campaign.trim() : "";
+    if (campaign.length > 80) return respond(origin, fail("Promotion name must be 80 characters or fewer."), 400);
     const action = clean(body.duplicateAction, 20).toUpperCase();
     if (!memoId || !sourceFile || !["MEMO_LIST", "KIOSK_MEMO_LIST"].includes(memoType) ||
         !Array.isArray(body.products) || !body.products.length || body.products.length > MAX_ROWS ||
@@ -142,6 +144,7 @@ Deno.serve(async request => {
       p_imported_by: session.userId,
       p_duplicate_action: action,
       p_products: products,
+      ...(campaign ? { p_campaign: campaign } : {}),
     });
     if (error) return respond(origin, fail("Price memo import failed. The existing memo was not changed."), 500);
     const result = data as { skipped?: boolean; duplicate?: boolean; totalProducts?: number };
