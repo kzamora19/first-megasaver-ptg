@@ -116,6 +116,7 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
         ...(!category ? ["missing category"] : []),
         ...(!model || model.length > 240 ? ["missing/overlong model"] : []),
         ...(!Number.isFinite(srp) || srp <= 0 ? ["missing SRP"] : []),
+        ...(!Number.isFinite(cash) || cash <= 0 ? ["missing Cash Payment"] : []),
         ...(!Number.isFinite(tagThis) || tagThis <= 0 ? ["missing Tag This / Cash Payment"] : []),
       ];
       if (reasons.length) {
