@@ -91,14 +91,23 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
     }
     if (extracted.length > 10000) issues.push("A memo may contain no more than 10,000 products.");
     const products: SubdealerProduct[] = [];
+    const seenBarcodes = new Map<string, number>();
     for (const [index, row] of extracted.entries()) {
       const barcode = String(row.barcode || "").trim();
       const brand = String(row.brand || "").trim();
       const category = String(row.category || "").trim();
       const model = String(row.description || row.model || "").trim();
-      const srp = row.memoSrp ?? 0;
-      const cash = row.cashPayment ?? 0;
-      const tagThis = row.tagPrice ?? row.cashPayment ?? 0;
+      const priceRow = row as typeof row & { memoSrp?: number | null; cashPayment?: number | null; tagPrice?: number | null };
+      const srp = priceRow.memoSrp ?? 0;
+      const cash = priceRow.cashPayment ?? 0;
+      const tagThis = priceRow.tagPrice ?? priceRow.cashPayment ?? 0;
+      const previousRow = seenBarcodes.get(barcode);
+      if (previousRow !== undefined) {
+        issues.push("Duplicate barcode " + barcode + " on rows " + previousRow + " and " +
+          (index + 1) + ". Review which price applies before importing.");
+      } else {
+        seenBarcodes.set(barcode, index + 1);
+      }
       const reasons = [
         ...row.warnings,
         ...(!/^0\d{7}$/.test(barcode) ? ["barcode must be eight digits with leading zeroes"] : []),
