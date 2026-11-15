@@ -37,6 +37,9 @@ export type Product = {
   price_tag_status?: string;
   source_file?: string;
   campaign?: string | null;
+  selling_starts_on?: string | null;
+  selling_ends_on?: string | null;
+  early_print_only?: boolean;
   price_memos: MemoInfo | MemoInfo[] | null;
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
@@ -114,13 +117,18 @@ function Pagination({ page, totalPages, label, busy = false, onPage }: {
 }
 
 function BlankRows({ used }: { used: number }) {
-  return Array.from({ length: pageSize - used }, (_, index) =>
+  return Array.from({ length: Math.max(0, pageSize - used) }, (_, index) =>
     <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={8}>&nbsp;</td></tr>
   );
 }
 const amount = (value: number | null | undefined) => Number(value || 0);
 const peso = (value: number | null | undefined) => "₱ " + amount(value).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const priceNow = (product: Product) => amount(product.tag_this);
+const offerDate = (date: string) => new Date(date + "T00:00:00Z")
+  .toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "UTC" });
+const installments = (product: Product) => ([6, 9, 12, 18, 24] as const)
+  .map(months => ({ months, total: amount(product[`months_${months}`]) }))
+  .filter(({ total }) => total > 0);
 const memoInfo = (product: Product | null): MemoInfo | null => {
   if (!product) return null;
   return Array.isArray(product.price_memos) ? product.price_memos[0] ?? null : product.price_memos;
@@ -136,6 +144,35 @@ function MemoSummary({ product }: { product: Product }) {
   const label = memoLabel(memo, product);
   if (!label) return null;
   return <><br /><small>{product.campaign && <strong>{product.campaign} · </strong>}{label}{memo?.period ? <> · {memo.period}</> : null}</small></>;
+}
+function SearchOfferMemo({ product }: { product: Product }) {
+  const memo = memoInfo(product);
+  if (!memo) return null;
+  const label = product.campaign
+    ? product.campaign + " PROMO"
+    : /^PDF-[a-f0-9]{64}$/i.test(memo.memo_id) ? "PROMO" : "REGULAR MONTHLY";
+  const starts = product.selling_starts_on;
+  const ends = product.selling_ends_on;
+  return <><br /><small>
+    <strong>{label}</strong> · {memo.memo_id}{memo.period && <> · {memo.period}</>}
+    {product.campaign === "7MBDS" && starts && ends && <>
+      <br />Selling {offerDate(starts)}–{offerDate(ends)}
+      {product.early_print_only && <> · Early printing only</>}
+    </>}
+  </small></>;
+}
+
+function SearchOfferPrices({ product }: { product: Product }) {
+  const terms = installments(product);
+  return <>
+    <span className="ptg-search-offer-amount">{peso(priceNow(product))}</span>
+    {amount(product.cash_payment) > 0 && amount(product.cash_payment) !== priceNow(product) &&
+      <small className="ptg-search-payment">Cash <span className="ptg-search-offer-amount">{peso(product.cash_payment)}</span></small>}
+    {terms.map(({ months, total }) => <small className="ptg-search-payment" key={months}>
+      {months} months · <span className="ptg-search-offer-amount">{peso(total / months)}</span>/mo
+      {" · "}<span className="ptg-search-offer-amount">{peso(total)}</span> total
+    </small>)}
+  </>;
 }
 const endDate = (period: string) => {
   const raw = String(period || "").trim();
@@ -337,9 +374,7 @@ export default function ProductSearch({
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
   const detailMemo = memoInfo(detailProduct);
-  const detailInstallments = detailProduct ? ([6, 9, 12, 18, 24] as const)
-    .map(months => ({ months, total: amount(detailProduct[`months_${months}`]) }))
-    .filter(({ total }) => total > 0) : [];
+  const detailInstallments = detailProduct ? installments(detailProduct) : [];
 
   function openProductDetails(product: Product) {
     if (!detailProduct || detailProduct.barcode !== product.barcode) {
@@ -478,13 +513,18 @@ export default function ProductSearch({
               <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => {
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
+                className={product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
                 if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
               }}>
-                <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
+                <td><input type="checkbox" aria-label={["Select", product.brand, product.model, memoInfo(product)?.memo_id].filter(Boolean).join(" ")} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><SearchOfferMemo product={product} /></td>
+                <td>{product.remarks || "N/A"}</td>
+                <td className="ptg-srp-amount"><span className="ptg-search-offer-amount">{peso(product.srp)}</span></td>
+                <td className="ptg-tag-this-amount"><SearchOfferPrices product={product} /></td>
+                <td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               <BlankRows used={Math.max(1, results.length)} />
             </tbody>
@@ -679,6 +719,9 @@ export default function ProductSearch({
         .legacy-product-details{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:.65rem 1rem;margin:1rem 0 0;font-size:.9rem}
         .legacy-product-details dt{font-weight:700}
         .legacy-products-table td.ptg-srp-amount,.legacy-product-details .ptg-srp-amount{color:#b42318}
+        .legacy-results-panel .ptg-search-promo .ptg-search-offer-amount{color:#DC2626;font-weight:700}
+        .legacy-results-panel .ptg-search-payment{display:block}
+        .legacy-results-panel .ptg-search-promo .ptg-search-payment{font-weight:400}
         .legacy-products-table td.ptg-tag-this-amount,.legacy-product-details .ptg-tag-this-amount{color:#12366c;font-weight:800}
         .legacy-product-details dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         .legacy-product-installment-table{width:100%;margin-top:1rem;border-collapse:collapse;font-size:.85rem;text-align:left}
