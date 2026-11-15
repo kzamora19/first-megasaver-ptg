@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import WorkspaceLoader from "@/components/workspace-loader";
 import AppDialog from "@/components/app-dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -15,17 +15,43 @@ import {
 
 export type PtgClientSession = NonNullable<EdgeAuthResponse["account"]>;
 
-export default function ClientSessionGate({
-  children,
-  allowRoles,
-  watchAvailability = false,
-  deniedTo = "/no-access",
-}: {
+// Share the already-verified workspace identity with nested protected pages.
+// The outer gate keeps the availability/force-logout watcher active.
+const VerifiedPtgSession = createContext<PtgClientSession | null>(null);
+
+function InheritedSessionGate({ session, children, allowRoles, deniedTo = "/no-access" }: {
+  session: PtgClientSession;
+  children: (session: PtgClientSession) => ReactNode;
+  allowRoles?: string[];
+  deniedTo?: string;
+}) {
+  const router = useRouter();
+  const allowed = !allowRoles?.length || allowRoles.includes(session.role);
+  useEffect(() => {
+    if (!allowed) router.replace(deniedTo);
+  }, [allowed, deniedTo, router]);
+  return allowed ? <VerifiedPtgSession.Provider value={session}>{children(session)}</VerifiedPtgSession.Provider> : null;
+}
+
+type GateProps = {
   children: (session: PtgClientSession) => ReactNode;
   allowRoles?: string[];
   watchAvailability?: boolean;
   deniedTo?: string;
-}) {
+};
+
+export default function ClientSessionGate(props: GateProps) {
+  const parent = useContext(VerifiedPtgSession);
+  if (parent) return <InheritedSessionGate session={parent} {...props}/>;
+  return <VerifyPtgSessionGate {...props}/>;
+}
+
+function VerifyPtgSessionGate({
+  children,
+  allowRoles,
+  watchAvailability = false,
+  deniedTo = "/no-access",
+}: GateProps) {
   const router = useRouter();
   const [session, setSession] = useState<PtgClientSession | null>(null);
   const [progress, setProgress] = useState(0);
@@ -179,5 +205,5 @@ export default function ClientSessionGate({
     </section></main>;
   }
   if (!session) return null;
-  return children(session);
+  return <VerifiedPtgSession.Provider value={session}>{children(session)}</VerifiedPtgSession.Provider>;
 }
