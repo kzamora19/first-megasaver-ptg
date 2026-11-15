@@ -30,9 +30,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     <a href={withBasePath("/data-desk/?mode=catalog")} onClick={onNavigate}
       className={"ptg-nav-item" + (catalog ? " active" : "")}
       aria-current={catalog ? "page" : undefined}>Cross-App Catalog Review</a>
-    {deskPtgTools.map(([path, label]) => <a key={path} href={withBasePath(path + "/") + "?workspace=data-desk"}
+    {deskPtgTools.map(([path, label]) => <Link key={path} href={path + "/?workspace=data-desk"}
       onClick={onNavigate} className={"ptg-nav-item" + (active === path ? " active" : "")}
-      aria-current={active === path ? "page" : undefined}>{label}</a>)}
+      aria-current={active === path ? "page" : undefined}>{label}</Link>)}
     <a href={withBasePath("/data-desk/?mode=srp")} onClick={onNavigate}
       className={"ptg-nav-item" + (srp ? " active" : "")}
       aria-current={srp ? "page" : undefined}>Product SRP Import</a>
