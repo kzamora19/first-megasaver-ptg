@@ -851,7 +851,8 @@ export default function ProductSearch({
           .legacy-half-sheet{grid-template-columns:repeat(2,5.07in);grid-template-rows:6.76in;gap:0;width:11in!important;height:8.5in!important}
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
           .legacy-four-sheet{grid-template-columns:repeat(2,3.822in);grid-template-rows:repeat(2,5.096in);gap:0}
-          .legacy-four-sheet .legacy-price-tag{zoom:.49}
+          .legacy-four-sheet .legacy-price-tag{zoom:.47}
+          .legacy-four-sheet .legacy-tag-header-with-promo img.legacy-tag-promo{right:14px}
           .legacy-six-sheet{grid-template-columns:repeat(2,4.05in);grid-template-rows:repeat(3,calc(10.6in / 3));gap:0}
           .ptg-compact-tag{box-sizing:border-box;display:flex;flex-direction:column;gap:2px;width:100%;height:100%;padding:8px 10px;border:1px solid #003da5;color:#003da5;font:700 13px/1.15 Arial,sans-serif;overflow:hidden}
           .ptg-compact-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 68px;min-height:0;border-bottom:2px solid #003da5}
