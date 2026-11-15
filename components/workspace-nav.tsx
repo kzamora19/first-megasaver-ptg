@@ -18,12 +18,16 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const srp = onDesk && query.get("mode") === "srp";
   const promotionPdf = onDesk && query.get("mode") === "promotion-pdf";
   const subdealerPdf = onDesk && query.get("mode") === "subdealer";
+  const invitations = onDesk && query.get("mode") === "invitations";
   const salesTool = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
-  const unified = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !salesTool;
+  const unified = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !invitations && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
       className={"ptg-nav-item" + (unified ? " active" : "")}
       aria-current={unified ? "page" : undefined}>Unified Import</a>
+    <Link href="/data-desk/?mode=invitations" onClick={onNavigate}
+      className={"ptg-nav-item" + (invitations ? " active" : "")}
+      aria-current={invitations ? "page" : undefined}>Unified Invitations</Link>
     <a href={withBasePath("/data-desk/?mode=promotion-pdf")} onClick={onNavigate}
       className={"ptg-nav-item" + (promotionPdf ? " active" : "")}
       aria-current={promotionPdf ? "page" : undefined}>Promotion PDF Import</a>
