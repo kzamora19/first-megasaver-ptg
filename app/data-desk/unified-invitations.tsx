@@ -81,7 +81,7 @@ export default function UnifiedInvitations({
     }
   }, [checkAdmin]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void Promise.resolve().then(refresh); }, [refresh]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
