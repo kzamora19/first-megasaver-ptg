@@ -64,7 +64,7 @@ export function setPtgAppSessionId(value: string, rememberMe: boolean) {
   preferredStorage.setItem(appSessionKey, value);
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = rememberMe
-    ? `ptg_app_session=${encodeURIComponent(value)}; Path=/; Max-Age=28800; SameSite=Strict${secure}`
+    ? `ptg_app_session=${encodeURIComponent(value)}; Path=/; Max-Age=604800; SameSite=Strict${secure}`
     : `ptg_app_session=; Path=/; Max-Age=0; SameSite=Strict${secure}`;
 }
 
