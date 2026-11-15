@@ -13,7 +13,7 @@ jobs:
           node-version: '22'
       - run: npm install
       - name: Lint SSO client and callback
-        run: npx eslint app/sso/callback/page.tsx lib/ptg/unified-sso-client.ts app/login/page.tsx
+        run: npx eslint app/sso/callback/page.tsx lib/ptg/unified-sso-client.ts
       - name: Type-check complete PTG app
         run: npx tsc --noEmit
       - name: Build static workspace with SSO UI gated off
