@@ -25,7 +25,8 @@ export type Product = {
   description: string;
   sub_category: string;
   srp: number;
-  cash_payment: number;
+  cash_payment?: number;
+  has_cash_payment?: boolean;
   tag_this: number;
   months_6: number;
   months_9: number;
@@ -372,6 +373,8 @@ export default function ProductSearch({
     setDetailProduct(product);
   }
   const canManageBranch = systemRole === "BRANCH_ADMIN";
+  const canSeeCashPrice = systemRole === "SYSTEM_ADMIN" ||
+    (canManageBranch && legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -473,16 +476,16 @@ export default function ProductSearch({
               <label htmlFor="legacy-product-search">SEARCH PRODUCT</label>
               <div><input id="legacy-product-search" value={term} onChange={event => setTerm(event.target.value)} placeholder="Search brand, model, barcode, description..." aria-label="Search brand, model, barcode, description" /><button type="submit" disabled={loading}>{loading ? "SEARCHING…" : "SEARCH"}</button></div>
             </form>
-            {inventoryEnabled && <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
-              setInStock(event.target.checked);
-              void loadProducts(term, 1, event.target.checked, memoFilter, campaign);
-            }} /> In stock only</label>}
-            {!demo && usesEdgeData && <>
+            {inventoryEnabled && <div className="legacy-search-filters">
+              <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
+                setInStock(event.target.checked);
+                void loadProducts(term, 1, event.target.checked, memoFilter, campaign);
+              }} /> In stock only</label>
               <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "regular"}
                 onChange={event => changeMemoFilter(event.target.checked ? "regular" : "all")} /> Regular memos only</label>
               <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "promotion"}
                 onChange={event => changeMemoFilter(event.target.checked ? "promotion" : "all")} /> Promotion memos only</label>
-            </>}
+            </div>}
             {!demo && usesEdgeData && memoFilter === "promotion" && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
               setCampaign(event.target.value);
               void loadProducts(term, 1, inStock, "promotion", event.target.value);
@@ -609,7 +612,8 @@ export default function ProductSearch({
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
-            const term = amount(product.cash_payment) === 0
+            const hasCashPayment = product.has_cash_payment ?? (amount(product.cash_payment) !== 0);
+            const term = !hasCashPayment
               ? Number(/\b(6|9|12|18|24)-MONTH CREDIT CARD ONLY\b/i.exec(product.remarks || "")?.[1] || 0) : 0;
             const termTotal = term ? amount(product["months_" + term as "months_6"]) : 0;
             const priceCaption = termTotal ? `CREDIT CARD · ${term} MONTHS` : "CASH / STRAIGHT";
@@ -683,7 +687,7 @@ export default function ProductSearch({
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
           <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
           <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
-          {amount(detailProduct.cash_payment) > 0 && amount(detailProduct.cash_payment) !== priceNow(detailProduct) &&
+          {canSeeCashPrice && amount(detailProduct.cash_payment) > 0 && amount(detailProduct.cash_payment) !== priceNow(detailProduct) &&
             <><dt>Cash price</dt><dd>{peso(detailProduct.cash_payment)}</dd></>}
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
@@ -712,6 +716,8 @@ export default function ProductSearch({
       </AppDialog>}
       <style jsx global>{`
         .legacy-stock-filter{display:flex;align-items:center;gap:.4rem;color:#12366c;font-size:.85rem}
+        .legacy-search-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem}
+        .legacy-search-filters .legacy-stock-filter{white-space:nowrap}
         .legacy-product-stock{padding:.65rem .85rem;background:#eef5ff;border-radius:7px}
         .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
         .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
