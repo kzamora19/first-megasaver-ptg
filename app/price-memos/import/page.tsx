@@ -26,7 +26,7 @@ export default function PriceMemoImportPage() {
         <p className="intro">Import Head Office price memos once for all four branches. Memo products and the product master are shared across PTG.</p>
         <div className="status"><span className="status-dot"/>{session.role.replaceAll("_", " ")}</div>
       </section>
-      <p><a href={withBasePath("/price-memos/subdealer/")} className="admin-link">Open SUBDEALER MEMO IMPORTER (PDF)</a></p>
+      <p><a href={withBasePath("/price-memos/subdealer/") + (session.role === "SYSTEM_ADMIN" ? "?workspace=data-desk" : "")} className="admin-link">Open SUBDEALER MEMO IMPORTER (PDF)</a></p>
       <PriceMemoImporter />
     </main>}
   </ClientSessionGate>;
