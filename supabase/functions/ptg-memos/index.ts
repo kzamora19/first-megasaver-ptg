@@ -39,11 +39,12 @@ async function getSession(request: Request): Promise<ActiveSession | null> {
   const appSessionId = request.headers.get("x-ptg-session-id");
   if (!appSessionId || appSessionId.length > 100) return null;
   const { data: row, error: rowError } = await admin.from("app_sessions")
-    .select("id,user_id,branch_id,session_version,last_activity_at,expires_at,revoked_at")
+    .select("id,user_id,branch_id,session_version,remember_device,last_activity_at,expires_at,revoked_at")
     .eq("id", appSessionId).eq("user_id", authData.user.id).is("revoked_at", null).maybeSingle();
   if (rowError || !row) return null;
   const now = Date.now();
-  const idleExpired = now - new Date(row.last_activity_at).getTime() > 30 * 60 * 1000;
+  const idleLimitMs = row.remember_device === true ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
+  const idleExpired = now - new Date(row.last_activity_at).getTime() > idleLimitMs;
   const absoluteExpired = new Date(row.expires_at).getTime() <= now;
   const { data: profile, error: profileError } = await admin.from("user_profiles")
     .select("role_key,is_active,session_version,must_change_password")
