@@ -14,5 +14,6 @@ jobs:
       - run: npm install
       # Existing repository-wide React hook lint failures are tracked separately.
       - run: npx eslint lib/ptg/subdealer-pdf.ts app/price-memos/subdealer
+      - run: node --test lib/ptg/subdealer-layout.test.mjs
       - run: npx tsc --noEmit
       - run: npm run build
