@@ -42,6 +42,7 @@ export type Product = {
   selling_ends_on?: string | null;
   early_print_only?: boolean;
   price_memos: MemoInfo | MemoInfo[] | null;
+  unit_only_offer?: Product | null;
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
 type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
@@ -131,6 +132,19 @@ const offerDate = (date: string) => new Date(date + "T00:00:00Z")
 const installments = (product: Product) => ([6, 9, 12, 18, 24] as const)
   .map(months => ({ months, total: amount(product[`months_${months}`]) }))
   .filter(({ total }) => total > 0);
+function InstallmentOfferTable({ product, caption }: { product: Product; caption: string }) {
+  const rows = installments(product);
+  return <table className="legacy-product-installment-table">
+    <caption>{caption}</caption>
+    <thead><tr><th scope="col">Term</th><th scope="col">Total installment</th><th scope="col">Monthly payment</th></tr></thead>
+    <tbody>
+      {rows.map(({ months, total }) =>
+        <tr key={months}><th scope="row">{months} months</th><td>{peso(total)}</td><td>{peso(total / months)}</td></tr>
+      )}
+      {!rows.length && <tr><td colSpan={3}>No installment prices available.</td></tr>}
+    </tbody>
+  </table>;
+}
 const memoInfo = (product: Product | null): MemoInfo | null => {
   if (!product) return null;
   return Array.isArray(product.price_memos) ? product.price_memos[0] ?? null : product.price_memos;
@@ -359,7 +373,7 @@ export default function ProductSearch({
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
   const detailMemo = memoInfo(detailProduct);
-  const detailInstallments = detailProduct ? installments(detailProduct) : [];
+  const detailUnitOnly = detailProduct?.unit_only_offer ?? null;
 
   function openProductDetails(product: Product) {
     if (!detailProduct || detailProduct.barcode !== product.barcode) {
@@ -686,10 +700,12 @@ export default function ProductSearch({
           {detailProduct.category && <><dt>Category</dt><dd>{detailProduct.category}</dd></>}
           {detailProduct.sub_category && <><dt>Subcategory</dt><dd>{detailProduct.sub_category}</dd></>}
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
-          <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
-          <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
-          {canSeeCashPrice && amount(detailProduct.cash_payment) > 0 && amount(detailProduct.cash_payment) !== priceNow(detailProduct) &&
-            <><dt>Cash price</dt><dd>{peso(detailProduct.cash_payment)}</dd></>}
+          {!detailUnitOnly && <>
+            <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
+            <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
+            {canSeeCashPrice && amount(detailProduct.cash_payment) > 0 && amount(detailProduct.cash_payment) !== priceNow(detailProduct) &&
+              <><dt>Cash price</dt><dd>{peso(detailProduct.cash_payment)}</dd></>}
+          </>}
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
             <dt>Memo ID</dt><dd>{memoLabel(detailMemo, detailProduct) || "—"}</dd>
@@ -703,16 +719,25 @@ export default function ProductSearch({
             </dd>
           </>}
         </dl>
-        <table className="legacy-product-installment-table">
-          <caption>Installment prices</caption>
-          <thead><tr><th scope="col">Term</th><th scope="col">Total installment</th><th scope="col">Monthly payment</th></tr></thead>
-          <tbody>
-            {detailInstallments.map(({ months, total }) =>
-              <tr key={months}><th scope="row">{months} months</th><td>{peso(total)}</td><td>{peso(total / months)}</td></tr>
-            )}
-            {!detailInstallments.length && <tr><td colSpan={3}>No installment prices available.</td></tr>}
-          </tbody>
-        </table>
+        {detailUnitOnly && <>
+          <table className="legacy-product-installment-table legacy-price-comparison-table">
+            <caption>Price options — selected memo</caption>
+            <thead><tr><th scope="col">Price</th><th scope="col">Free installation</th><th scope="col">Unit only</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">SRP</th><td className="ptg-srp-amount">{peso(detailProduct.srp)}</td><td className="ptg-srp-amount">{peso(detailUnitOnly.srp)}</td></tr>
+              <tr><th scope="row">Tag This</th><td className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</td><td className="ptg-tag-this-amount">{peso(priceNow(detailUnitOnly))}</td></tr>
+              {canSeeCashPrice && (amount(detailProduct.cash_payment) > 0 || amount(detailUnitOnly.cash_payment) > 0) &&
+                <tr><th scope="row">Cash price</th><td>{amount(detailProduct.cash_payment) > 0 ? peso(detailProduct.cash_payment) : "—"}</td><td>{amount(detailUnitOnly.cash_payment) > 0 ? peso(detailUnitOnly.cash_payment) : "—"}</td></tr>}
+            </tbody>
+          </table>
+          <p className="legacy-unit-only-remarks"><strong>Unit-only remarks:</strong> {detailUnitOnly.remarks || "N/A"}</p>
+          <button type="button" className="legacy-unit-only-queue-button" disabled={queue.some(item => item.id === detailUnitOnly.id)}
+            onClick={() => toggleProduct(detailUnitOnly, true)}>
+            {queue.some(item => item.id === detailUnitOnly.id) ? "Unit-only offer added to print queue" : "Add unit-only offer to print queue"}
+          </button>
+        </>}
+        <InstallmentOfferTable product={detailProduct} caption={detailUnitOnly ? "Installment offer — Free installation" : "Installment prices"} />
+        {detailUnitOnly && <InstallmentOfferTable product={detailUnitOnly} caption="Installment offer — Unit only" />}
         </>}
       </AppDialog>}
       <style jsx global>{`
@@ -733,6 +758,12 @@ export default function ProductSearch({
         .legacy-product-installment-table caption{text-align:left;font-size:.9rem;font-weight:700;margin-bottom:.4rem}
         .legacy-product-installment-table th,.legacy-product-installment-table td{padding:.45rem;border-bottom:1px solid #dbe3ed}
         .legacy-product-installment-table thead{background:#f0f5fb}
+        .legacy-price-comparison-table th,.legacy-price-comparison-table td{width:33.333%;white-space:normal}
+        .legacy-price-comparison-table td.ptg-srp-amount{color:#b42318}
+        .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
+        .legacy-unit-only-remarks{margin:.6rem 0 .45rem;font-size:.85rem}
+        .legacy-unit-only-queue-button{border:1px solid #2465c3;border-radius:5px;background:#eef5ff;color:#124a9c;padding:7px 12px;font-weight:700;cursor:pointer}
+        .legacy-unit-only-queue-button:disabled{opacity:.65;cursor:default}
         .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
         .legacy-branch-tools,.legacy-search-card,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
