@@ -41,6 +41,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Verify Subdealer PDF field extraction
+        run: node --test lib/ptg/subdealer-layout.test.mjs
       - name: Build static site
         run: npm run build
       - name: Upload Pages artifact
