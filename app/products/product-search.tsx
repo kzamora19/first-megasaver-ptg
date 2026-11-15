@@ -312,7 +312,7 @@ export default function ProductSearch({
       setTotal(Number(payload.total || 0));
       setPage(Number(payload.page || requestedPage));
       setMessage(query.trim()
-        ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
+        ? (payload.total ? payload.total + " matching price entries." : "No matching products found.")
         : filter === "promotion"
           ? (payload.total ? "Promotion offers." : "No promotion offers found.")
           : filter === "regular"
