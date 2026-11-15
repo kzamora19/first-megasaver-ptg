@@ -99,7 +99,7 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
     }
     if (extracted.length > 10000) issues.push("A memo may contain no more than 10,000 products.");
     const products: SubdealerProduct[] = [];
-    const seenBarcodes = new Map<string, number>();
+    const seenBarcodes = new Map<string, { rowNumber: number; product: SubdealerProduct }>();
     for (const [index, row] of extracted.entries()) {
       const barcode = String(row.barcode || "").trim();
       const brand = String(row.brand || "").trim();
@@ -109,13 +109,6 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
       const srp = priceRow.memoSrp ?? 0;
       const cash = priceRow.cashPayment ?? 0;
       const tagThis = priceRow.tagPrice ?? priceRow.cashPayment ?? 0;
-      const previousRow = seenBarcodes.get(barcode);
-      if (previousRow !== undefined) {
-        issues.push("Duplicate barcode " + barcode + " on rows " + previousRow + " and " +
-          (index + 1) + ". Review which price applies before importing.");
-      } else {
-        seenBarcodes.set(barcode, index + 1);
-      }
       const reasons = [
         ...row.warnings,
         ...(!/^0\d{7}$/.test(barcode) ? ["barcode must be eight digits with leading zeroes"] : []),
@@ -133,10 +126,22 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
         const entry = row.installments.find(value => value.months === term);
         return ["months_" + term, entry ? entry.amount * (entry.basis === "monthly" ? term : 1) : 0];
       })) as Record<"months_6" | "months_9" | "months_12" | "months_18" | "months_24", number>;
-      products.push({
+      const product: SubdealerProduct = {
         barcode, brand, category, model, srp, cash_payment: cash, tag_this: tagThis,
         remarks: String(row.remarks || "").trim(), ...installments,
-      });
+      };
+      const previous = seenBarcodes.get(barcode);
+      if (previous) {
+        if (JSON.stringify(previous.product) !== JSON.stringify(product)) {
+          issues.push("Conflicting prices or product details for barcode " + barcode +
+            " on PDF rows " + previous.rowNumber + " and " + (index + 1) +
+            ". Review the original PDF; no price is selected automatically.");
+        }
+        // Identical repeats are one product, not two import operations.
+        continue;
+      }
+      seenBarcodes.set(barcode, { rowNumber: index + 1, product });
+      products.push(product);
     }
     return { fileName: file.name, memoId, period, pageCount: pages.length,
       expectedRows, extractedRows: extracted.length, products, issues };
