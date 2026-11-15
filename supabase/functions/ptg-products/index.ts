@@ -114,10 +114,12 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
     p_branch_id: session.branchId ?? null,
     p_system_admin: session.role === "SYSTEM_ADMIN",
     p_page: page,
-    ...stock,
+    ...(body.promotions_only === true ? {
+      p_stock_barcodes: null, ...stock, p_promotions_only: true, p_campaign: clean(body.campaign, 80) || null,
+    } : stock),
   });
   if (error || !data) return respond(origin, fail("Could not search imported memo products."), 500);
-  return respond(origin, { ok: true, products: data.products, total: data.total, page, pageSize: 5 });
+  return respond(origin, { ok: true, products: data.products, total: data.total, campaigns: data.campaigns ?? [], page, pageSize: 5 });
 }
 
 async function productInventory(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
