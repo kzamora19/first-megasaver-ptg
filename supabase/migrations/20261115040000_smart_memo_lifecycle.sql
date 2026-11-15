@@ -1,6 +1,5 @@
 -- DEVELOPMENT ONLY: after migrations 20261115020000 and 20261115030000.
--- Test on a DB branch before production. No historical cleanup is run at migration time.
-
+-- Test on an isolated DB branch; no historical cleanup runs at migration time.
 create or replace function public.ptg_period_end(v text)
 returns date language plpgsql stable set search_path to '' as $$
 declare result text;
@@ -63,6 +62,7 @@ begin
 end; $$;
 revoke all on function public.ptg_cleanup_after_import(uuid) from public,anon,authenticated;
 grant execute on function public.ptg_cleanup_after_import(uuid) to service_role;
+
 
 CREATE OR REPLACE FUNCTION public.import_price_memo(p_branch_id uuid, p_memo_id text, p_period text, p_memo_type text, p_source_file text, p_imported_by uuid, p_duplicate_action text, p_products jsonb)
  RETURNS jsonb
@@ -213,155 +213,7 @@ AS $function$
       and (not p_promotions_only or (campaign.campaign is not null
         and (p_campaign is null or campaign.campaign = p_campaign)))
       and public.ptg_pdf_promotion_current(memo.memo_id, memo.period)
-      and (memo.memo_id ~ '^PDF-[0-9a-f]{64}
-      and (length(i.needle) < 2 or strpos(lower(m.barcode), i.needle) > 0
-        or strpos(lower(m.brand), i.needle) > 0 or strpos(lower(m.model), i.needle) > 0
-        or strpos(lower(pm.description), i.needle) > 0
-        or (i.needle ~ '^[0-9]+$' and public.ptg_srp_barcode_key(m.barcode) = public.ptg_srp_barcode_key(i.needle)))
-  ), memo_rows as (
-    select r.id,r.memo_id,r.source_file,r.brand,r.category,r.barcode,r.model,r.description,
-      r.sub_category,r.srp,r.cash_payment,r.tag_this,r.months_6,r.months_9,r.months_12,
-      r.months_18,r.months_24,r.remarks,r.eligible_for_price_tag,r.price_tag_status,
-      r.campaign,r.price_memos
-    from (
-      select c.*, dense_rank() over (
-        partition by case when c.memo_id ~ '^PDF-[0-9a-f]{64}
-    select s.id, s.barcode, s.model, s.brand, s.srp, s.sub_category,
-      coalesce(nullif(btrim(pm.description), ''), s.model) as description
-    from public.ptg_search_srp_fallback((select needle from input), p_branch_id, p_system_admin) s
-    left join lateral (
-      select p.description
-      from public.product_master p
-      where p.barcode in (s.barcode, public.ptg_srp_barcode_key(s.barcode),
-        case when s.barcode ~ '^[0-9]+$' and length(public.ptg_srp_barcode_key(s.barcode)) <= 8
-          then lpad(public.ptg_srp_barcode_key(s.barcode), 8, '0') end)
-      order by (p.barcode = s.barcode) desc, p.barcode
-      limit 1
-    ) pm on true
-    where not p_promotions_only
-  ), products as (
-    select 0 as source, m.id, m.brand, m.model, m.description, m.category, m.sub_category, m.remarks, to_jsonb(m) as payload
-    from memo_rows m
-    union all
-    select 1, s.id, s.brand, s.model, s.description, '', s.sub_category, '', to_jsonb(s) ||
-      jsonb_build_object('cash_payment', s.srp, 'tag_this', s.srp, 'eligible_for_price_tag', false,
-        'price_tag_status', 'SRP ONLY', 'price_memos', null)
-    from srp_rows s
-  ), aircon_models as (
-    select p.*,
-      length(i.needle) >= 2 and concat_ws(' ', p.sub_category, p.description, p.model) ~* 'SPLIT[ -]+TYPE' as is_split,
-      length(i.needle) >= 2 and concat_ws(' ', p.category, p.sub_category, p.description, p.model)
-        ~* '\m(AIR[ -]*CON(DITIONER|DITIONING)?|SPLIT[ -]+TYPE)\M' as is_aircon,
-      concat_ws(' ', p.description, p.model) ~* '\mOUTDOOR\M' as is_outdoor,
-      upper(coalesce(nullif(p.description, ''), p.model, '')) as model_text
-    from products p cross join input i
-    where p_stock_barcodes is null or public.ptg_srp_barcode_key(p.payload->>'barcode') = any(p_stock_barcodes)
-  ), sort_keys as (
-    select p.*,
-      case when p.is_aircon then
-        trim(regexp_replace(regexp_replace(regexp_replace(regexp_replace(p.model_text,
-          '[0-9]+([.][0-9]+)?[[:space:]]*HP\y', '', 'g'),
-          '\m(?=[A-Z0-9/-]*[A-Z])(?=[A-Z0-9/-]*[0-9])[A-Z0-9]+([/-][A-Z0-9]+)*\M', '', 'g'),
-          '\m(INDOOR|OUTDOOR)([[:space:]]+UNIT)?\M', '', 'g'),
-          '[[:space:]]+', ' ', 'g')) end as family,
-      case when p.is_aircon then substring(concat_ws(' ', p.description, p.model)
-        from '(?i)\m([0-9]+(?:[.][0-9]+)?)[[:space:]]*HP\y')::numeric end as capacity,
-      case when p.is_aircon then case
-        when p.is_outdoor then 2
-        when p.remarks ~* 'UNIT[ -]+ONLY|WITHOUT[[:space:]]+INSTALLATION|NO[[:space:]]+INSTALLATION' then 1
-        when p.remarks ~* 'INSTALLATION' then 0
-        else 3 end end as installation
-    from aircon_models p
-  ), ordered as (
-    select p.payload, row_number() over (order by case when p.is_split then 0 when p.is_aircon then 1 else p.source + 2 end,
-      upper(p.brand), p.family nulls last, p.capacity nulls last, p.installation nulls last,
-      p.source, upper(p.model), p.id) as position
-    from sort_keys p
-  )
-  select jsonb_build_object('total', count(*), 'campaigns', (
-      select coalesce(jsonb_agg(distinct c.campaign order by c.campaign), '[]'::jsonb)
-      from public.ptg_memo_campaigns c
-      join public.price_memos m on m.memo_id = c.memo_number and m.branch_id is null
-      where m.product_count > 0
-    ), 'products',
-    coalesce(jsonb_agg(payload order by position) filter (where position between
-      (greatest(1, least(p_page, 1000000)) - 1) * 5 + 1 and greatest(1, least(p_page, 1000000)) * 5), '[]'::jsonb))
-  from ordered
-$function$;
-
-
-          then c.id::text else public.ptg_srp_barcode_key(c.barcode) end
-        order by case when c.campaign is not null then 0 else 1 end,
-          public.ptg_period_start(c.price_memos->>'period') desc nulls last,
-          (c.price_memos->>'created_at')::timestamptz desc,
-          c.memo_id desc
-      ) as rank_for_ptg from memo_candidates c
-    ) r where r.rank_for_ptg=1 or (p_promotions_only and r.campaign is not null)
-  ), srp_rows as (
-    select s.id, s.barcode, s.model, s.brand, s.srp, s.sub_category,
-      coalesce(nullif(btrim(pm.description), ''), s.model) as description
-    from public.ptg_search_srp_fallback((select needle from input), p_branch_id, p_system_admin) s
-    left join lateral (
-      select p.description
-      from public.product_master p
-      where p.barcode in (s.barcode, public.ptg_srp_barcode_key(s.barcode),
-        case when s.barcode ~ '^[0-9]+$' and length(public.ptg_srp_barcode_key(s.barcode)) <= 8
-          then lpad(public.ptg_srp_barcode_key(s.barcode), 8, '0') end)
-      order by (p.barcode = s.barcode) desc, p.barcode
-      limit 1
-    ) pm on true
-    where not p_promotions_only
-  ), products as (
-    select 0 as source, m.id, m.brand, m.model, m.description, m.category, m.sub_category, m.remarks, to_jsonb(m) as payload
-    from memo_rows m
-    union all
-    select 1, s.id, s.brand, s.model, s.description, '', s.sub_category, '', to_jsonb(s) ||
-      jsonb_build_object('cash_payment', s.srp, 'tag_this', s.srp, 'eligible_for_price_tag', false,
-        'price_tag_status', 'SRP ONLY', 'price_memos', null)
-    from srp_rows s
-  ), aircon_models as (
-    select p.*,
-      length(i.needle) >= 2 and concat_ws(' ', p.sub_category, p.description, p.model) ~* 'SPLIT[ -]+TYPE' as is_split,
-      length(i.needle) >= 2 and concat_ws(' ', p.category, p.sub_category, p.description, p.model)
-        ~* '\m(AIR[ -]*CON(DITIONER|DITIONING)?|SPLIT[ -]+TYPE)\M' as is_aircon,
-      concat_ws(' ', p.description, p.model) ~* '\mOUTDOOR\M' as is_outdoor,
-      upper(coalesce(nullif(p.description, ''), p.model, '')) as model_text
-    from products p cross join input i
-    where p_stock_barcodes is null or public.ptg_srp_barcode_key(p.payload->>'barcode') = any(p_stock_barcodes)
-  ), sort_keys as (
-    select p.*,
-      case when p.is_aircon then
-        trim(regexp_replace(regexp_replace(regexp_replace(regexp_replace(p.model_text,
-          '[0-9]+([.][0-9]+)?[[:space:]]*HP\y', '', 'g'),
-          '\m(?=[A-Z0-9/-]*[A-Z])(?=[A-Z0-9/-]*[0-9])[A-Z0-9]+([/-][A-Z0-9]+)*\M', '', 'g'),
-          '\m(INDOOR|OUTDOOR)([[:space:]]+UNIT)?\M', '', 'g'),
-          '[[:space:]]+', ' ', 'g')) end as family,
-      case when p.is_aircon then substring(concat_ws(' ', p.description, p.model)
-        from '(?i)\m([0-9]+(?:[.][0-9]+)?)[[:space:]]*HP\y')::numeric end as capacity,
-      case when p.is_aircon then case
-        when p.is_outdoor then 2
-        when p.remarks ~* 'UNIT[ -]+ONLY|WITHOUT[[:space:]]+INSTALLATION|NO[[:space:]]+INSTALLATION' then 1
-        when p.remarks ~* 'INSTALLATION' then 0
-        else 3 end end as installation
-    from aircon_models p
-  ), ordered as (
-    select p.payload, row_number() over (order by case when p.is_split then 0 when p.is_aircon then 1 else p.source + 2 end,
-      upper(p.brand), p.family nulls last, p.capacity nulls last, p.installation nulls last,
-      p.source, upper(p.model), p.id) as position
-    from sort_keys p
-  )
-  select jsonb_build_object('total', count(*), 'campaigns', (
-      select coalesce(jsonb_agg(distinct c.campaign order by c.campaign), '[]'::jsonb)
-      from public.ptg_memo_campaigns c
-      join public.price_memos m on m.memo_id = c.memo_number and m.branch_id is null
-      where m.product_count > 0
-    ), 'products',
-    coalesce(jsonb_agg(payload order by position) filter (where position between
-      (greatest(1, least(p_page, 1000000)) - 1) * 5 + 1 and greatest(1, least(p_page, 1000000)) * 5), '[]'::jsonb))
-  from ordered
-$function$;
-
-
+      and (memo.memo_id ~ '^PDF-[0-9a-f]{64}$'
         or (campaign.campaign is null and public.ptg_period_start(memo.period)
           <= (current_timestamp at time zone 'Asia/Manila')::date)
         or (campaign.campaign is not null and
@@ -378,71 +230,7 @@ $function$;
       r.campaign,r.price_memos
     from (
       select c.*, dense_rank() over (
-        partition by case when c.memo_id ~ '^PDF-[0-9a-f]{64}
-    select s.id, s.barcode, s.model, s.brand, s.srp, s.sub_category,
-      coalesce(nullif(btrim(pm.description), ''), s.model) as description
-    from public.ptg_search_srp_fallback((select needle from input), p_branch_id, p_system_admin) s
-    left join lateral (
-      select p.description
-      from public.product_master p
-      where p.barcode in (s.barcode, public.ptg_srp_barcode_key(s.barcode),
-        case when s.barcode ~ '^[0-9]+$' and length(public.ptg_srp_barcode_key(s.barcode)) <= 8
-          then lpad(public.ptg_srp_barcode_key(s.barcode), 8, '0') end)
-      order by (p.barcode = s.barcode) desc, p.barcode
-      limit 1
-    ) pm on true
-    where not p_promotions_only
-  ), products as (
-    select 0 as source, m.id, m.brand, m.model, m.description, m.category, m.sub_category, m.remarks, to_jsonb(m) as payload
-    from memo_rows m
-    union all
-    select 1, s.id, s.brand, s.model, s.description, '', s.sub_category, '', to_jsonb(s) ||
-      jsonb_build_object('cash_payment', s.srp, 'tag_this', s.srp, 'eligible_for_price_tag', false,
-        'price_tag_status', 'SRP ONLY', 'price_memos', null)
-    from srp_rows s
-  ), aircon_models as (
-    select p.*,
-      length(i.needle) >= 2 and concat_ws(' ', p.sub_category, p.description, p.model) ~* 'SPLIT[ -]+TYPE' as is_split,
-      length(i.needle) >= 2 and concat_ws(' ', p.category, p.sub_category, p.description, p.model)
-        ~* '\m(AIR[ -]*CON(DITIONER|DITIONING)?|SPLIT[ -]+TYPE)\M' as is_aircon,
-      concat_ws(' ', p.description, p.model) ~* '\mOUTDOOR\M' as is_outdoor,
-      upper(coalesce(nullif(p.description, ''), p.model, '')) as model_text
-    from products p cross join input i
-    where p_stock_barcodes is null or public.ptg_srp_barcode_key(p.payload->>'barcode') = any(p_stock_barcodes)
-  ), sort_keys as (
-    select p.*,
-      case when p.is_aircon then
-        trim(regexp_replace(regexp_replace(regexp_replace(regexp_replace(p.model_text,
-          '[0-9]+([.][0-9]+)?[[:space:]]*HP\y', '', 'g'),
-          '\m(?=[A-Z0-9/-]*[A-Z])(?=[A-Z0-9/-]*[0-9])[A-Z0-9]+([/-][A-Z0-9]+)*\M', '', 'g'),
-          '\m(INDOOR|OUTDOOR)([[:space:]]+UNIT)?\M', '', 'g'),
-          '[[:space:]]+', ' ', 'g')) end as family,
-      case when p.is_aircon then substring(concat_ws(' ', p.description, p.model)
-        from '(?i)\m([0-9]+(?:[.][0-9]+)?)[[:space:]]*HP\y')::numeric end as capacity,
-      case when p.is_aircon then case
-        when p.is_outdoor then 2
-        when p.remarks ~* 'UNIT[ -]+ONLY|WITHOUT[[:space:]]+INSTALLATION|NO[[:space:]]+INSTALLATION' then 1
-        when p.remarks ~* 'INSTALLATION' then 0
-        else 3 end end as installation
-    from aircon_models p
-  ), ordered as (
-    select p.payload, row_number() over (order by case when p.is_split then 0 when p.is_aircon then 1 else p.source + 2 end,
-      upper(p.brand), p.family nulls last, p.capacity nulls last, p.installation nulls last,
-      p.source, upper(p.model), p.id) as position
-    from sort_keys p
-  )
-  select jsonb_build_object('total', count(*), 'campaigns', (
-      select coalesce(jsonb_agg(distinct c.campaign order by c.campaign), '[]'::jsonb)
-      from public.ptg_memo_campaigns c
-      join public.price_memos m on m.memo_id = c.memo_number and m.branch_id is null
-      where m.product_count > 0
-    ), 'products',
-    coalesce(jsonb_agg(payload order by position) filter (where position between
-      (greatest(1, least(p_page, 1000000)) - 1) * 5 + 1 and greatest(1, least(p_page, 1000000)) * 5), '[]'::jsonb))
-  from ordered
-$function$;
-
-
+        partition by case when (c.price_memos->>'memo_id') ~ '^PDF-[0-9a-f]{64}$'
           then c.id::text else public.ptg_srp_barcode_key(c.barcode) end
         order by case when c.campaign is not null then 0 else 1 end,
           public.ptg_period_start(c.price_memos->>'period') desc nulls last,
