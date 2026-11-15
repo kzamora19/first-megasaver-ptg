@@ -10,6 +10,7 @@ import {
   type EdgeAuthResponse,
 } from "@/lib/ptg/auth-client";
 import { withBasePath } from "@/lib/base-path";
+import { startBranchlineSso, unifiedSsoVisible } from "@/lib/ptg/unified-sso-client";
 
 function accountDestination(account: EdgeAuthResponse["account"]) {
   return account?.mustChangePassword ? "/change-password/" :
@@ -180,6 +181,20 @@ export default function LoginPage() {
             </details>
             <button type="submit" disabled={busy || restoring}>{restoring ? "RESTORING SIGN-IN…" : busy ? "AUTHENTICATING…" : "🔒 SIGN IN"}</button>
           </form>
+          {unifiedSsoVisible && <div className="legacy-sso-login">
+            <button type="button" className="legacy-forgot-button"
+              disabled={busy || restoring}
+              onClick={() => {
+                setBusy(true);
+                setMessage("");
+                void startBranchlineSso(rememberMe).catch(error => {
+                  setMessage(error instanceof Error ? error.message : "Branchline sign-in is unavailable.");
+                  setBusy(false);
+                });
+              }}>
+              Sign in with Branchline (one account)
+            </button>
+          </div>}
           <p className="legacy-login-message" role="status">{message}</p>
           <div className="legacy-login-security">
             <button className="legacy-forgot-button" type="button" disabled={restoring} onClick={() => setRecovery(true)}>Forgot password?</button>
