@@ -90,6 +90,7 @@ export default function UnifiedInvitations({
   async function validate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (checking || !salesClient) return;
+    if (pendingSalesId) { setProblem("A staged invitation is pending. Resume or resolve it before reviewing another employee."); return; }
     setProblem("");
     setReview(null);
     setChecking(true);
@@ -129,7 +130,7 @@ export default function UnifiedInvitations({
       const apiKey = process.env.NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY;
       if (!url || !apiKey) throw Error("Sales Tracker is not configured.");
       async function salesAction(payload: Record<string, unknown>) {
-        const response = await fetch(url!.replace(/\\/$/, "") + "/functions/v1/admin-create-user", {
+        const response = await fetch(url!.replace(/\/$/, "") + "/functions/v1/admin-create-user", {
           method: "POST", cache: "no-store",
           headers: { apikey: apiKey!, Authorization: "Bearer " + token,
             "Content-Type": "application/json" },
@@ -146,7 +147,8 @@ export default function UnifiedInvitations({
       let userId = pendingSalesId;
       if (!userId) {
         const prepared = await salesAction({
-          unified: true, ptg_access: review.ptgRole ? ptgAccess : "NONE",
+          unified: true, ptg_access: review.ptgRole === "BRANCH_ADMIN" ? "BRANCH_MANAGER" :
+            review.ptgRole === "BRANCH_USER" ? "TEAM_LEADER" : "NONE",
           full_name: review.fullName, login: review.login,
           email: review.email, role: review.salesRole,
           district_id: review.salesDistrictId, branch_id: review.salesBranchId,
