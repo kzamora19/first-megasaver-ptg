@@ -145,21 +145,13 @@ function MemoSummary({ product }: { product: Product }) {
   if (!label) return null;
   return <><br /><small>{product.campaign && <strong>{product.campaign} · </strong>}{label}{memo?.period ? <> · {memo.period}</> : null}</small></>;
 }
-function SearchOfferMemo({ product }: { product: Product }) {
+function SearchOfferLabel({ product }: { product: Product }) {
   const memo = memoInfo(product);
   if (!memo) return null;
   const label = product.campaign
     ? product.campaign + " PROMO"
     : /^PDF-[a-f0-9]{64}$/i.test(memo.memo_id) ? "PROMO" : "REGULAR MONTHLY";
-  const starts = product.selling_starts_on;
-  const ends = product.selling_ends_on;
-  return <><br /><small>
-    <strong>{label}</strong> · {memo.memo_id}{memo.period && <> · {memo.period}</>}
-    {product.campaign === "7MBDS" && starts && ends && <>
-      <br />Selling {offerDate(starts)}–{offerDate(ends)}
-      {product.early_print_only && <> · Early printing only</>}
-    </>}
-  </small></>;
+  return <><br /><small><strong>{label}</strong></small></>;
 }
 
 const endDate = (period: string) => {
@@ -508,7 +500,7 @@ export default function ProductSearch({
                 <td><input type="checkbox" aria-label={["Select", product.brand, product.model, memoInfo(product)?.memo_id].filter(Boolean).join(" ")} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><SearchOfferMemo product={product} /></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><SearchOfferLabel product={product} /></td>
                 <td>{product.remarks || "N/A"}</td>
                 <td className="ptg-srp-amount"><span className="ptg-search-offer-amount">{peso(product.srp)}</span></td>
                 <td className="ptg-tag-this-amount"><span className="ptg-search-offer-amount">{peso(priceNow(product))}</span></td>
@@ -687,6 +679,12 @@ export default function ProductSearch({
             <dt>Memo ID</dt><dd>{memoLabel(detailMemo, detailProduct) || "—"}</dd>
             <dt>Period</dt><dd>{detailMemo.period || "—"}</dd>
             <dt>Import date</dt><dd>{detailMemo.created_at ? new Date(detailMemo.created_at).toLocaleDateString("en-US") : "—"}</dd>
+          </>}
+          {detailProduct.campaign === "7MBDS" && detailProduct.selling_starts_on && detailProduct.selling_ends_on && <>
+            <dt>Selling period</dt>
+            <dd>{offerDate(detailProduct.selling_starts_on)}–{offerDate(detailProduct.selling_ends_on)}
+              {detailProduct.early_print_only && <> · Early printing only</>}
+            </dd>
           </>}
         </dl>
         <table className="legacy-product-installment-table">
