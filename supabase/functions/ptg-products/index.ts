@@ -126,10 +126,21 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   const canSeeCashPrice = session.role === "SYSTEM_ADMIN" ||
     (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
   const products = canSeeCashPrice ? data.products : data.products.map(
-    ({ cash_payment, ...product }: { cash_payment?: number } & Record<string, unknown>) => ({
-      ...product,
-      has_cash_payment: Number(cash_payment ?? 0) !== 0,
-    }),
+    (product: Record<string, unknown>) => {
+      const { cash_payment, unit_only_offer, ...visible } = product;
+      // A paired unit-only variant contains its own cash price. Never expose
+      // this nested value to roles that cannot view cash prices.
+      let safeUnitOnly: Record<string, unknown> | null = null;
+      if (unit_only_offer && typeof unit_only_offer === "object" && !Array.isArray(unit_only_offer)) {
+        const { cash_payment: unitCash, ...unitFields } = unit_only_offer as Record<string, unknown>;
+        safeUnitOnly = { ...unitFields, has_cash_payment: Number(unitCash ?? 0) !== 0 };
+      }
+      return {
+        ...visible,
+        has_cash_payment: Number(cash_payment ?? 0) !== 0,
+        ...(safeUnitOnly ? { unit_only_offer: safeUnitOnly } : {}),
+      };
+    },
   );
   return respond(origin, { ok: true, products, total: data.total, campaigns: data.campaigns ?? [], page, pageSize: 5 });
 }
