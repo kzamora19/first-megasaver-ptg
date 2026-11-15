@@ -1,21 +1,44 @@
--- AIRCON search: group by model series first, then HP capacity and offer variant.
--- Family codes use the memo's model identifier, not product description keywords.
--- The generic rule replaces the first numeric size block in the model code while
--- preserving the remaining letters and revision markers. Known exceptions prevent
--- series numbers (e.g. Samsung AR60H, Midea FP-53AST) from being mistaken for HP.
--- Panasonic CS/CU indoor/outdoor variants are grouped by their shared series.
-create or replace function public.ptg_aircon_family_key(p_brand text, p_model text)
+-- Model-family-first AIRCON ordering, applied to all brands with safe
+-- barcode-preserving lookup. Within each capacity and precise paired model:
+-- all indoor memo offers first, then the SRP-only matching outdoor model.
+-- Pair normalization covers confirmed code conventions (LG HSN/HSU,
+-- Panasonic CS/CU, TCL identical codes, Carrier/Condura 42/38, Daikin
+-- FTK/RK, Midea -ID/-OD, and Kolin -I/-O).
+-- No product, SRP, or memo records are modified.
+
+-- Identify a model code even when an SRP-only row supplies the full description.
+create or replace function public.ptg_aircon_model_key(p_brand text, p_model text)
 returns text language sql immutable set search_path = ''
 as $function$
   with raw as (
     select upper(btrim(coalesce(p_brand, ''))) as brand,
-      upper(btrim(coalesce(p_model, ''))) as code
-  ), normalized as (
-    select brand,
-      case when brand = 'PANASONIC' then
-        regexp_replace(code, '^(CS|CU|CS/CU|CS/U|S/U|S)-', 'AC-')
-      else code end as code
-    from raw
+      upper(btrim(coalesce(p_model, ''))) as model_text
+  ), parsed as (
+    select brand, coalesce(
+      substring(model_text from '^([0-9]{1,3}[A-Z][A-Z0-9/-]*)'),
+      substring(model_text from 'TYPE[[:space:]]+([0-9]{1,3}[A-Z][A-Z0-9/-]*)'),
+      substring(model_text from 'MOUNTED[[:space:]]+([0-9]{1,3}[A-Z][A-Z0-9/-]*)'),
+      substring(model_text from '([A-Z][A-Z0-9/-]*[0-9][A-Z0-9/-]*)'),
+      model_text
+    ) as code from raw
+  )
+  select case
+    when brand = 'LG' then regexp_replace(code, '^HSU', 'HSN')
+    when brand in ('CARRIER', 'CONDURA') then regexp_replace(code, '^38([A-Z])', '42\1')
+    when brand = 'PANASONIC' then regexp_replace(code, '^(CS/CU|CS/U|CU|CS|S/U|S)-', 'AC-')
+    when brand = 'DAIKIN' then regexp_replace(code, '^R(K[A-Z])', 'FT\1')
+    when brand = 'MIDEA' then regexp_replace(code, '-(ID|OD)$', '')
+    when brand = 'KOLIN' then regexp_replace(code, '-(I|O)$', '')
+    else code
+  end from parsed;
+$function$;
+
+create or replace function public.ptg_aircon_family_key(p_brand text, p_model text)
+returns text language sql immutable set search_path = ''
+as $function$
+  with normalized as (
+    select upper(btrim(coalesce(p_brand, ''))) as brand,
+      public.ptg_aircon_model_key(p_brand, p_model) as code
   )
   select case
     when brand = 'PANASONIC' and code ~ '^(AC|CW)-[A-Z]+[0-9]'
@@ -25,10 +48,11 @@ as $function$
     when brand = 'MIDEA' and code ~ '^FP-[0-9]{2}[A-Z]+[0-9]{3}'
       then regexp_replace(code, '^([A-Z]+-[0-9]{2}[A-Z]+)[0-9]{3}', '\1#')
     else regexp_replace(code, '([A-Z][A-Z/-]*)[0-9]{1,3}', '\1#')
-  end
-  from normalized;
+  end from normalized;
 $function$;
 
+revoke all on function public.ptg_aircon_model_key(text, text) from public, anon, authenticated;
+grant execute on function public.ptg_aircon_model_key(text, text) to service_role;
 revoke all on function public.ptg_aircon_family_key(text, text) from public, anon, authenticated;
 grant execute on function public.ptg_aircon_family_key(text, text) to service_role;
 
@@ -147,6 +171,7 @@ AS $function$
     select p.*,
       case when p.is_aircon then
         public.ptg_aircon_family_key(p.brand, p.model) end as family,
+      case when p.is_aircon then public.ptg_aircon_model_key(p.brand, p.model) end as model_key,
       case when p.is_aircon then substring(concat_ws(' ', p.description, p.model)
         from '(?i)\m([0-9]+(?:[.][0-9]+)?)[[:space:]]*HP\y')::numeric end as capacity,
       case when p.is_aircon then case
@@ -162,7 +187,8 @@ AS $function$
       else 0
     end as offer_position,
     row_number() over (order by case when p.is_split then 0 when p.is_aircon then 1 else p.source + 2 end,
-      upper(p.brand), p.family nulls last, p.capacity nulls last, p.is_outdoor, p.installation nulls last,
+      upper(p.brand), p.family nulls last, p.capacity nulls last, p.model_key nulls last,
+      p.is_outdoor, p.installation nulls last,
       p.source, upper(p.model), p.id) as position
     from sort_keys p
   ), grouped as (
@@ -177,7 +203,7 @@ AS $function$
       from scheduled_memos m cross join input i
       where m.product_count > 0 and m.campaign is not null and i.today between m.opens_on and m.closes_on
     ), 'products',
-    coalesce(jsonb_agg(payload order by product_position, is_outdoor, offer_position, position)
+    coalesce(jsonb_agg(payload order by product_position, offer_position, position)
       filter (where product_position between
       (greatest(1, least(p_page, 1000000)) - 1) * 5 + 1 and greatest(1, least(p_page, 1000000)) * 5), '[]'::jsonb))
   from paged
