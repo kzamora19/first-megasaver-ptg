@@ -36,6 +36,9 @@ export function createClient() {
   return edgeClient ??= createSupabaseClient(url, publishableKey, {
     auth: {
       storageKey: "branchline-ptg-edge-auth",
+      // OAuth sign-in needs the PKCE verifier persisted across the redirect;
+      // keep the legacy configuration untouched while SSO is disabled.
+      flowType: process.env.NEXT_PUBLIC_PTG_UNIFIED_SSO_ENABLED === "true" ? "pkce" : "implicit",
       detectSessionInUrl: false,
       storage: {
         getItem: key => sessionStorage.getItem(key) ?? localStorage.getItem(key),
