@@ -30,7 +30,7 @@ async function verifyPtgSystemAdmin(request: Request): Promise<string | null> {
   const { data: verified, error } = await userClient.auth.getUser(auth.slice(7));
   if (error || !verified.user) return null;
   const [row, profile] = await Promise.all([
-    admin.from("app_sessions").select("user_id,session_version,last_activity_at,expires_at,revoked_at")
+    admin.from("app_sessions").select("user_id,session_version,remember_device,last_activity_at,expires_at,revoked_at")
       .eq("id", sessionId).eq("user_id", verified.user.id).is("revoked_at", null).maybeSingle(),
     admin.from("user_profiles").select("role_key,is_active,must_change_password,session_version")
       .eq("id", verified.user.id).maybeSingle(),
@@ -40,7 +40,8 @@ async function verifyPtgSystemAdmin(request: Request): Promise<string | null> {
     profile.data.must_change_password ||
     Number(row.data.session_version) !== Number(profile.data.session_version) ||
     Date.now() >= new Date(row.data.expires_at).getTime() ||
-    Date.now() - new Date(row.data.last_activity_at).getTime() > 7 * 24 * 60 * 60 * 1000) return null;
+    Date.now() - new Date(row.data.last_activity_at).getTime() >
+      (row.data.remember_device ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000)) return null;
   return verified.user.id;
 }
 
