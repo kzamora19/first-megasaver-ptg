@@ -8,6 +8,10 @@ type ImportState = "READY" | "REVIEW" | "IMPORTED" | "SKIPPED" | "FAILED";
 type Entry = { id: number; fileName: string; preview?: SubdealerPreview; error?: string; state: ImportState };
 type ImportResult = { ok?: boolean; summary?: { skipped?: boolean; duplicate?: boolean; totalProducts?: number }; message?: string };
 
+// For SUBCON-86 and SUB2026-327, the final number is the memo sequence.
+// Higher sequence numbers supersede lower ones, regardless of PDF period or upload order.
+const memoSequence = (memoId: string) => Number(memoId.match(/-(\d+)$/)?.[1] ?? 0);
+
 export default function SubdealerMemoImporter() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
@@ -33,20 +37,21 @@ export default function SubdealerMemoImporter() {
             state: "REVIEW" });
         }
       }
-      // Different memos with the same effective start date must never
-      // silently overwrite each other's price for a shared barcode.
+      // Different memo IDs with the same numeric sequence cannot be ranked.
+      // Higher/lower sequences are automatically resolved at import, even when
+      // their selling periods overlap or share the same start date.
       const seen = new Map<string, { memoId: string; fileName: string; entry: Entry }>();
       for (const entry of next) {
         const preview = entry.preview;
         if (!preview) continue;
         for (const product of preview.products) {
-          const key = product.barcode.replace(/^0+(?=\d)/, "") + ":" + preview.period.slice(0, 10);
+          const key = product.barcode.replace(/^0+(?=\d)/, "") + ":" + memoSequence(preview.memoId);
           const prior = seen.get(key);
           if (prior && prior.memoId !== preview.memoId) {
-            entry.preview!.issues.push("Conflicting same-date price for " + product.barcode +
-              " in " + prior.fileName + ". Both files require review.");
-            prior.entry.preview!.issues.push("Conflicting same-date price for " + product.barcode +
-              " in " + entry.fileName + ". Both files require review.");
+            entry.preview!.issues.push("Equal memo sequence for barcode " + product.barcode +
+              " in " + prior.fileName + ". Different memo IDs need manual review.");
+            prior.entry.preview!.issues.push("Equal memo sequence for barcode " + product.barcode +
+              " in " + entry.fileName + ". Different memo IDs need manual review.");
             entry.state = "REVIEW";
             prior.entry.state = "REVIEW";
           } else {
@@ -65,10 +70,10 @@ export default function SubdealerMemoImporter() {
 
   async function importReady() {
     if (!usesEdgeData || busy) return;
-    // Import chronologically, regardless of file chooser or ZIP order.
-    // The newest effective memo then supersedes prices in earlier ones.
+    // Import ascending by memo sequence so the highest ID wins, irrespective
+    // of the PDF selling dates or the file-selection order.
     const pending = entries.filter(item => item.state === "READY" && item.preview)
-      .sort((a, b) => a.preview!.period.localeCompare(b.preview!.period)
+      .sort((a, b) => memoSequence(a.preview!.memoId) - memoSequence(b.preview!.memoId)
         || a.preview!.memoId.localeCompare(b.preview!.memoId));
     if (!pending.length) return;
     if (duplicateAction === "REPLACE" &&
