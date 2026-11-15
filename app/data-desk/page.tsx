@@ -9,6 +9,7 @@ import { invokePtgData } from "@/lib/ptg/edge-api";
 import BatchImport from "./batch-import";
 import PromotionPdfConverter from "./promotion-pdf-converter";
 import SubdealerMemoImporter from "@/app/price-memos/subdealer/subdealer-memo-importer";
+import UnifiedInvitations from "./unified-invitations";
 import SecurityWorkspace from "@/app/admin/accounts/security-workspace";
 import { deskSalesTools } from "@/lib/ptg/batch-import";
 import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, reviewRowLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
@@ -251,9 +252,11 @@ function DataDeskView() {
   const srp = query.get("mode") === "srp";
   const promotionPdf = query.get("mode") === "promotion-pdf";
   const subdealerPdf = query.get("mode") === "subdealer";
+  const invitations = query.get("mode") === "invitations";
   const tool = deskSalesTools.find(item => item.id === query.get("tool"));
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => srp ? <SecurityWorkspace desk /> : catalog ? <CatalogPilot /> :
     promotionPdf ? <PromotionPdfConverter verifyPtg={verifyPtg} verifySales={verifySales} /> :
+    invitations ? <UnifiedInvitations verifyPtg={verifyPtg} verifySales={verifySales} /> :
     subdealerPdf ? <main className="ptg-main shell admin-shell">
       <section className="hero admin-hero">
         <p className="eyebrow">PRICE MEMO MANAGEMENT</p>
