@@ -55,7 +55,11 @@ export default function LoginPage() {
         const { account } = await invokePtgAuth("session");
         if (!active || getPtgAppSessionId() !== sessionId || !account) return;
         if (!login) setRememberedPtgLogin(account.username, true);
-        router.replace(accountDestination(account));
+        // A delayed remembered-session check must not override a deep link
+        // that has already navigated away from the login page.
+        if (window.location.pathname.replace(/\/$/, "").endsWith("/login")) {
+          router.replace(accountDestination(account));
+        }
       } catch (error) {
         if (!active || getPtgAppSessionId() !== sessionId) return;
         if (typeof error === "object" && error !== null && "status" in error && error.status === 401) {
