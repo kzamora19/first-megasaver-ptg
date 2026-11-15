@@ -52,7 +52,7 @@ async function activeSession(request: Request, touchActivity: boolean): Promise<
   const appSessionId = request.headers.get("x-ptg-session-id");
   if (!appSessionId || appSessionId.length > 100) return null;
   const { data: row, error: sessionError } = await admin.from("app_sessions")
-    .select("id,user_id,branch_id,session_version,last_activity_at,expires_at,revoked_at,revoke_reason")
+    .select("id,user_id,branch_id,session_version,remember_device,last_activity_at,expires_at,revoked_at,revoke_reason")
     .eq("id", appSessionId)
     .eq("user_id", authData.user.id)
     .maybeSingle();
@@ -63,7 +63,12 @@ async function activeSession(request: Request, touchActivity: boolean): Promise<
   }
 
   const now = Date.now();
-  const idleExpired = now - new Date(row.last_activity_at).getTime() > 30 * 60 * 1000;
+  // A remembered device is explicitly opted in at password login. It may
+  // restore the session across browser/app restarts for seven days, unless
+  // revoked by the user, an administrator, or a branch/system security rule.
+  const idleLimitMs = row.remember_device === true
+    ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
+  const idleExpired = now - new Date(row.last_activity_at).getTime() > idleLimitMs;
   const absoluteExpired = new Date(row.expires_at).getTime() <= now;
   const { data: profile, error: profileError } = await admin.from("user_profiles")
     .select("role_key,legacy_role,display_name,is_active,session_version,must_change_password")
@@ -184,11 +189,15 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
   }
 
   await admin.rpc("clear_ptg_login_failures", { p_user_id: identity.auth_user_id });
-  const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+  const rememberDevice = body.rememberMe === true;
+  const maxLifetimeMinutes = rememberDevice ? 7 * 24 * 60 : 8 * 60;
+  const idleTimeoutMinutes = rememberDevice ? 7 * 24 * 60 : 30;
+  const expiresAt = new Date(Date.now() + maxLifetimeMinutes * 60 * 1000).toISOString();
   const { data: appSession, error: sessionError } = await admin.from("app_sessions").insert({
     user_id: identity.auth_user_id,
     branch_id: identity.branch_id,
     session_version: identity.session_version,
+    remember_device: rememberDevice,
     device_label: String(request.headers.get("user-agent") ?? "Browser").slice(0, 200),
     last_activity_at: new Date().toISOString(),
     expires_at: expiresAt,
@@ -226,7 +235,7 @@ async function login(body: Record<string, unknown>, request: Request, origin: st
       expiresIn: data.session.expires_in,
       expiresAt: data.session.expires_at,
     },
-    sessionPolicy: { idleTimeoutMinutes: 30, maxLifetimeMinutes: 480 },
+    sessionPolicy: { idleTimeoutMinutes, maxLifetimeMinutes, rememberedDevice: rememberDevice },
   });
 }
 
