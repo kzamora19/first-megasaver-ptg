@@ -9,8 +9,8 @@ import WorkspaceNav from "@/components/workspace-nav";
 import { withBasePath } from "@/lib/base-path";
 import { invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 
-const workspacePaths = new Set(["/dashboard", "/products", "/price-memos/import", "/admin/accounts", "/admin/logos", "/product-master", "/data-desk"]);
-const deskTools = new Set(["/price-memos/import", "/admin/logos", "/product-master"]);
+const workspacePaths = new Set(["/dashboard", "/products", "/price-memos/import", "/price-memos/subdealer", "/admin/accounts", "/admin/logos", "/product-master", "/data-desk"]);
+const deskTools = new Set(["/price-memos/import", "/price-memos/subdealer", "/admin/logos", "/product-master"]);
 
 function WorkspaceFrame({ session, path, children }: { session: PtgClientSession; path: string; children: ReactNode }) {
   const [openOnPath, setOpenOnPath] = useState<string | null>(null);
