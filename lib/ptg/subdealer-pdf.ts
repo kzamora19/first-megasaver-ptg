@@ -112,6 +112,7 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
         ...row.warnings,
         ...(!/^0\d{7}$/.test(barcode) ? ["barcode must be eight digits with leading zeroes"] : []),
         ...(!brand ? ["missing brand"] : []),
+        ...(!category ? ["missing category"] : []),
         ...(!model || model.length > 240 ? ["missing/overlong model"] : []),
         ...(!Number.isFinite(srp) || srp <= 0 ? ["missing SRP"] : []),
         ...(!Number.isFinite(tagThis) || tagThis <= 0 ? ["missing Tag This / Cash Payment"] : []),
