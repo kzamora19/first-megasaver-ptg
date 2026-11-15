@@ -100,7 +100,17 @@ Deno.serve(async request => {
     const sourceFile = clean(body.sourceFile, 240);
     const memoType = clean(body.memoType, 40).toUpperCase();
     const period = clean(body.period, 120);
+    const importKind = clean(body.importKind, 40).toUpperCase();
+    const isSubdealer = importKind === "SUBDEALER_PDF";
     const campaign = typeof body.campaign === "string" ? body.campaign.trim() : "";
+    // The generic importer cannot impersonate the restricted subdealer workflow.
+    if (campaign.toUpperCase() === "SUBDEALER" && !isSubdealer) {
+      return respond(origin, fail("Use SUBDEALER MEMO IMPORTER for restricted prices."), 403);
+    }
+    if (isSubdealer && (!/^SUB(?:CON-\d+|D?20\d{2}-\d+)$/i.test(clean(body.memoId, 120)) ||
+        !/\.pdf$/i.test(clean(body.sourceFile, 240)))) {
+      return respond(origin, fail("A valid subdealer PDF and memo number are required."), 400);
+    }
     if (campaign.length > 80) return respond(origin, fail("Promotion name must be 80 characters or fewer."), 400);
     const action = clean(body.duplicateAction, 20).toUpperCase();
     if (!memoId || !sourceFile || !["MEMO_LIST", "KIOSK_MEMO_LIST"].includes(memoType) ||
@@ -119,7 +129,7 @@ Deno.serve(async request => {
         model: clean(row.model, 240),
         srp: Number(row.srp) || 0,
         cash_payment: Number(row.cash_payment) || 0,
-        tag_this: Number(row.tag_this) || 0,
+        tag_this: Number(isSubdealer ? row.tag_this ?? row.cash_payment : row.tag_this) || 0,
         months_6: Number(row.months_6) || 0,
         months_9: Number(row.months_9) || 0,
         months_12: Number(row.months_12) || 0,
@@ -136,16 +146,16 @@ Deno.serve(async request => {
       return respond(origin, fail("One or more product rows contain missing identifiers or invalid prices."), 400);
     }
 
-    const { data, error } = await admin.rpc("import_price_memo", {
-      p_branch_id: null,
+    const { data, error } = await admin.rpc(isSubdealer ? "import_subdealer_price_memo" : "import_price_memo", {
+      ...(isSubdealer ? {} : { p_branch_id: null }),
       p_memo_id: memoId,
       p_period: period,
-      p_memo_type: memoType,
+      ...(isSubdealer ? {} : { p_memo_type: memoType }),
       p_source_file: sourceFile,
       p_imported_by: session.userId,
       p_duplicate_action: action,
       p_products: products,
-      ...(campaign ? { p_campaign: campaign } : {}),
+      ...(!isSubdealer && campaign ? { p_campaign: campaign } : {}),
     });
     if (error) return respond(origin, fail("Price memo import failed. The existing memo was not changed."), 500);
     const result = data as { skipped?: boolean; duplicate?: boolean; totalProducts?: number };
@@ -161,8 +171,9 @@ Deno.serve(async request => {
         metadata: {
           source_file: sourceFile,
           period,
-          memo_type: memoType,
+          memo_type: isSubdealer ? "SUBDEALER" : memoType,
           total_products: result.totalProducts,
+          superseded_product_rows: (result as { supersededProductsRemoved?: number }).supersededProductsRemoved ?? 0,
           scope: "ALL_BRANCHES",
         },
       });
