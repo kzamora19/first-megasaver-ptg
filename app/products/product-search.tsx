@@ -471,7 +471,8 @@ export default function ProductSearch({
       </section> : systemRole !== "SYSTEM_ADMIN" && <section className="legacy-branch-tools ptg-print-hide">
         <div className="legacy-tools-heading"><strong>BRANCH TOOLS</strong><span className="legacy-tools-account"><LogoutButton /><small>{username} · {branchCode} — {legacyRole || systemRole.replaceAll("_", " ")}</small></span></div>
         <nav>
-          {canManageBranch && <a href={withBasePath("/admin/accounts")}>CHANGE PASSWORD</a>}
+          {canManageBranch && <a href={withBasePath("/change-password/")}>CHANGE PASSWORD</a>}
+          {canManageBranch && legacyRole.trim().toUpperCase() === "BRANCH MANAGER" && <a href={withBasePath("/admin/accounts/")}>ACCOUNT ADMINISTRATION</a>}
           {canManageBranch && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
         </nav>
       </section>}
@@ -883,3 +884,4 @@ export default function ProductSearch({
     </main>
   );
 }
+

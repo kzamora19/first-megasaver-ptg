@@ -367,6 +367,7 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
     </>}
     {section === "permissions" && data && <section className="admin-card">
       <h3>Role permission matrix</h3>
+      <p className="admin-muted">Branch Admin and Branch Manager share the Branch Admin base role shown below. Account administration is available only to Branch Managers and System Admins; Branch Admins can still change their own password.</p>
       <SecurityTable label="Role permission matrix" empty="No permissions found."
         headers={["Permission", "System Admin", "Branch Admin", "Branch User", "Scope"]}
         rows={(data.catalog ?? []).map(permission => ({
@@ -447,3 +448,4 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
     </section>}
   </div>;
 }
+
