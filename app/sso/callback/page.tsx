@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient, withPtgAuthStorage } from "@/lib/supabase/client";
 import {
   clearPtgAuthSession, invokePtgAuth, setPtgAppSessionId, setRememberedPtgLogin,
@@ -56,6 +57,6 @@ export default function SsoCallbackPage() {
   return <main className="auth-shell"><section className="auth-card">
     <h1>Branchline unified sign-in</h1>
     <p role="status">{message}</p>
-    <a href="../login/">Back to PTG login</a>
+    <Link href="/login/">Back to PTG login</Link>
   </section></main>;
 }
