@@ -55,11 +55,10 @@ export default function SubdealerMemoImporter() {
         const preview = entry.preview!;
         try {
           const result = await invokePtgData("ptg-memos", {
-            action: "import", memoId: preview.memoId, period: preview.period,
-            // The existing schema stores this as MEMO_LIST; the campaign separates
-            // subdealer promotions from regular monthly price memos.
-            memoType: "MEMO_LIST", campaign: "SUBDEALER",
-            sourceFile: preview.fileName, duplicateAction, products: preview.products,
+            action: "import", importKind: "SUBDEALER_PDF",
+            memoId: preview.memoId, period: preview.period,
+            memoType: "MEMO_LIST", sourceFile: preview.fileName,
+            duplicateAction, products: preview.products,
           }) as ImportResult;
           if (!result.ok) throw Error(result.message || "Import failed.");
           const state = result.summary?.skipped ? "SKIPPED" : "IMPORTED";
