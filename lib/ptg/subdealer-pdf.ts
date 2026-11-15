@@ -127,7 +127,7 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
       }
       const installments = Object.fromEntries([6, 9, 12, 18, 24].map(term => {
         const entry = row.installments.find(value => value.months === term);
-        return ["months_" + term, entry ? entry.amount * (entry.basis === "monthly" ? term : 1) : 0];
+        return ["months_" + term, entry?.amount != null ? entry.amount * (entry.basis === "monthly" ? term : 1) : 0];
       })) as Record<"months_6" | "months_9" | "months_12" | "months_18" | "months_24", number>;
       const product: SubdealerProduct = {
         barcode, brand, category, model, srp, cash_payment: cash, tag_this: tagThis,
