@@ -164,7 +164,8 @@ function MemoSummary({ product }: { product: Product }) {
 function SearchOfferLabel({ product }: { product: Product }) {
   const memo = memoInfo(product);
   if (!memo) return null;
-  const label = product.campaign
+  const label = product.campaign === "SUBDEALER" ? "SUBDEALER · RESTRICTED"
+    : product.campaign
     ? product.campaign + " PROMO"
     : /^PDF-[a-f0-9]{64}$/i.test(memo.memo_id) ? "PROMO" : "REGULAR MONTHLY";
   return <><br /><small><strong>{label}</strong></small></>;
@@ -231,6 +232,7 @@ export default function ProductSearch({
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [inStock, setInStock] = useState(false);
   const [memoFilter, setMemoFilter] = useState<MemoFilter>("all");
+  const [showSubdealer, setShowSubdealer] = useState(false);
   const [campaigns, setCampaigns] = useState<string[]>([]);
   const [campaign, setCampaign] = useState("");
   const [stock, setStock] = useState<StockInfo | null>(null);
@@ -289,7 +291,7 @@ export default function ProductSearch({
     }
   }
 
-  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false, filter: MemoFilter = "all", selectedCampaign = "") => {
+  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false, filter: MemoFilter = "all", selectedCampaign = "", includeSubdealer = false) => {
     const request = ++searchRequest.current;
     setLoading(true);
     try {
@@ -309,6 +311,7 @@ export default function ProductSearch({
           regular_only: filter === "regular",
           promotions_only: filter === "promotion",
           campaign: selectedCampaign,
+          include_subdealer: includeSubdealer,
         }) as typeof payload;
       } else {
         const params = new URLSearchParams({ page: String(requestedPage) });
@@ -392,12 +395,12 @@ export default function ProductSearch({
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void loadProducts(term, 1, inStock, memoFilter, campaign);
+    void loadProducts(term, 1, inStock, memoFilter, campaign, showSubdealer);
   }
 
   function changeMemoFilter(filter: MemoFilter) {
     setMemoFilter(filter);
-    void loadProducts(term, 1, inStock, filter, campaign);
+    void loadProducts(term, 1, inStock, filter, campaign, showSubdealer);
   }
 
   function toggleProduct(product: Product, checked: boolean) {
@@ -494,16 +497,28 @@ export default function ProductSearch({
             {inventoryEnabled && <div className="legacy-search-filters">
               <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
                 setInStock(event.target.checked);
-                void loadProducts(term, 1, event.target.checked, memoFilter, campaign);
+                void loadProducts(term, 1, event.target.checked, memoFilter, campaign, showSubdealer);
               }} /> In stock only</label>
               <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "regular"}
                 onChange={event => changeMemoFilter(event.target.checked ? "regular" : "all")} /> Regular memos only</label>
               <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "promotion"}
                 onChange={event => changeMemoFilter(event.target.checked ? "promotion" : "all")} /> Promotion memos only</label>
+              {canSeeCashPrice && <label className="legacy-stock-filter ptg-subdealer-filter">
+                <input type="checkbox" checked={showSubdealer} onChange={event => {
+                  const enabled = event.target.checked;
+                  setShowSubdealer(enabled);
+                  if (!enabled) {
+                    setQueue(items => items.filter(item => item.campaign !== "SUBDEALER"));
+                    setActiveProduct(item => item?.campaign === "SUBDEALER" ? null : item);
+                    setDetailProduct(item => item?.campaign === "SUBDEALER" ? null : item);
+                  }
+                  void loadProducts(term, 1, inStock, memoFilter, campaign, enabled);
+                }} /> Subdealer prices <small>(restricted)</small>
+              </label>}
             </div>}
             {!demo && usesEdgeData && memoFilter === "promotion" && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
               setCampaign(event.target.value);
-              void loadProducts(term, 1, inStock, "promotion", event.target.value);
+              void loadProducts(term, 1, inStock, "promotion", event.target.value, showSubdealer);
             }}><option value="">All promotions</option>{campaigns.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
             <div className="legacy-memo-info">
               <label>MEMO_ID<input readOnly value={memoLabel(currentMemo, activeProduct)} /></label>
@@ -523,7 +538,7 @@ export default function ProductSearch({
             </tr></thead>
             <tbody>
               {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
-                className={product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
+                className={product.campaign === "SUBDEALER" ? "ptg-search-subdealer" : product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
                 if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
               }}>
                 <td><input type="checkbox" aria-label={["Select", product.brand, product.model, memoInfo(product)?.memo_id].filter(Boolean).join(" ")} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
@@ -540,7 +555,7 @@ export default function ProductSearch({
           </table>
         </div>
         <p className="legacy-result-count" role="status">{loading ? "Loading products…" : `Search Results ${firstResult}–${lastResult} of ${total}`}</p>
-        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock, memoFilter, campaign)} />
+        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock, memoFilter, campaign, showSubdealer)} />
       </section>
 
       <section className="legacy-queue-panel ptg-print-hide">
@@ -743,6 +758,9 @@ export default function ProductSearch({
         .legacy-stock-filter{display:flex;align-items:center;gap:.4rem;color:#12366c;font-size:.85rem}
         .legacy-search-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem}
         .legacy-search-filters .legacy-stock-filter{white-space:nowrap}
+        .ptg-subdealer-filter{color:#653d8e;font-weight:700}
+        .ptg-search-subdealer{background:#faf6ff!important}
+        .ptg-search-subdealer .ptg-tag-this-amount{color:#653d8e!important}
         .legacy-product-stock{padding:.65rem .85rem;background:#eef5ff;border-radius:7px}
         .legacy-product-detail-link{border:0;background:transparent;color:inherit;font:inherit;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
         .legacy-product-detail-link:focus-visible{outline:2px solid #1d5bb6;outline-offset:3px}
