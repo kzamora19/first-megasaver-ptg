@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
 import { getPtgAppSessionId } from "@/lib/ptg/auth-client";
 import {
@@ -14,9 +15,10 @@ type SalesBranch = { id: string; name: string; code: string; dealer_id: string; 
 type PtgBranch = { id: string; branch_code: string; branch_name: string; status: string; operational_status: string };
 type Account = { email?: string | null; display_name?: string };
 type Match = { code: string; salesBranchId: string; salesDistrictId: string; salesDealerId: string; ptgBranchId: string; name: string };
-type SalesVerification = { scope: { userId: string; branches: Array<{id: string; name: string; code: string}> }; client: {
-  from: (table: string) => any;
-} };
+type SalesVerification = {
+  scope: { userId: string; branches: Array<{ id: string; name: string; code: string }> };
+  client: SupabaseClient;
+};
 
 export default function UnifiedInvitations({
   verifyPtg, verifySales,
@@ -47,11 +49,11 @@ export default function UnifiedInvitations({
     try {
       const sessionId = getPtgAppSessionId();
       if (!sessionId) throw Error("Sign in as PTG System Admin.");
+      await verifyPtg(sessionId);
       const [sales, ptgResponse] = await Promise.all([
         verifySales(),
         requestPtgAccounts("GET"),
-        verifyPtg(sessionId),
-      ]).then(([s, r]) => [s, r] as const);
+      ]);
       if (!ptgResponse.ok) throw Error("PTG account administration is unavailable.");
       const ptgData = await ptgResponse.json() as { ok?: boolean; branches?: PtgBranch[]; accounts?: Account[]; message?: string };
       if (!ptgData.ok) throw Error(ptgData.message || "PTG branch access could not be verified.");
