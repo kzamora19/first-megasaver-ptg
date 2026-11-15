@@ -36,6 +36,7 @@ export type Product = {
   eligible_for_price_tag?: boolean;
   price_tag_status?: string;
   source_file?: string;
+  campaign?: string | null;
   price_memos: MemoInfo | MemoInfo[] | null;
 };
 type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CARAVAN";
@@ -134,7 +135,7 @@ function MemoSummary({ product }: { product: Product }) {
   const memo = memoInfo(product);
   const label = memoLabel(memo, product);
   if (!label) return null;
-  return <><br /><small>{label}{memo?.period ? <> · {memo.period}</> : null}</small></>;
+  return <><br /><small>{product.campaign && <strong>{product.campaign} · </strong>}{label}{memo?.period ? <> · {memo.period}</> : null}</small></>;
 }
 const endDate = (period: string) => {
   const raw = String(period || "").trim();
@@ -196,6 +197,9 @@ export default function ProductSearch({
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [inStock, setInStock] = useState(false);
+  const [promotionsOnly, setPromotionsOnly] = useState(false);
+  const [campaigns, setCampaigns] = useState<string[]>([]);
+  const [campaign, setCampaign] = useState("");
   const [stock, setStock] = useState<StockInfo | null>(null);
   const [stockMessage, setStockMessage] = useState("");
   const [showSerials, setShowSerials] = useState(false);
@@ -252,11 +256,11 @@ export default function ProductSearch({
     }
   }
 
-  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false) => {
+  const loadProducts = useCallback(async (query: string, requestedPage: number, onlyStock = false, filterPromotions = false, selectedCampaign = "") => {
     const request = ++searchRequest.current;
     setLoading(true);
     try {
-      let payload: { ok: boolean; products: Product[]; total: number; page: number };
+      let payload: { ok: boolean; products: Product[]; total: number; page: number; campaigns?: string[] };
       if (demoProducts) {
         const term = query.trim().toLowerCase();
         const matches = demoProducts.filter(product =>
@@ -269,6 +273,8 @@ export default function ProductSearch({
           q: query.trim(),
           page: requestedPage,
           in_stock: onlyStock,
+          promotions_only: filterPromotions,
+          campaign: selectedCampaign,
         }) as typeof payload;
       } else {
         const params = new URLSearchParams({ page: String(requestedPage) });
@@ -281,12 +287,15 @@ export default function ProductSearch({
       if (!payload.ok || !Array.isArray(payload.products)) throw new Error("Search failed.");
       if (request !== searchRequest.current) return;
       setSearchQuery(query);
+      setCampaigns(payload.campaigns ?? []);
       setResults(payload.products as Product[]);
       setTotal(Number(payload.total || 0));
       setPage(Number(payload.page || requestedPage));
       setMessage(query.trim()
         ? (payload.total ? payload.total + " matching product(s)." : "No matching products found.")
-        : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
+        : filterPromotions
+          ? (payload.total ? "Promotion offers." : "No promotion offers found.")
+          : (payload.total ? "Memo and SRP products." : "No memo or SRP products found."));
     } catch (error) {
       if (request === searchRequest.current) {
         setResults([]);
@@ -347,7 +356,7 @@ export default function ProductSearch({
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void loadProducts(term, 1, inStock);
+    void loadProducts(term, 1, inStock, promotionsOnly, campaign);
   }
 
   function toggleProduct(product: Product, checked: boolean) {
@@ -442,8 +451,16 @@ export default function ProductSearch({
             </form>
             {inventoryEnabled && <label className="legacy-stock-filter"><input type="checkbox" checked={inStock} onChange={event => {
               setInStock(event.target.checked);
-              void loadProducts(term, 1, event.target.checked);
+              void loadProducts(term, 1, event.target.checked, promotionsOnly, campaign);
             }} /> In stock only</label>}
+            {!demo && usesEdgeData && <label className="legacy-stock-filter"><input type="checkbox" checked={promotionsOnly} onChange={event => {
+              setPromotionsOnly(event.target.checked);
+              void loadProducts(term, 1, inStock, event.target.checked, campaign);
+            }} /> Promotion memos only</label>}
+            {!demo && usesEdgeData && promotionsOnly && <label className="legacy-stock-filter">Promotion <select value={campaign} onChange={event => {
+              setCampaign(event.target.value);
+              void loadProducts(term, 1, inStock, true, event.target.value);
+            }}><option value="">All promotions</option>{campaigns.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
             <div className="legacy-memo-info">
               <label>MEMO_ID<input readOnly value={memoLabel(currentMemo, activeProduct)} /></label>
               <label>PERIOD<input readOnly value={currentMemo?.period || ""} /></label>
@@ -474,7 +491,7 @@ export default function ProductSearch({
           </table>
         </div>
         <p className="legacy-result-count" role="status">{loading ? "Loading products…" : `Search Results ${firstResult}–${lastResult} of ${total}`}</p>
-        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock)} />
+        <Pagination page={page} totalPages={totalPages} label="Product results" busy={loading} onPage={next => void loadProducts(searchQuery, next, inStock, promotionsOnly, campaign)} />
       </section>
 
       <section className="legacy-queue-panel ptg-print-hide">
