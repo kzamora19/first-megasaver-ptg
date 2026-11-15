@@ -627,7 +627,7 @@ export default function ProductSearch({
               <div>Brand: <strong>{product.brand}</strong></div>
               <div className="ptg-compact-model">MODEL: <strong>{modelDescription}</strong></div>
               {!srpOnly && <div>SRP: <strong className={format === "SIX" && amount(product.srp) > 0 && pay > 0 && amount(product.srp) > pay ? "ptg-compact-srp-discounted" : undefined}>{peso(product.srp)}</strong></div>}
-              <div className="ptg-compact-cash">{srpOnly ? "SRP" : priceCaption}</div>
+              {!srpOnly && <div className="ptg-compact-cash">{priceCaption}</div>}
               <div className="ptg-compact-pay">{termTotal && !srpOnly ? "PER MONTH:" : "PAY NOW:"} <strong>{peso(srpOnly ? product.srp : termTotal ? termTotal / term : pay)}</strong></div>
               {!srpOnly && <div className="ptg-compact-summary">
                 <span>{endDate(memo?.period || "") ? "Valid Until: " + endDate(memo?.period || "") : ""}</span>
