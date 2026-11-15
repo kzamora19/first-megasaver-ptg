@@ -91,6 +91,7 @@ AS $function$
            or upper(coalesce(m.description, '')) like '%AIRCON%')
       and upper(coalesce(m.description, '')) not like '%OUTDOOR%'
       and nullif(btrim(m.model), '') is not null
+      and (p_stock_barcodes is null or public.ptg_srp_barcode_key(m.barcode) = any(p_stock_barcodes))
   ), srp_candidates as (
     -- Preserve existing unfiltered behavior and keyword search.
     select s.* from public.ptg_search_srp_fallback(
