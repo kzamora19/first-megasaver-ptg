@@ -33,6 +33,27 @@ export default function SubdealerMemoImporter() {
             state: "REVIEW" });
         }
       }
+      // Different memos with the same effective start date must never
+      // silently overwrite each other's price for a shared barcode.
+      const seen = new Map<string, { memoId: string; fileName: string; entry: Entry }>();
+      for (const entry of next) {
+        const preview = entry.preview;
+        if (!preview) continue;
+        for (const product of preview.products) {
+          const key = product.barcode.replace(/^0+(?=\d)/, "") + ":" + preview.period.slice(0, 10);
+          const prior = seen.get(key);
+          if (prior && prior.memoId !== preview.memoId) {
+            entry.preview!.issues.push("Conflicting same-date price for " + product.barcode +
+              " in " + prior.fileName + ". Both files require review.");
+            prior.entry.preview!.issues.push("Conflicting same-date price for " + product.barcode +
+              " in " + entry.fileName + ". Both files require review.");
+            entry.state = "REVIEW";
+            prior.entry.state = "REVIEW";
+          } else {
+            seen.set(key, { memoId: preview.memoId, fileName: entry.fileName, entry });
+          }
+        }
+      }
       setEntries(next);
       const review = next.filter(item => item.state === "REVIEW").length;
       setMessage(next.length + " PDFs reviewed; " + review +
@@ -44,7 +65,11 @@ export default function SubdealerMemoImporter() {
 
   async function importReady() {
     if (!usesEdgeData || busy) return;
-    const pending = entries.filter(item => item.state === "READY" && item.preview);
+    // Import chronologically, regardless of file chooser or ZIP order.
+    // The newest effective memo then supersedes prices in earlier ones.
+    const pending = entries.filter(item => item.state === "READY" && item.preview)
+      .sort((a, b) => a.preview!.period.localeCompare(b.preview!.period)
+        || a.preview!.memoId.localeCompare(b.preview!.memoId));
     if (!pending.length) return;
     if (duplicateAction === "REPLACE" &&
         !window.confirm("Replace matching memo numbers and their existing products?")) return;
