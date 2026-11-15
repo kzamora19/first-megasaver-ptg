@@ -8,6 +8,7 @@ import { getPtgAppSessionId, invokePtgAuth } from "@/lib/ptg/auth-client";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import BatchImport from "./batch-import";
 import PromotionPdfConverter from "./promotion-pdf-converter";
+import SubdealerMemoImporter from "@/app/price-memos/subdealer/subdealer-memo-importer";
 import SecurityWorkspace from "@/app/admin/accounts/security-workspace";
 import { deskSalesTools } from "@/lib/ptg/batch-import";
 import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, reviewRowLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
@@ -249,9 +250,18 @@ function DataDeskView() {
   const catalog = query.get("mode") === "catalog";
   const srp = query.get("mode") === "srp";
   const promotionPdf = query.get("mode") === "promotion-pdf";
+  const subdealerPdf = query.get("mode") === "subdealer";
   const tool = deskSalesTools.find(item => item.id === query.get("tool"));
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => srp ? <SecurityWorkspace desk /> : catalog ? <CatalogPilot /> :
     promotionPdf ? <PromotionPdfConverter verifyPtg={verifyPtg} verifySales={verifySales} /> :
+    subdealerPdf ? <main className="ptg-main shell admin-shell">
+      <section className="hero admin-hero">
+        <p className="eyebrow">PRICE MEMO MANAGEMENT</p>
+        <h1>SUBDEALER MEMO IMPORTER</h1>
+        <p className="intro">Review subdealer PDF prices before importing them. Higher numeric memo IDs supersede older prices for matching barcodes.</p>
+      </section>
+      <SubdealerMemoImporter />
+    </main> :
     <BatchImport key={tool?.id ?? "unified"} tool={tool} verifyPtg={verifyPtg} verifySales={verifySales} />}</ClientSessionGate>;
 }
 
