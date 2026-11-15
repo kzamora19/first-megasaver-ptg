@@ -101,6 +101,12 @@ async function readSalesInventory(request: Request, mode: string, barcode?: stri
 async function searchMemoProducts(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
   if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
   if (!["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) return respond(origin, fail("PTG access is not enabled for this account."), 403);
+  const canSeeSubdealer = session.role === "SYSTEM_ADMIN" ||
+    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
+  const includeSubdealer = body.include_subdealer === true;
+  if (includeSubdealer && !canSeeSubdealer) {
+    return respond(origin, fail("Subdealer prices are restricted to authorized managers."), 403);
+  }
   const page = Math.min(1_000_000, Math.max(1, Math.trunc(Number(body.page || 1)) || 1));
   let stock = {};
   if (body.in_stock === true) {
@@ -112,17 +118,20 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
     stock = { p_stock_barcodes: inventory.barcodes.map((barcode: string) => /^\d+$/.test(barcode)
       ? barcode.replace(/^0+(?=\d)/, "") : barcode) };
   }
-  const { data, error } = await admin.rpc("ptg_ordered_product_search", {
+  const params = {
     p_query: clean(body.q, 100),
     p_branch_id: session.branchId ?? null,
     p_system_admin: session.role === "SYSTEM_ADMIN",
     p_page: page,
-    ...(body.regular_only === true ? {
-      p_stock_barcodes: null, ...stock, p_promotions_only: false, p_campaign: null, p_regular_only: true,
-    } : body.promotions_only === true ? {
-      p_stock_barcodes: null, ...stock, p_promotions_only: true, p_campaign: clean(body.campaign, 80) || null,
-    } : stock),
-  });
+    p_stock_barcodes: null as string[] | null,
+    p_promotions_only: body.promotions_only === true,
+    p_campaign: clean(body.campaign, 80) || null,
+    p_regular_only: body.regular_only === true,
+    ...stock,
+  };
+  const { data, error } = includeSubdealer
+    ? await admin.rpc("ptg_ordered_product_search_secure", { ...params, p_include_subdealer: true })
+    : await admin.rpc("ptg_ordered_product_search", params);
   if (error || !data) return respond(origin, fail("Could not search imported memo products."), 500);
   const canSeeCashPrice = session.role === "SYSTEM_ADMIN" ||
     (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
