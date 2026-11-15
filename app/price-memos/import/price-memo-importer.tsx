@@ -10,13 +10,14 @@ type MemoEntry={id:number;fileName:string;parsed?:ParsedMemo;error?:string;summa
 export default function PriceMemoImporter() {
   const [entries,setEntries]=useState<MemoEntry[]>([]);
   const [duplicateAction,setDuplicateAction]=useState<"SKIP"|"REPLACE">("SKIP");
+  const [campaign,setCampaign]=useState("");
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const [isError,setIsError]=useState(false);
 
   async function chooseFiles(fileList?:FileList|null) {
     const files=Array.from(fileList??[]);
-    setEntries([]);setMessage("");setIsError(false);
+    setEntries([]);setCampaign("");setMessage("");setIsError(false);
     if(!files.length)return;
     setBusy(true);
     const parsedEntries:MemoEntry[]=[];
@@ -49,7 +50,7 @@ export default function PriceMemoImporter() {
         if(usesEdgeData){
           result=await invokePtgData("ptg-memos",{
             action:"import",memoId:parsed.memoId,period:parsed.period,memoType:parsed.memoType,
-            sourceFile:entry.fileName,duplicateAction,products:parsed.products
+            sourceFile:entry.fileName,duplicateAction,products:parsed.products,campaign:campaign.trim()
           }) as typeof result;
         }else{
           const response=await fetch("/api/price-memos/import",{
@@ -105,6 +106,7 @@ export default function PriceMemoImporter() {
         </tr>)}
       </tbody></table></div>
       <label className="admin-field"><span>If a memo number already exists in shared PTG data</span><select value={duplicateAction} disabled={busy} onChange={e=>setDuplicateAction(e.target.value as "SKIP"|"REPLACE")}><option value="SKIP">Skip existing memo (recommended)</option><option value="REPLACE">Replace existing memo and its products</option></select></label>
+      {usesEdgeData && <label className="admin-field"><span>Promotion name for this batch (optional)</span><input value={campaign} maxLength={80} disabled={busy} onChange={e=>setCampaign(e.target.value)} placeholder="e.g. 7MBDS" /></label>}
       <button className="admin-button" disabled={busy||readyCount===0} onClick={()=>void importMemos()}>{busy?"PROCESSING BATCH…":`IMPORT ${readyCount} READY MEMO(S)`}</button>
     </>}
     {message&&<p className={isError?"admin-alert error":"admin-alert success"} role="status">{message}</p>}
