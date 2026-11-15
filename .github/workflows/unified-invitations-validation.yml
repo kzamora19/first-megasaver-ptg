@@ -17,4 +17,9 @@ jobs:
       - name: Lint new invitation code
         run: npx eslint lib/ptg/unified-invitation-rules.mjs app/data-desk/unified-invitations.tsx
       - run: npx tsc --noEmit
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check unified edge provisioning and sign-in
+        run: deno check supabase/functions/ptg-unified-provision/index.ts supabase/functions/ptg-unified-sso/index.ts
       - run: npm run build
