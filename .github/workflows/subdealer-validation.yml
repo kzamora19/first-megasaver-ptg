@@ -1,0 +1,17 @@
+name: Validate Subdealer Importer
+on:
+  push:
+    branches: [feature/subdealer-memo-importer]
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
