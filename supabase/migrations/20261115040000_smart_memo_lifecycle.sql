@@ -216,7 +216,9 @@ AS $function$
       and (not p_promotions_only or (coalesce(campaign.campaign,
         case when public.ptg_period_start(memo.period)=date '2026-11-14'
         and public.ptg_period_end(memo.period)=date '2026-11-22' then '7MBDS' end) is not null
-        and (p_campaign is null or campaign.campaign = p_campaign)))
+        and (p_campaign is null or coalesce(campaign.campaign,
+          case when public.ptg_period_start(memo.period)=date '2026-11-14'
+          and public.ptg_period_end(memo.period)=date '2026-11-22' then '7MBDS' end)=p_campaign)))
       and public.ptg_pdf_promotion_current(memo.memo_id, memo.period)
       and (memo.memo_id ~ '^PDF-[0-9a-f]{64}$'
         or (campaign.campaign is null
