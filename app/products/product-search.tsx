@@ -754,10 +754,9 @@ export default function ProductSearch({
         .legacy-search-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
         .legacy-search-form>label,.legacy-format-controls>strong{display:block;margin-bottom:4px;color:#1d3e67;font-size:9px;font-weight:800}
         .legacy-search-form>div{display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:5px}
-        .legacy-search-form input{min-width:0;height:34px;padding:0 12px;border:1.5px solid #84b5ee;border-radius:5px;background:#eaf4ff;color:#123b72;font:inherit;font-size:15px;font-weight:600;transition:background-color .15s,border-color .15s,box-shadow .15s}
+        .legacy-search-form input{min-width:0;height:25px;padding:0 8px;border:1px solid #d3d8e0;border-radius:4px;background:#eaf4ff;color:#123b72;font:inherit;font-size:15px;font-weight:600}
         .legacy-search-form input::placeholder{color:#607b9e;font-size:13px;font-weight:400}
-        .legacy-search-form input:focus{outline:none;border-color:#2465c3;background:#f5faff;box-shadow:0 0 0 3px rgba(36,101,195,.17)}
-        .legacy-search-form button{height:34px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:10px;font-weight:800}
+        .legacy-search-form button{height:27px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:800}
         .legacy-format-controls>div{display:flex;gap:4px;flex-wrap:wrap}
         .legacy-format-controls button{min-width:62px;height:23px;padding:0 9px;border:1px solid #2465c3;border-radius:4px;background:#fff;color:#124a9c;font-size:9px;font-weight:800;cursor:pointer}
         .legacy-format-controls button.active{background:#0647a7;color:#fff}
