@@ -145,7 +145,7 @@ AS $function$
           '', 'i'))),
         '[[:space:]]*/[[:space:]]*', '/', 'g'),
         '[[:space:]]+', ' ', 'g'),
-        '^NEW MODEL
+        '^NEW[[:space:]]+MODEL', 'NEW') as offer_suffix
     from memo_rows m
   ), paired_memo_rows as (
     select m.*,
