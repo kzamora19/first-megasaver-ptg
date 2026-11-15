@@ -124,9 +124,11 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
     p_system_admin: session.role === "SYSTEM_ADMIN",
     p_page: page,
     p_stock_barcodes: null as string[] | null,
-    p_promotions_only: body.promotions_only === true,
-    p_campaign: clean(body.campaign, 80) || null,
-    p_regular_only: body.regular_only === true,
+    // Subdealer is an exclusive search mode: do not apply regular/promo
+    // filters or a campaign selector to a restricted subdealer search.
+    p_promotions_only: !includeSubdealer && body.promotions_only === true,
+    p_campaign: includeSubdealer ? null : clean(body.campaign, 80) || null,
+    p_regular_only: !includeSubdealer && body.regular_only === true,
     ...stock,
   };
   const { data, error } = includeSubdealer
