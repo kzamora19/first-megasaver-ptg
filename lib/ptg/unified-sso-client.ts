@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, withPtgAuthStorage } from "@/lib/supabase/client";
+import type { Provider } from "@supabase/supabase-js";
 import { withBasePath } from "@/lib/base-path";
 
 // Both the UI and the server exchange endpoint have independent kill switches.
@@ -16,7 +17,7 @@ export async function startBranchlineSso(remember: boolean) {
   const redirectTo = window.location.origin + withBasePath(ssoCallbackPath);
   const { error } = await withPtgAuthStorage(remember, () =>
     createClient().auth.signInWithOAuth({
-      provider: "custom:branchline",
+      provider: "custom:branchline" as Provider,
       options: { redirectTo },
     }),
   );
