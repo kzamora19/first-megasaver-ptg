@@ -45,7 +45,7 @@ const respondError = (origin: string, error: unknown) => {
   return json(origin, { ok: false, message: "The account operation could not be completed." }, 400);
 };
 
-type Session = { id: string; userId: string; role: string; branchId: string | null; mustChangePassword: boolean; };
+type Session = { id: string; userId: string; role: string; legacyRole: string; branchId: string | null; mustChangePassword: boolean; };
 async function getSession(request: Request): Promise<Session | null> {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return null;
@@ -58,20 +58,27 @@ async function getSession(request: Request): Promise<Session | null> {
   const id = request.headers.get("x-ptg-session-id");
   if (!id || id.length > 100) return null;
   const { data: row, error } = await admin.from("app_sessions")
-    .select("id,user_id,branch_id,session_version,last_activity_at,expires_at,revoked_at")
+    .select("id,user_id,branch_id,session_version,remember_device,last_activity_at,expires_at,revoked_at")
     .eq("id", id).eq("user_id", authData.user.id).is("revoked_at", null).maybeSingle();
   if (error || !row) return null;
   const { data: profile, error: profileError } = await admin.from("user_profiles")
-    .select("role_key,is_active,session_version,must_change_password")
+    .select("role_key,legacy_role,is_active,session_version,must_change_password")
     .eq("id", authData.user.id).maybeSingle();
-  const expired = Date.now() - new Date(row.last_activity_at).getTime() > 30 * 60 * 1000 || new Date(row.expires_at).getTime() <= Date.now();
+  const idleLimitMs = row.remember_device === true ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
+  const expired = Date.now() - new Date(row.last_activity_at).getTime() > idleLimitMs ||
+    new Date(row.expires_at).getTime() <= Date.now();
   if (profileError || !profile || !profile.is_active || Number(profile.session_version) !== Number(row.session_version) || expired) return null;
   if (row.branch_id) {
     const { data: branch } = await admin.from("branches").select("status,operational_status").eq("id", row.branch_id).maybeSingle();
     if (!branch || branch.status !== "ACTIVE" || branch.operational_status !== "ON") return null;
   }
   await admin.from("app_sessions").update({ last_activity_at: new Date().toISOString() }).eq("id", id).is("revoked_at", null);
-  return { id: row.id, userId: authData.user.id, role: profile.role_key, branchId: row.branch_id, mustChangePassword: profile.must_change_password === true };
+  return { id: row.id, userId: authData.user.id, role: profile.role_key, legacyRole: profile.legacy_role ?? "", branchId: row.branch_id, mustChangePassword: profile.must_change_password === true };
+}
+
+function canManageAccounts(session: Session): boolean {
+  return session.role === "SYSTEM_ADMIN" ||
+    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
 }
 
 async function requirePermission(session: Session, permissionKey: string, action: "VIEW" | "EXECUTE", targetBranchId?: string | null) {
@@ -425,7 +432,7 @@ async function securityAction(session: Session, origin: string, body: Record<str
       .select("id,user_id,branch_id,device_label,created_at,last_activity_at")
       .not("branch_id", "is", null).is("revoked_at", null)
       .gt("expires_at", new Date(now).toISOString())
-      .gt("last_activity_at", new Date(now - 30 * 60 * 1000).toISOString())
+      .or(`remember_device.eq.true,last_activity_at.gt.${new Date(now - 30 * 60 * 1000).toISOString()}`)
       .order("last_activity_at", { ascending: false }).limit(500);
     if (error) throw new Error("SECURITY_READ_FAILED");
     const ids = [...new Set(data.map(row => row.user_id))];
@@ -587,11 +594,13 @@ Deno.serve(async request => {
     if (request.method === "GET") {
       const session = await getSession(request);
       if (!session) throw new Error("AUTH_REQUIRED");
+      if (!canManageAccounts(session)) throw new Error("PERMISSION_DENIED");
       return await listAccounts(request, session, origin);
     }
     if (request.method === "PATCH") {
       const session = await getSession(request);
       if (!session) throw new Error("AUTH_REQUIRED");
+      if (!canManageAccounts(session)) throw new Error("PERMISSION_DENIED");
       return await updateAccount(request, session, origin, await request.json() as Record<string, unknown>);
     }
     if (request.method !== "POST") return json(origin, { ok: false, message: "Method not allowed." }, 405);
@@ -604,6 +613,7 @@ Deno.serve(async request => {
     if (action === "bootstrapFinish") return await bootstrapFinish(body, origin);
     const session = await getSession(request);
     if (!session) throw new Error("AUTH_REQUIRED");
+    if (!canManageAccounts(session)) throw new Error("PERMISSION_DENIED");
     if (action === "createAccount") return await createAccount(request, session, origin, body);
     if (action === "resendInvitation") return await resendInvitation(clean(body.userId, 100), session, origin);
     if (action.startsWith("security")) return await securityAction(session, origin, body);
@@ -612,3 +622,5 @@ Deno.serve(async request => {
     return respondError(origin, error);
   }
 });
+
+
