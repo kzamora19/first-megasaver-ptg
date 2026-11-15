@@ -5,7 +5,6 @@ import { deskSalesTools } from "@/lib/ptg/batch-import";
 
 const deskPtgTools = [
   ["/price-memos/import", "Price Memo Import"],
-  ["/price-memos/subdealer", "Subdealer Memo Import"],
   ["/product-master", "Product Master"],
   ["/admin/logos", "Logo Manager"],
 ];
@@ -18,8 +17,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const catalog = onDesk && query.get("mode") === "catalog";
   const srp = onDesk && query.get("mode") === "srp";
   const promotionPdf = onDesk && query.get("mode") === "promotion-pdf";
-  const salesTool = onDesk && !catalog && !srp && !promotionPdf ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
-  const unified = onDesk && !catalog && !srp && !promotionPdf && !salesTool;
+  const subdealerPdf = onDesk && query.get("mode") === "subdealer";
+  const salesTool = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
+  const unified = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
       className={"ptg-nav-item" + (unified ? " active" : "")}
@@ -27,6 +27,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     <a href={withBasePath("/data-desk/?mode=promotion-pdf")} onClick={onNavigate}
       className={"ptg-nav-item" + (promotionPdf ? " active" : "")}
       aria-current={promotionPdf ? "page" : undefined}>Promotion PDF Import</a>
+    <Link href="/data-desk/?mode=subdealer" onClick={onNavigate}
+      className={"ptg-nav-item" + (subdealerPdf ? " active" : "")}
+      aria-current={subdealerPdf ? "page" : undefined}>Subdealer Memo Import</Link>
     <a href={withBasePath("/data-desk/?mode=catalog")} onClick={onNavigate}
       className={"ptg-nav-item" + (catalog ? " active" : "")}
       aria-current={catalog ? "page" : undefined}>Cross-App Catalog Review</a>
