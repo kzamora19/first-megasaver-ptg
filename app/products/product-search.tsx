@@ -879,7 +879,7 @@ export default function ProductSearch({
           .legacy-print-sheet{width:8.5in!important;height:11in!important;margin:0!important;padding:0!important;box-shadow:none!important}
           .legacy-half-sheet{grid-template-columns:repeat(2,5.07in);grid-template-rows:6.76in;gap:0;width:11in!important;height:8.5in!important}
           .legacy-half-sheet .legacy-price-tag{zoom:.65}
-          .legacy-four-sheet{grid-template-columns:repeat(2,3.822in);grid-template-rows:repeat(2,5.096in);gap:0}
+          .legacy-four-sheet{grid-template-columns:repeat(2,3.666in);grid-template-rows:repeat(2,4.888in);gap:0}
           .legacy-four-sheet .legacy-price-tag{zoom:.47}
           .legacy-four-sheet .legacy-tag-header-with-promo img.legacy-tag-promo{right:14px}
           .legacy-six-sheet{grid-template-columns:repeat(2,4.05in);grid-template-rows:repeat(3,calc(10.6in / 3));gap:0}
