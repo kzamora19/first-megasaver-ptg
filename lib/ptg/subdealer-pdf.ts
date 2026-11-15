@@ -89,8 +89,10 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
     const period = subdealerPeriod(heading);
     const memoId = subdealerMemoNumber(file.name, heading);
     const extracted = positionedSubdealerRows({ sourceName: file.name, pages });
+    // Preserve source barcodes exactly, including documented nine-digit
+    // entries, rather than wrongly flagging them as missing rows.
     const expectedRows = pages.reduce((n, page) =>
-      n + page.items.filter(item => /^0\d{7}$/.test(item.text.trim())).length, 0);
+      n + page.items.filter(item => /^0\d{6,9}$/.test(item.text.trim())).length, 0);
     const issues: string[] = [];
     if (!expectedRows) issues.push("No selectable eight-digit product barcodes were found (scanned PDF?).");
     if (extracted.length !== expectedRows) {
@@ -111,7 +113,7 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
       const tagThis = priceRow.tagPrice ?? priceRow.cashPayment ?? 0;
       const reasons = [
         ...row.warnings,
-        ...(!/^0\d{7}$/.test(barcode) ? ["barcode must be eight digits with leading zeroes"] : []),
+        ...(!/^0\d{6,9}$/.test(barcode) ? ["invalid barcode format or missing leading zeroes"] : []),
         ...(!brand ? ["missing brand"] : []),
         ...(!category ? ["missing category"] : []),
         ...(!model || model.length > 240 ? ["missing/overlong model"] : []),
