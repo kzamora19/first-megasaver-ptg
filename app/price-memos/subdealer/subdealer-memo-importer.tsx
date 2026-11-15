@@ -110,7 +110,7 @@ export default function SubdealerMemoImporter() {
       <h2>SUBDEALER MEMO IMPORTER</h2>
       <p className="admin-muted">Import subdealer promotional PDF memos. Required fields:
         barcode, brand, model/description, SRP and a price (Tag This or Cash Payment).
-        Category and other missing optional fields remain blank. Tag This falls back to Cash Payment
+        Category is required; missing optional fields remain blank. Tag This falls back to Cash Payment
         only when Tag This is absent. Dates are normalized before import.</p>
       <p className="admin-muted">Choose one or more PDF files. For a ZIP folder,
         extract the PDFs first. Files with missing or misaligned values are held for review;
