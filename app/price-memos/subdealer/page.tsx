@@ -2,12 +2,12 @@
 
 import ClientSessionGate from "@/components/client-session-gate";
 import SubdealerMemoImporter from "./subdealer-memo-importer";
-import { withBasePath } from "@/lib/base-path";
+import Link from "next/link";
 
 export default function SubdealerMemoImportPage() {
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN", "BRANCH_ADMIN"]}>
     {session => <main className="shell admin-shell">
-      <a href={withBasePath("/price-memos/import/") + (session.role === "SYSTEM_ADMIN" ? "?workspace=data-desk" : "")} className="admin-link">← Head Office memo importer</a>
+      <Link href={"/price-memos/import/" + (session.role === "SYSTEM_ADMIN" ? "?workspace=data-desk" : "")} className="admin-link">← Head Office memo importer</Link>
       <section className="hero">
         <p className="eyebrow">PRICE MEMO MANAGEMENT</p>
         <h1>SUBDEALER MEMO IMPORTER</h1>
