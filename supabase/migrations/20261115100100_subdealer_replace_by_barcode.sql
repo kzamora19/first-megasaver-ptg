@@ -45,10 +45,10 @@ begin
     join public.ptg_memo_campaigns campaign on campaign.memo_number=old.memo_id
     where campaign.campaign='SUBDEALER' and old.branch_id is null
       and public.ptg_srp_barcode_key(item.barcode)=any(v_incoming)
-      and public.ptg_period_start(old.period)>v_start
+      and public.ptg_period_start(old.period)>=v_start
       and old.memo_id <> p_memo_id
   ) then
-    raise exception 'A newer subdealer price already exists for one or more products; older memo not imported';
+    raise exception 'A newer or same-start subdealer price exists for an updated barcode; review conflicting memo';
   end if;
 
   -- Replacing an existing memo must not remove unsubmitted products from it.
