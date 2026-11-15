@@ -5,6 +5,7 @@ import { deskSalesTools } from "@/lib/ptg/batch-import";
 
 const deskPtgTools = [
   ["/price-memos/import", "Price Memo Import"],
+  ["/price-memos/subdealer", "Subdealer Memo Import"],
   ["/product-master", "Product Master"],
   ["/admin/logos", "Logo Manager"],
 ];
