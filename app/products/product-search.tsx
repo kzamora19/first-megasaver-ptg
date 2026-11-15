@@ -116,9 +116,9 @@ function Pagination({ page, totalPages, label, busy = false, onPage }: {
   </form>;
 }
 
-function BlankRows({ used, columns = 8 }: { used: number; columns?: number }) {
+function BlankRows({ used }: { used: number }) {
   return Array.from({ length: Math.max(0, pageSize - used) }, (_, index) =>
-    <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={columns}>&nbsp;</td></tr>
+    <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={8}>&nbsp;</td></tr>
   );
 }
 const amount = (value: number | null | undefined) => Number(value || 0);
@@ -162,19 +162,6 @@ function SearchOfferMemo({ product }: { product: Product }) {
   </small></>;
 }
 
-function SearchPaymentTerms({ product }: { product: Product }) {
-  const terms = installments(product);
-  const hasCashPrice = amount(product.cash_payment) > 0 && amount(product.cash_payment) !== priceNow(product);
-  if (!hasCashPrice && !terms.length) return <>—</>;
-  return <>
-    {hasCashPrice &&
-      <div className="ptg-search-payment">Cash <span className="ptg-search-offer-amount">{peso(product.cash_payment)}</span></div>}
-    {terms.map(({ months, total }) => <div className="ptg-search-payment" key={months}>
-      {months} months · <span className="ptg-search-offer-amount">{peso(total / months)}</span>/mo
-      {" · "}<span className="ptg-search-offer-amount">{peso(total)}</span> total
-    </div>)}
-  </>;
-}
 const endDate = (period: string) => {
   const raw = String(period || "").trim();
   let match = raw.match(/^([A-Za-z]+)\s+\d{1,2}\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})$/i);
@@ -511,10 +498,10 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all visible products" checked={results.length > 0 && results.every(item => queue.some(queued => queued.id === item.id))} onChange={event => toggleVisible(event.target.checked)} /></th>
-              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Payment terms</th><th>Status</th>
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={9} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
+              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
                 className={product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
                 if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
               }}>
@@ -525,10 +512,9 @@ export default function ProductSearch({
                 <td>{product.remarks || "N/A"}</td>
                 <td className="ptg-srp-amount"><span className="ptg-search-offer-amount">{peso(product.srp)}</span></td>
                 <td className="ptg-tag-this-amount"><span className="ptg-search-offer-amount">{peso(priceNow(product))}</span></td>
-                <td className="ptg-search-terms"><SearchPaymentTerms product={product} /></td>
                 <td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
-              </tr>) : <tr><td colSpan={9} className="legacy-empty-row">No products found.</td></tr>}
-              <BlankRows used={Math.max(1, results.length)} columns={9} />
+              </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
+              <BlankRows used={Math.max(1, results.length)} />
             </tbody>
           </table>
         </div>
@@ -694,6 +680,8 @@ export default function ProductSearch({
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
           <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
           <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
+          {amount(detailProduct.cash_payment) > 0 && amount(detailProduct.cash_payment) !== priceNow(detailProduct) &&
+            <><dt>Cash price</dt><dd>{peso(detailProduct.cash_payment)}</dd></>}
           <dt>Status</dt><dd>{displayStatus(detailProduct)}</dd>
           {detailMemo && <>
             <dt>Memo ID</dt><dd>{memoLabel(detailMemo, detailProduct) || "—"}</dd>
@@ -722,7 +710,6 @@ export default function ProductSearch({
         .legacy-product-details dt{font-weight:700}
         .legacy-products-table td.ptg-srp-amount,.legacy-product-details .ptg-srp-amount{color:#b42318}
         .legacy-results-panel .ptg-search-promo .ptg-search-offer-amount{color:#DC2626;font-weight:700}
-        .legacy-results-panel .ptg-search-terms,.legacy-results-panel .ptg-search-payment{white-space:normal}
         .legacy-results-panel .ptg-search-offer-amount{white-space:nowrap}
         .legacy-products-table td.ptg-tag-this-amount,.legacy-product-details .ptg-tag-this-amount{color:#12366c;font-weight:800}
         .legacy-product-details dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
@@ -770,12 +757,8 @@ export default function ProductSearch({
         .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
         .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
         .legacy-products-table th:nth-child(2){width:10%}.legacy-products-table th:nth-child(3){width:9%}.legacy-products-table th:nth-child(4){width:33%}.legacy-products-table th:nth-child(5){width:23%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:8%}.legacy-products-table th:nth-child(8){width:6%}
-        .legacy-results-panel .legacy-products-table{min-width:850px}
-        .legacy-results-panel .legacy-products-table th:nth-child(3){width:7%}
-        .legacy-results-panel .legacy-products-table th:nth-child(4){width:23%}
-        .legacy-results-panel .legacy-products-table th:nth-child(5){width:14%}
-        .legacy-results-panel .legacy-products-table th:nth-child(8){width:23%}
-        .legacy-results-panel .legacy-products-table th:nth-child(9){width:6%}
+        .legacy-results-panel .legacy-products-table th:nth-child(5){width:19%}
+        .legacy-results-panel .legacy-products-table :is(th:nth-child(6),th:nth-child(7)){width:10%}
         .legacy-products-table td{height:38px;padding:4px 6px;border-bottom:1px solid #d6d6d6;color:#143d75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5),.legacy-products-table .legacy-product-detail-link{white-space:normal;overflow-wrap:anywhere}
         .legacy-products-table tbody tr:not(.legacy-blank-row){cursor:pointer}
