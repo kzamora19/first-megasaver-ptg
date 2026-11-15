@@ -255,6 +255,8 @@ async function ssoSession(body: Record<string, unknown>, request: Request, origi
     return json(origin, { ok: false, message: "The SSO session could not be verified." }, 401);
   }
   const user = authData.user;
+  const authEmail = user.email?.trim().toLowerCase() || "";
+  if (!authEmail) return json(origin, { ok: false, message: "A verified email is required." }, 403);
   // These identities are supplied by Supabase Auth's verified OIDC provider,
   // not by changeable user_metadata fields or a client-supplied central UUID.
   const { data: detailed, error: identityError } = await admin.auth.admin.getUserById(user.id);
@@ -271,7 +273,7 @@ async function ssoSession(body: Record<string, unknown>, request: Request, origi
     .select("sales_user_id,ptg_user_id,expected_email,username,display_name,role_key,legacy_role,branch_id,is_active,approved_at")
     .eq("sales_user_id", centralId).eq("is_active", true).maybeSingle();
   if (grantError) return json(origin, { ok: false, message: "Unified sign-in grants are temporarily unavailable." }, 503);
-  if (!grant || !grant.approved_at || grant.expected_email !== user.email.toLowerCase() ||
+  if (!grant || !grant.approved_at || grant.expected_email !== authEmail ||
       (grant.ptg_user_id && grant.ptg_user_id !== user.id)) {
     return json(origin, { ok: false, message: "No approved PTG entitlement was found for this account." }, 403);
   }
@@ -308,7 +310,7 @@ async function ssoSession(body: Record<string, unknown>, request: Request, origi
       p_user_id: user.id, p_username: grant.username,
       p_display_name: grant.display_name, p_role_key: grant.role_key,
       p_legacy_role: grant.legacy_role, p_branch_id: grant.branch_id,
-      p_auth_email: user.email,
+      p_auth_email: authEmail,
     });
     if (createdError) {
       return json(origin, { ok: false, message: "PTG account provisioning needs administrator review." }, 503);
