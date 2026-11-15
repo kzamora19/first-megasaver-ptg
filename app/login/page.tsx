@@ -10,6 +10,7 @@ import {
   type EdgeAuthResponse,
 } from "@/lib/ptg/auth-client";
 import { withBasePath } from "@/lib/base-path";
+import { clearUnifiedSalesMarker, restoreUnifiedPtgSession } from "@/lib/ptg/unified-auth-client";
 
 function accountDestination(account: EdgeAuthResponse["account"]) {
   return account?.mustChangePassword ? "/change-password/" :
@@ -23,6 +24,7 @@ export default function LoginPage() {
   const [branchCode, setBranchCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [checkingUnified, setCheckingUnified] = useState(false);
   const [availabilityNotice, setAvailabilityNotice] = useState<ReturnType<typeof getAvailabilityNotice>>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -78,6 +80,23 @@ export default function LoginPage() {
     return () => { active = false; };
   }, [router]);
 
+  useEffect(() => {
+    if (!usesEdgeAuth || getPtgAppSessionId() ||
+      new URLSearchParams(window.location.hash.slice(1)).has("reset")) return;
+    let active = true;
+    setCheckingUnified(true);
+    void restoreUnifiedPtgSession().then(result => {
+      if (active && result?.account &&
+          window.location.pathname.replace(/\/$/, "").endsWith("/login")) {
+        router.replace(accountDestination(result.account));
+      }
+    }).catch(() => {
+      // An unavailable SSO broker must never prevent existing PTG users
+      // from signing in with their own established credentials.
+    }).finally(() => { if (active) setCheckingUnified(false); });
+    return () => { active = false; };
+  }, [router]);
+
   function closeRecovery() {
     setRecovery(false);
     setResetToken("");
@@ -123,6 +142,7 @@ export default function LoginPage() {
       if (usesEdgeAuth) {
         const result = await invokePtgAuth("login", { username, password, branchCode, rememberMe });
         await establishPtgAuthSession(result, rememberMe);
+        clearUnifiedSalesMarker();
         setRememberedPtgLogin(username, rememberMe);
         destination = accountDestination(result.account);
       } else {
