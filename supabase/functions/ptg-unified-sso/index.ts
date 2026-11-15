@@ -54,8 +54,16 @@ Deno.serve(async request => {
       return reply(origin, 403, { ok: false, message: "Application permissions no longer match." });
     // A branch assignment can be changed later by an administrator. Never
     // silently grant PTG access if Sales scope drifted from the original link.
+    const { data: managerBranches, error: managerError } = salesProfile.role === "manager"
+      ? await sales.from("manager_branches").select("branch_id")
+          .eq("manager_id", verified.user.id).eq("dealer_id", salesProfile.dealer_id)
+      : { data: null, error: null };
+    if (managerError || (salesProfile.role === "manager" && managerBranches?.length !== 1))
+      return reply(origin, 403, { ok: false, message: "Manager branch authorization changed." });
+    const salesBranchId = salesProfile.role === "manager"
+      ? managerBranches![0].branch_id : salesProfile.branch_id;
     const { data: salesBranches, error: salesBranchError } = await sales.from("branches")
-      .select("id,code").eq("id", salesProfile.branch_id);
+      .select("id,code").eq("id", salesBranchId);
     if (salesBranchError || salesBranches?.length !== 1 ||
         String(salesBranches[0].code).toUpperCase() !== link.sales_branch_code)
       return reply(origin, 403, { ok: false, message: "Sales Tracker branch access changed." });
