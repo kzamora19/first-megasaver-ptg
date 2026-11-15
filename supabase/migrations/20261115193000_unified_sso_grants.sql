@@ -31,3 +31,34 @@ grant all on public.ptg_unified_sso_grants to service_role;
 
 comment on table public.ptg_unified_sso_grants is
  'Trusted cross-project SSO entitlements for approved new users only; not email-self-service registration. Only service_role may read/write.';
+
+-- Revoking an approved SSO entitlement must also invalidate PTG's own
+-- sessions. Future cross-project admin events will update this grant via a
+-- trusted service credential; the trigger never affects legacy accounts.
+create or replace function private.revoke_ptg_unified_sessions()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $func$
+begin
+  update public.user_profiles
+  set is_active = false,
+      session_version = session_version + 1,
+      updated_at = now()
+  where id = old.ptg_user_id;
+
+  update public.app_sessions
+  set revoked_at = now(), revoke_reason = 'UNIFIED_GRANT_REVOKED'
+  where user_id = old.ptg_user_id and revoked_at is null;
+  return new;
+end
+$func$;
+
+revoke all on function private.revoke_ptg_unified_sessions() from public, anon, authenticated;
+
+drop trigger if exists ptg_unified_grant_revocation on public.ptg_unified_sso_grants;
+create trigger ptg_unified_grant_revocation
+  after update of is_active on public.ptg_unified_sso_grants
+  for each row when (old.is_active and not new.is_active and old.ptg_user_id is not null)
+  execute function private.revoke_ptg_unified_sessions();
