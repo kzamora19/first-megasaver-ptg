@@ -1,4 +1,4 @@
-import { positionedPromotionRows } from "./promotion-pdf-layout.mjs";
+import { positionedSubdealerRows } from "./subdealer-pdf-layout.mjs";
 
 export type SubdealerProduct = {
   barcode: string; brand: string; category: string; model: string;
@@ -42,10 +42,18 @@ export function subdealerPeriod(text: string): string {
   return first + " to " + last;
 }
 
-export function subdealerMemoNumber(fileName: string) {
-  const match = fileName.toUpperCase().match(/\b(SUBCON-\d+|SUBD20\d{2}-\d+|SUB20\d{2}-\d+)\b/);
-  if (!match) throw Error("Memo number is missing from the filename.");
-  return match[1];
+const memoPattern = /\b(?:SUBCON-\d+|SUBD20\d{2}-\d+|SUB20\d{2}-\d+)\b/gi;
+const canonicalMemo = (value: string) => value.toUpperCase().replace(/^SUBD(20\d{2}-)/, "SUB$1");
+
+export function subdealerMemoNumber(fileName: string, headingText: string) {
+  const filenameId = (fileName.match(memoPattern) ?? [])[0];
+  if (!filenameId) throw Error("Memo number is missing from the filename.");
+  const printed = headingText.match(memoPattern) ?? [];
+  const verified = printed.find(id => canonicalMemo(id) === canonicalMemo(filenameId));
+  // Some PDFs mention a different memo being superseded; never use that
+  // reference as the current memo number.
+  if (!verified) throw Error("The memo number printed in the PDF does not match its filename.");
+  return canonicalMemo(verified);
 }
 
 type PdfTextItem = { str: string; transform: number[]; width: number; height: number };
@@ -56,7 +64,6 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
   if (!/\.pdf$/i.test(file.name) || file.size > 20 * 1024 * 1024) {
     throw Error("Choose a PDF memo no larger than 20 MB.");
   }
-  const memoId = subdealerMemoNumber(file.name);
   const pdfjs = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ pdfJsRoot + "pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = pdfJsRoot + "pdf.worker.mjs";
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -80,7 +87,8 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
       b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4]
     ).map(item => item.text).join(" ");
     const period = subdealerPeriod(heading);
-    const extracted = positionedPromotionRows({ sourceName: file.name, pages });
+    const memoId = subdealerMemoNumber(file.name, heading);
+    const extracted = positionedSubdealerRows({ sourceName: file.name, pages });
     const expectedRows = pages.reduce((n, page) =>
       n + page.items.filter(item => /^0\d{7}$/.test(item.text.trim())).length, 0);
     const issues: string[] = [];
