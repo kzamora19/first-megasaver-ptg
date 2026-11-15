@@ -117,7 +117,7 @@ export default function LoginPage() {
     try {
       let destination = "/dashboard";
       if (usesEdgeAuth) {
-        const result = await invokePtgAuth("login", { username, password, branchCode });
+        const result = await invokePtgAuth("login", { username, password, branchCode, rememberMe });
         await establishPtgAuthSession(result, rememberMe);
         setRememberedPtgLogin(username, rememberMe);
         destination = accountDestination(result.account);
@@ -166,7 +166,7 @@ export default function LoginPage() {
             </label>
             {usesEdgeAuth && <label className="legacy-show-password">
               <input type="checkbox" checked={rememberMe} onChange={event => setRememberMe(event.target.checked)} />
-              <span>Remember me on this device</span>
+              <span>Remember me on this device <small>(7 days · private devices only)</small></span>
             </label>}
             <details className="legacy-branch-option">
               <summary>Branch code (optional)</summary>
