@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import ClientSessionGate from "@/components/client-session-gate";
 import { withBasePath } from "@/lib/base-path";
+import Link from "next/link";
 import PriceMemoImporter from "./price-memo-importer";
 
 function ImportBackLink({ systemAdmin }: { systemAdmin: boolean }) {
@@ -26,7 +27,7 @@ export default function PriceMemoImportPage() {
         <p className="intro">Import Head Office price memos once for all four branches. Memo products and the product master are shared across PTG.</p>
         <div className="status"><span className="status-dot"/>{session.role.replaceAll("_", " ")}</div>
       </section>
-      <p><a href={withBasePath("/price-memos/subdealer/") + (session.role === "SYSTEM_ADMIN" ? "?workspace=data-desk" : "")} className="admin-link">Open SUBDEALER MEMO IMPORTER (PDF)</a></p>
+      <p><Link href={"/price-memos/subdealer/" + (session.role === "SYSTEM_ADMIN" ? "?workspace=data-desk" : "")} className="admin-link">Open SUBDEALER MEMO IMPORTER (PDF)</Link></p>
       <PriceMemoImporter />
     </main>}
   </ClientSessionGate>;
