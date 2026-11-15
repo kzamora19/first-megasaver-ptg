@@ -85,7 +85,11 @@ export default function UnifiedInvitations({
     }
   }, [verifyPtg, verifySales]);
 
-  useEffect(() => { void verifyConnections(); }, [verifyConnections]);
+  useEffect(() => {
+    // Start the asynchronous verification after the effect returns; do not
+    // synchronously schedule cascading UI state changes on mount.
+    void Promise.resolve().then(() => verifyConnections());
+  }, [verifyConnections]);
 
   async function validate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -240,7 +244,7 @@ export default function UnifiedInvitations({
         {enabled ? <button type="button" className="admin-button"
           disabled={sending} onClick={() => void sendUnifiedInvitation()}>
           {sending ? "Preparing invitation…" : pendingSalesId ? "Resume pending invitation" : "Send one unified invitation"}
-        </button> : <p role="status"><strong>Review complete.</strong> Sending is not enabled until both projects' shared sign-in and cross-app revocation tests pass.</p>}
+        </button> : <p role="status"><strong>Review complete.</strong> Sending is not enabled until the shared sign-in and cross-app revocation tests pass.</p>}
       </div>}
     </section>
   </main>;
