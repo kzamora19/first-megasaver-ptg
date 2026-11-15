@@ -43,7 +43,7 @@ begin
     select 1 from public.memo_products item
     join public.price_memos old on old.id=item.memo_id
     join public.ptg_memo_campaigns campaign on campaign.memo_number=old.memo_id
-    where campaign.campaign='SUBDEALER'
+    where campaign.campaign='SUBDEALER' and old.branch_id is null
       and public.ptg_srp_barcode_key(item.barcode)=any(v_incoming)
       and public.ptg_period_start(old.period)>v_start
       and old.memo_id <> p_memo_id
@@ -56,7 +56,7 @@ begin
     select 1 from public.memo_products item
     join public.price_memos old on old.id=item.memo_id
     join public.ptg_memo_campaigns campaign on campaign.memo_number=old.memo_id
-    where campaign.campaign='SUBDEALER'
+    where campaign.campaign='SUBDEALER' and old.branch_id is null
       and old.memo_id=p_memo_id
       and public.ptg_srp_barcode_key(item.barcode) <> all(v_incoming)
   ) then
@@ -76,13 +76,13 @@ begin
     public.ptg_memo_campaigns campaign
   where item.memo_id=old.id
     and campaign.memo_number=old.memo_id and campaign.campaign='SUBDEALER'
-    and old.id<>v_new_id
+    and old.branch_id is null and old.id<>v_new_id
     and public.ptg_srp_barcode_key(item.barcode)=any(v_incoming);
   get diagnostics v_removed = row_count;
 
   update public.price_memos old set product_count=(
     select count(*) from public.memo_products item where item.memo_id=old.id
-  ) where old.memo_id in (
+  ) where old.branch_id is null and old.memo_id in (
     select campaign.memo_number from public.ptg_memo_campaigns campaign
     where campaign.campaign='SUBDEALER'
   );
@@ -91,9 +91,9 @@ begin
   from public.price_memos old
   join public.ptg_memo_campaigns campaign
     on campaign.memo_number=old.memo_id and campaign.campaign='SUBDEALER'
-  where old.id<>v_new_id and old.product_count=0;
+  where old.branch_id is null and old.id<>v_new_id and old.product_count=0;
   if coalesce(array_length(v_empties,1),0)>0 then
-    delete from public.price_memos where memo_id=any(v_empties);
+    delete from public.price_memos where branch_id is null and memo_id=any(v_empties);
     delete from public.ptg_memo_campaigns where memo_number=any(v_empties)
       and campaign='SUBDEALER';
   end if;
