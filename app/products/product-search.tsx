@@ -130,6 +130,12 @@ const memoLabel = (memo: MemoInfo | null, product: Product | null) => {
   const source = memo?.source_file || product?.source_file;
   return source?.trim().replace(/\.pdf$/i, "") || memoId;
 };
+function MemoSummary({ product }: { product: Product }) {
+  const memo = memoInfo(product);
+  const label = memoLabel(memo, product);
+  if (!label) return null;
+  return <><br /><small>{label}{memo?.period ? <> · {memo.period}</> : null}</small></>;
+}
 const endDate = (period: string) => {
   const raw = String(period || "").trim();
   let match = raw.match(/^([A-Za-z]+)\s+\d{1,2}\s*[-–—]\s*(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})$/i);
@@ -461,7 +467,7 @@ export default function ProductSearch({
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               <BlankRows used={Math.max(1, results.length)} />
             </tbody>
@@ -486,7 +492,7 @@ export default function ProductSearch({
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
               </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
               <BlankRows used={Math.max(1, queueRows.length)} />
             </tbody>
