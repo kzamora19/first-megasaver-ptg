@@ -29,6 +29,22 @@ function client() {
   return sales;
 }
 
+const unifiedMarker = "ptg_unified_sales_login";
+
+export function isUnifiedSalesLogin() {
+  return typeof window !== "undefined" && window.sessionStorage.getItem(unifiedMarker) === "1";
+}
+
+export function clearUnifiedSalesMarker() {
+  if (typeof window !== "undefined") window.sessionStorage.removeItem(unifiedMarker);
+}
+
+export async function signOutUnifiedSalesSession() {
+  if (!isUnifiedSalesLogin()) return;
+  try { await client()?.auth.signOut({ scope: "local" }); }
+  finally { clearUnifiedSalesMarker(); }
+}
+
 export async function salesTrackerAdminSessionToken() {
   const sales = client();
   if (!sales) return null;
@@ -53,5 +69,6 @@ export async function restoreUnifiedPtgSession(): Promise<EdgeAuthResponse | nul
   const result = await response.json().catch(() => ({})) as EdgeAuthResponse;
   if (!response.ok || !result.ok) throw Error(result.message || "Unified sign-in is unavailable.");
   await establishPtgAuthSession(result, false);
+  window.sessionStorage.setItem(unifiedMarker, "1");
   return result;
 }
