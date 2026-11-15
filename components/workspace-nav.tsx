@@ -17,9 +17,13 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const catalog = onDesk && query.get("mode") === "catalog";
   const srp = onDesk && query.get("mode") === "srp";
   const promotionPdf = onDesk && query.get("mode") === "promotion-pdf";
-  const salesTool = onDesk && !catalog && !srp && !promotionPdf ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
-  const unified = onDesk && !catalog && !srp && !promotionPdf && !salesTool;
+  const users = onDesk && query.get("mode") === "users";
+  const salesTool = onDesk && !catalog && !srp && !promotionPdf && !users ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
+  const unified = onDesk && !catalog && !srp && !promotionPdf && !users && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
+    <a href={withBasePath("/data-desk/?mode=users")} onClick={onNavigate}
+      className={"ptg-nav-item" + (users ? " active" : "")}
+      aria-current={users ? "page" : undefined}>User Administration</a>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
       className={"ptg-nav-item" + (unified ? " active" : "")}
       aria-current={unified ? "page" : undefined}>Unified Import</a>
@@ -52,3 +56,4 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }
+
