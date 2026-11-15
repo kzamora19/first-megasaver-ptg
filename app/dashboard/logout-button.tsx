@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { clearPtgAuthSession, invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
+import { signOutUnifiedSalesSession } from "@/lib/ptg/unified-auth-client";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -13,7 +14,9 @@ export default function LogoutButton() {
     setBusy(true);
     try {
       if (usesEdgeAuth) {
-        try { await invokePtgAuth("logout"); } catch { /* Local sign-out still clears this device session. */ } finally { await clearPtgAuthSession(); }
+        try { await invokePtgAuth("logout"); } catch { /* Local sign-out still clears this device session. */ } finally {
+          try { await signOutUnifiedSalesSession(); } finally { await clearPtgAuthSession(); }
+        }
       } else {
         await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
       }
