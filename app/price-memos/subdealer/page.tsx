@@ -7,7 +7,7 @@ import { withBasePath } from "@/lib/base-path";
 export default function SubdealerMemoImportPage() {
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN", "BRANCH_ADMIN"]}>
     {session => <main className="shell admin-shell">
-      <a href={withBasePath("/price-memos/import/")} className="admin-link">← Head Office memo importer</a>
+      <a href={withBasePath("/price-memos/import/") + (session.role === "SYSTEM_ADMIN" ? "?workspace=data-desk" : "")} className="admin-link">← Head Office memo importer</a>
       <section className="hero">
         <p className="eyebrow">PRICE MEMO MANAGEMENT</p>
         <h1>SUBDEALER MEMO IMPORTER</h1>
