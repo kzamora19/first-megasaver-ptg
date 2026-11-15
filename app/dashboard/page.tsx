@@ -7,7 +7,11 @@ import ClientSessionGate from "@/components/client-session-gate";
 function WorkspaceHome({ admin }: { admin: boolean }) {
   const router = useRouter();
   useEffect(() => {
-    router.replace(admin ? "/admin/accounts/" : "/products/");
+    // The dashboard is a landing-only redirect, not a persistent navigation
+    // command. Avoid overriding a deep link after the route has changed.
+    if (window.location.pathname.replace(/\/$/, "").endsWith("/dashboard")) {
+      router.replace(admin ? "/admin/accounts/" : "/products/");
+    }
   }, [admin, router]);
   return <p role="status">Opening PTG…</p>;
 }
