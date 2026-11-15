@@ -200,7 +200,8 @@ export default function LoginPage() {
             </details>
             <button type="submit" disabled={busy || restoring}>{restoring ? "RESTORING SIGN-IN…" : busy ? "AUTHENTICATING…" : "🔒 SIGN IN"}</button>
           </form>
-          <p className="legacy-login-message" role="status">{message}</p>
+          <p className="legacy-login-message" role="status">{checkingUnified ? "Checking your Branchline Sales Tracker sign-in…" : message}</p>
+          <p className="legacy-login-message"><a href="https://kzamora19.github.io/branchline/">New unified account? Sign in through Sales Tracker first.</a></p>
           <div className="legacy-login-security">
             <button className="legacy-forgot-button" type="button" disabled={restoring} onClick={() => setRecovery(true)}>Forgot password?</button>
             <div><span className="legacy-security-dot" />Protected by System Security</div>
