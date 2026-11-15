@@ -1,4 +1,5 @@
 import { positionedSubdealerRows } from "./subdealer-pdf-layout.mjs";
+import { preferredSubdealerOffer } from "./subdealer-offer-priority.mjs";
 
 export type SubdealerProduct = {
   barcode: string; brand: string; category: string; model: string;
@@ -9,7 +10,7 @@ export type SubdealerProduct = {
 export type SubdealerPreview = {
   fileName: string; memoId: string; period: string; pageCount: number;
   expectedRows: number; extractedRows: number; products: SubdealerProduct[];
-  issues: string[];
+  resolvedDuplicates: number; issues: string[];
 };
 
 const months: Record<string, number> = {
@@ -101,7 +102,8 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
     }
     if (extracted.length > 10000) issues.push("A memo may contain no more than 10,000 products.");
     const products: SubdealerProduct[] = [];
-    const seenBarcodes = new Map<string, { rowNumber: number; product: SubdealerProduct }>();
+    const seenBarcodes = new Map<string, { rowNumber: number; productIndex: number; product: SubdealerProduct }>();
+    let resolvedDuplicates = 0;
     for (const [index, row] of extracted.entries()) {
       const barcode = String(row.barcode || "").trim();
       const brand = String(row.brand || "").trim();
@@ -135,19 +137,25 @@ export async function inspectSubdealerPdf(file: File): Promise<SubdealerPreview>
       };
       const previous = seenBarcodes.get(barcode);
       if (previous) {
-        if (JSON.stringify(previous.product) !== JSON.stringify(product)) {
-          issues.push("Conflicting prices or product details for barcode " + barcode +
-            " on PDF rows " + previous.rowNumber + " and " + (index + 1) +
-            ". Review the original PDF; no price is selected automatically.");
+        // If multiple rows share a barcode in this PDF, retain the full row
+        // with the highest selling price. When Tag This is not printed,
+        // tag_this already falls back to the Cash Payment amount.
+        const preferred = preferredSubdealerOffer(previous.product, product);
+        resolvedDuplicates++;
+        if (preferred === product) {
+          products[previous.productIndex] = product;
+          seenBarcodes.set(barcode, {
+            rowNumber: index + 1, productIndex: previous.productIndex, product,
+          });
         }
-        // Identical repeats are one product, not two import operations.
         continue;
       }
-      seenBarcodes.set(barcode, { rowNumber: index + 1, product });
+      const productIndex = products.length;
+      seenBarcodes.set(barcode, { rowNumber: index + 1, productIndex, product });
       products.push(product);
     }
     return { fileName: file.name, memoId, period, pageCount: pages.length,
-      expectedRows, extractedRows: extracted.length, products, issues };
+      expectedRows, extractedRows: extracted.length, products, resolvedDuplicates, issues };
   } finally {
     await pdf.destroy();
   }
