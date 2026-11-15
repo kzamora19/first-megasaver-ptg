@@ -626,7 +626,7 @@ export default function ProductSearch({
               <div className="ptg-compact-barcode">Barcode: <strong>{product.barcode}</strong></div>
               <div>Brand: <strong>{product.brand}</strong></div>
               <div className="ptg-compact-model">MODEL: <strong>{modelDescription}</strong></div>
-              {!srpOnly && <div>SRP: <strong>{peso(product.srp)}</strong></div>}
+              {!srpOnly && <div>SRP: <strong className={format === "SIX" && amount(product.srp) > 0 && pay > 0 && amount(product.srp) > pay ? "ptg-compact-srp-discounted" : undefined}>{peso(product.srp)}</strong></div>}
               <div className="ptg-compact-cash">{srpOnly ? "SRP" : priceCaption}</div>
               <div className="ptg-compact-pay">{termTotal && !srpOnly ? "PER MONTH:" : "PAY NOW:"} <strong>{peso(srpOnly ? product.srp : termTotal ? termTotal / term : pay)}</strong></div>
               {!srpOnly && <div className="ptg-compact-summary">
@@ -861,6 +861,7 @@ export default function ProductSearch({
           .ptg-compact-barcode strong{display:inline-block;min-width:8em;padding:1px 5px;background:#e1e4e8;color:#344761;text-align:center;white-space:nowrap;print-color-adjust:exact;-webkit-print-color-adjust:exact}
           .ptg-compact-model{display:flex;gap:5px;min-height:38px;align-items:start}
           .ptg-compact-model strong{flex:1;text-align:center;overflow-wrap:anywhere}
+          .legacy-six-sheet .ptg-compact-srp-discounted{text-decoration-line:line-through;text-decoration-thickness:2px;text-decoration-color:currentColor;text-decoration-skip-ink:none}
           .ptg-compact-cash{font-size:10px}
           .ptg-compact-pay{display:grid;grid-template-columns:30% minmax(0,1fr);align-items:center;justify-items:start;gap:6px;white-space:nowrap}
           .ptg-compact-pay strong{background:#fff500;padding:2px 6px;font-size:30px;print-color-adjust:exact}
