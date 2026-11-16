@@ -224,6 +224,15 @@ export default function ProductSearch({
       document.getElementById("print-price-tags")?.scrollIntoView();
     }
   }, []);
+  useEffect(() => {
+    const sidebar = document.querySelector<HTMLElement>(".ptg-sidebar");
+    if (!sidebar) return;
+    const updateOffset = () => document.documentElement.style.setProperty("--ptg-mobile-sidebar-height", `${sidebar.getBoundingClientRect().height}px`);
+    updateOffset();
+    const observer = new ResizeObserver(updateOffset);
+    observer.observe(sidebar);
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty("--ptg-mobile-sidebar-height"); };
+  }, []);
 
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
@@ -471,8 +480,9 @@ export default function ProductSearch({
 
   return (
     <main className="ptg-main legacy-ptg-main" data-demo={demo || undefined}>
-      {logos.appHeader && <img src={artworkUrl("appHeader")} alt="Interface header artwork"
-        className="ptg-print-hide legacy-products-banner" />}
+      {logos.appHeader && <div className="ptg-print-hide legacy-products-banner-pin">
+        <img src={artworkUrl("appHeader")} alt="Interface header artwork" className="legacy-products-banner" />
+      </div>}
 
       {demo ? <section className="legacy-branch-tools ptg-print-hide" aria-label="Demo workspace">
         <div className="legacy-tools-heading"><strong>DEMO · SAMPLE PRODUCTS ONLY</strong><a href={withBasePath("/login/")}>Exit demo</a></div>
@@ -792,7 +802,9 @@ export default function ProductSearch({
         .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
         .legacy-unit-only-queue-button{border:1px solid #2465c3;border-radius:5px;background:#eef5ff;color:#124a9c;padding:7px 12px;font-weight:700;cursor:pointer}
         .legacy-unit-only-queue-button:disabled{opacity:.65;cursor:default}
-        .legacy-products-banner{display:block;width:100%;height:auto;margin:0 0 9px;border-radius:5px}
+        .legacy-products-banner-pin{position:sticky;top:0;z-index:4;padding-bottom:9px;background:#f3f6fa}
+        .legacy-products-banner{display:block;width:100%;height:auto;margin:0;border-radius:5px}
+        @media(max-width:720px){.legacy-products-banner-pin{top:var(--ptg-mobile-sidebar-height,70px)}}
         .legacy-ptg-main{width:min(1500px,calc(100% - 20px));margin:0 auto;padding:8px 0 18px!important;color:#123b72;font-family:Arial,Helvetica,sans-serif}
         .legacy-branch-tools,.legacy-search-card,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{border:1px solid #dbe3ed;border-radius:6px;background:#fff}
         .legacy-branch-tools{margin-bottom:9px;padding:8px 10px}

@@ -1,0 +1,45 @@
+name: Verify pinned PTG banner
+
+on:
+  push:
+    branches:
+      - codex/pinned-ptg-banner-20261116
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-pinned-ptg-banner
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAGES: "true"
+      NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+      NEXT_PUBLIC_SUPABASE_URL: https://agknxlowackphvwyvxge.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_kv2q3dnNQt4ij0mgkOLbQQ_S2MO9FvG
+      NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_ASSETS: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_ACCOUNTS: "true"
+      NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL: https://psoopubvdpwztzkdyifa.supabase.co
+      NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY: sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm
+      NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES: "false"
+
+      NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Verify Subdealer PDF field extraction
+        run: node --test lib/ptg/subdealer-layout.test.mjs
+      - name: Build static site
+        run: npm run build
