@@ -5,8 +5,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { requestPtgAccounts } from "@/lib/ptg/accounts-client";
 import { validateWorkspaceInvitations } from "@/lib/ptg/workspace-invitation-validation.mjs";
 import { withBasePath } from "@/lib/base-path";
+import WorkspaceBranches from "./workspace-branches";
 
-type Branch = { id: string; name: string; district_id: string };
+type Branch = { id: string; name: string; code: string | null; district_id: string };
 type District = { id: string; name: string };
 type PtgBranch = { id: string; branch_code: string; branch_name: string; status: string; operational_status: string };
 type Person = { id: number; fullName: string; email: string; useSales: boolean; usePtg: boolean; salesRole: string; login: string; brand: string; districtId: string; branchId: string; branchIds: string[]; ptgRole: string; username: string; ptgBranchId: string; title: string; result?: string };
@@ -54,7 +55,7 @@ export default function WorkspaceInvitations() {
         if (!profile?.active || profile.role !== "admin" || !profile.dealer_id) return;
         const [d, b] = await Promise.all([
           client.from("districts").select("id,name").eq("dealer_id", profile.dealer_id).order("name"),
-          client.from("branches").select("id,name,district_id").eq("dealer_id", profile.dealer_id).order("name"),
+          client.from("branches").select("id,name,code,district_id").eq("dealer_id", profile.dealer_id).order("name"),
         ]);
         if (d.error || b.error) return;
         if (live) { setDistricts(d.data ?? []); setBranches(b.data ?? []); setSalesReady(true); }
@@ -101,6 +102,8 @@ export default function WorkspaceInvitations() {
       <p className="intro">Invite people to Sales Tracker, Price Tag Generator, or both. Each person receives one email for their selected apps.</p>
     </section>
     {!salesReady && <p className="admin-alert invitations-notice">For Sales Tracker access, sign in to Sales Tracker as an administrator in this browser, then reopen this page. PTG-only invitations are available without it.</p>}
+    <WorkspaceBranches tracker={tracker} ready={salesReady} branches={branches} districts={districts} ptgBranches={ptgBranches}
+      onUpdated={(sales, ptg) => { setBranches(sales); setPtgBranches(ptg); }} />
     <div className="invitation-list">{people.map((p, index) => <section className="admin-card invitation-card" key={p.id}>
       <div className="invitation-card-heading"><div><h2>Person {index + 1}</h2><p className="admin-muted">Enter their details and choose their app access.</p></div>
         {people.length > 1 && !busy && <button className="admin-button small secondary" type="button" onClick={() => setPeople(rows => rows.filter(row => row.id !== p.id))}>Remove person</button>}
@@ -121,7 +124,17 @@ export default function WorkspaceInvitations() {
           {p.salesRole === "ps" && <label>Assigned brand<input value={p.brand} onChange={e => update(p.id, { brand: e.target.value })} /></label>}
           {!['inventory_controller', 'stock_custodian'].includes(p.salesRole) ? <><label>District<select value={p.districtId} onChange={e => update(p.id, { districtId: e.target.value, branchId: "" })}><option value="">Choose district</option>{districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
             {p.salesRole !== "district_manager" && <label>Branch<select value={p.branchId} onChange={e => update(p.id, { branchId: e.target.value })}><option value="">Choose branch</option>{branches.filter(b => b.district_id === p.districtId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}</> :
-            <fieldset className="invitation-branches"><legend>Assigned branches</legend>{branches.map(b => <label className="invitation-choice" key={b.id}><input type="checkbox" checked={p.branchIds.includes(b.id)} onChange={e => update(p.id, { branchIds: e.target.checked ? [...p.branchIds, b.id] : p.branchIds.filter(id => id !== b.id) })} /> {b.name}</label>)}</fieldset>}
+            <div className="invitation-branches"><label>Assigned branches<select value="" onChange={e => {
+              const id = e.target.value;
+              if (id && !p.branchIds.includes(id)) update(p.id, { branchIds: [...p.branchIds, id] });
+            }}><option value="">Choose a branch to add</option>{branches.filter(b => !p.branchIds.includes(b.id)).map(b => <option key={b.id} value={b.id}>{b.code ? b.code + " — " : ""}{b.name}</option>)}</select></label>
+              <p className="admin-muted">Choose each branch this person can access.</p>
+              {p.branchIds.length > 0 && <div className="invitation-selected" aria-label="Selected branches">{p.branchIds.map(id => {
+                const branch = branches.find(item => item.id === id);
+                return <span className="invitation-selected-branch" key={id}>{branch?.name ?? "Selected branch"}<button type="button" aria-label={"Remove " + (branch?.name ?? "branch")} onClick={() => update(p.id, { branchIds: p.branchIds.filter(value => value !== id) })}>×</button></span>;
+              })}</div>}
+              {salesReady && ptgBranches.some(b => !branches.some(s => s.code?.toUpperCase() === b.branch_code.toUpperCase())) && <p className="admin-muted">This list uses Sales Tracker branches. Branches available only in PTG must first be added to Sales Tracker.</p>}
+            </div>}
         </div></div>}
         {p.usePtg && <div className="invitation-section"><h3>Price Tag Generator access</h3><div className="admin-form">
           <label>Username<input value={p.username} onChange={e => update(p.id, { username: e.target.value })} /></label>
@@ -141,19 +154,23 @@ export default function WorkspaceInvitations() {
       .invitation-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
       .invitation-card-heading h2 { margin: 0 0 5px; }
       .invitation-card-heading p, .invitation-section p { margin: 0; }
-      .invitation-fields, .invitation-branches { border: 0; padding: 0; margin: 0; min-width: 0; }
+      .invitation-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
       .invitation-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e3eaf2; }
       .invitation-section h3 { margin: 0 0 6px; font-size: 16px; }
       .invitation-section .admin-form { margin-top: 14px; }
       .invitation-apps { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
       .invitation-choice { display: inline-flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #d8e3ef; border-radius: 8px; color: #234468; font-size: 13px; font-weight: 700; }
       .invitation-choice input { width: 17px; height: 17px; margin: 0; accent-color: #164a8a; }
-      .invitation-branches { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
-      .invitation-branches legend { margin-bottom: 8px; color: #344761; font-size: 12px; font-weight: 800; }
+      .invitation-branches { min-width: 0; grid-column: 1 / -1; }
+      .invitation-branches > label { max-width: calc(50% - 8px); }
+      .invitation-branches > p { margin: 8px 0 0; }
+      .invitation-selected { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+      .invitation-selected-branch { display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border: 1px solid #c7d9ee; border-radius: 8px; background: #f4f8fd; color: #234468; font-size: 13px; font-weight: 700; }
+      .invitation-selected-branch button { border: 0; padding: 0 3px; background: transparent; color: #234468; font-size: 20px; cursor: pointer; }
       .invitation-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
       .invitations-notice { background: #eef5fd; color: #294b70; }
       .invitations-drafts { margin: 24px 0; }
-      @media (max-width: 760px) { .invitation-card-heading { flex-direction: column; } .invitation-actions > button { flex: 1 1 100%; } }
+      @media (max-width: 760px) { .invitation-card-heading { flex-direction: column; } .invitation-actions > button { flex: 1 1 100%; } .invitation-branches > label { max-width: none; } }
     `}</style>
   </main>;
 }
