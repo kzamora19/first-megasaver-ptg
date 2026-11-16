@@ -699,7 +699,13 @@ export default function ProductSearch({
           )}
           </div>)}
         </div>}
-      {detailProduct && <AppDialog title={showSerials ? "Available serial numbers" : "Product details"} closeIcon busy={false} onClose={() => setDetailProduct(null)}>
+      {detailProduct && <AppDialog title={showSerials ? "Available serial numbers" : "Product details"} closeIcon busy={false} onClose={() => setDetailProduct(null)} pinned
+        pinnedContent={!showSerials && inventoryEnabled ? <p className="legacy-product-stock">
+          <strong>Inventory quantity</strong>{" "}
+          {stock ? <>{stock.serialized ? <button type="button" className="legacy-product-detail-link" aria-label={stock.quantity + " units. Show available serial numbers"}
+            onClick={() => { setSerials(null); setSerialMessage(""); setShowSerials(true); }}>{stock.quantity}</button> : stock.quantity} · {stock.scope}</>
+            : <span role="status">{stockMessage || "Loading…"}</span>}
+        </p> : null}>
         {showSerials ? <>
           <p><button type="button" className="legacy-product-detail-link" onClick={() => setShowSerials(false)}>← Product details</button></p>
           <p>{detailProduct.barcode} · {stock?.scope}</p>
@@ -709,12 +715,6 @@ export default function ProductSearch({
               <tbody>{serials.map(item => <tr key={item.branch + ":" + item.serial}><td>{item.serial}</td><td>{item.branch}</td><td>{item.receivedOn || "—"}</td></tr>)}</tbody>
             </table> : <p>No serial numbers currently available.</p>}
         </> : <>
-        {inventoryEnabled && <p className="legacy-product-stock">
-          <strong>Inventory quantity</strong>{" "}
-          {stock ? <>{stock.serialized ? <button type="button" className="legacy-product-detail-link" aria-label={stock.quantity + " units. Show available serial numbers"}
-            onClick={() => { setSerials(null); setSerialMessage(""); setShowSerials(true); }}>{stock.quantity}</button> : stock.quantity} · {stock.scope}</>
-            : <span role="status">{stockMessage || "Loading…"}</span>}
-        </p>}
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
           <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
@@ -762,6 +762,11 @@ export default function ProductSearch({
         </>}
       </AppDialog>}
       <style jsx global>{`
+        .app-dialog.app-dialog-pinned[open]{display:flex;flex-direction:column;overflow:hidden}
+        .app-dialog-pinned > header{flex:none}
+        .app-dialog-pinned-content{flex-basis:100%;min-width:0}
+        .app-dialog-pinned-content .legacy-product-stock{margin:.25rem 0 0}
+        .app-dialog-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain}
         .legacy-stock-filter{display:flex;align-items:center;gap:.4rem;color:#12366c;font-size:.85rem}
         .legacy-search-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem}
         .legacy-search-filters .legacy-stock-filter{white-space:nowrap}
@@ -947,4 +952,6 @@ export default function ProductSearch({
     </main>
   );
 }
+
+
 
