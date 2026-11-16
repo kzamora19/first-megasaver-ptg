@@ -18,7 +18,7 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const srp = onDesk && query.get("mode") === "srp";
   const promotionPdf = onDesk && query.get("mode") === "promotion-pdf";
   const subdealerPdf = onDesk && query.get("mode") === "subdealer";
-  const unifiedInvites = onDesk && query.get("mode") === "invitations";
+  const unifiedInvites = onDesk && ["invitations", "invitation-drafts"].includes(query.get("mode") ?? "");
   const salesTool = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !unifiedInvites ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
   const unified = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !unifiedInvites && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
@@ -33,7 +33,7 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
       aria-current={subdealerPdf ? "page" : undefined}>Subdealer Memo Import</Link>
     <Link href="/data-desk/?mode=invitations" onClick={onNavigate}
       className={"ptg-nav-item" + (unifiedInvites ? " active" : "")}
-      aria-current={unifiedInvites ? "page" : undefined}>Unified Invitations</Link>
+      aria-current={unifiedInvites ? "page" : undefined}>User Administration</Link>
     <a href={withBasePath("/data-desk/?mode=catalog")} onClick={onNavigate}
       className={"ptg-nav-item" + (catalog ? " active" : "")}
       aria-current={catalog ? "page" : undefined}>Cross-App Catalog Review</a>
@@ -60,3 +60,5 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }
+
+
