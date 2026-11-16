@@ -94,37 +94,67 @@ export default function WorkspaceInvitations() {
       }
     } finally { running.current = false; setBusy(false); }
   }
-  return <main className="ptg-main"><h1>User Administration</h1>
-    <p>Invite one or more people to Sales Tracker, Price Tag Generator, or both. Each person receives one email with the access selected for them.</p>
-    <p><a href={withBasePath("/data-desk/?mode=invitation-drafts")}>View existing invitation drafts</a></p>
-    {!salesReady && <p className="admin-muted">For Sales Tracker access, sign in to Sales Tracker as an administrator in this browser, then reopen this page. PTG-only invitations are available without it.</p>}
-    {people.map((p, index) => <section className="admin-card" key={p.id}>
-      <h2>Person {index + 1}</h2><fieldset disabled={busy || !!p.result}>
-        <p><label>Full name <input value={p.fullName} onChange={e => update(p.id, { fullName: e.target.value })} /></label></p>
-        <p><label>Email <input type="email" value={p.email} onChange={e => update(p.id, { email: e.target.value })} /></label></p>
-        <p><label><input type="checkbox" checked={p.useSales} onChange={e => update(p.id, { useSales: e.target.checked })} /> Sales Tracker</label>{" "}
-        <label><input type="checkbox" checked={p.usePtg} onChange={e => update(p.id, { usePtg: e.target.checked })} /> Price Tag Generator</label></p>
-        {p.useSales && <div><h3>Sales Tracker access</h3>
-          <p><label>Role <select value={p.salesRole} onChange={e => update(p.id, { salesRole: e.target.value, branchId: "", branchIds: [] })}>
-            <option value="ps">Product Specialist</option><option value="manager">Branch Manager</option><option value="district_manager">District Manager</option><option value="inventory_controller">Inventory Controller</option><option value="stock_custodian">Stock Custodian</option></select></label></p>
-          <p><label>{p.salesRole === "ps" ? "Salesperson code" : "Login ID"} <input value={p.login} onChange={e => update(p.id, { login: e.target.value })} /></label></p>
-          {p.salesRole === "ps" && <p><label>Brand <input value={p.brand} onChange={e => update(p.id, { brand: e.target.value })} /></label></p>}
-          {!['inventory_controller', 'stock_custodian'].includes(p.salesRole) ? <><p><label>District <select value={p.districtId} onChange={e => update(p.id, { districtId: e.target.value, branchId: "" })}><option value="">Choose district</option>{districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label></p>
-            {p.salesRole !== "district_manager" && <p><label>Branch <select value={p.branchId} onChange={e => update(p.id, { branchId: e.target.value })}><option value="">Choose branch</option>{branches.filter(b => b.district_id === p.districtId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label></p>}</> :
-            <fieldset><legend>Assigned branches</legend>{branches.map(b => <label key={b.id} style={{ display: "block" }}><input type="checkbox" checked={p.branchIds.includes(b.id)} onChange={e => update(p.id, { branchIds: e.target.checked ? [...p.branchIds, b.id] : p.branchIds.filter(id => id !== b.id) })} /> {b.name}</label>)}</fieldset>}
-        </div>}
-        {p.usePtg && <div><h3>Price Tag Generator access</h3>
-          <p><label>Username <input value={p.username} onChange={e => update(p.id, { username: e.target.value })} /></label></p>
-          <p><label>Title <select value={p.title} onChange={e => update(p.id, { title: e.target.value, ptgRole: ["BRANCH ADMIN", "BRANCH MANAGER"].includes(e.target.value) ? "BRANCH_ADMIN" : "BRANCH_USER" })}><option value="BRANCH USER">Branch User</option><option value="TEAM LEADER">Team Leader</option><option value="BRANCH ADMIN">Branch Admin</option><option value="BRANCH MANAGER">Branch Manager</option></select></label></p>
-          <p><label>Branch <select value={p.ptgBranchId} onChange={e => update(p.id, { ptgBranchId: e.target.value })}><option value="">Choose branch</option>{ptgBranches.map(b => <option key={b.id} value={b.id}>{b.branch_code} — {b.branch_name}</option>)}</select></label></p>
-        </div>}
+  return <main className="ptg-main shell admin-shell invitations-page">
+    <section className="hero admin-hero">
+      <p className="eyebrow">BRANCHLINE DATA DESK · ACCOUNT ADMINISTRATION</p>
+      <h1>User Administration</h1>
+      <p className="intro">Invite people to Sales Tracker, Price Tag Generator, or both. Each person receives one email for their selected apps.</p>
+    </section>
+    {!salesReady && <p className="admin-alert invitations-notice">For Sales Tracker access, sign in to Sales Tracker as an administrator in this browser, then reopen this page. PTG-only invitations are available without it.</p>}
+    <div className="invitation-list">{people.map((p, index) => <section className="admin-card invitation-card" key={p.id}>
+      <div className="invitation-card-heading"><div><h2>Person {index + 1}</h2><p className="admin-muted">Enter their details and choose their app access.</p></div>
+        {people.length > 1 && !busy && <button className="admin-button small secondary" type="button" onClick={() => setPeople(rows => rows.filter(row => row.id !== p.id))}>Remove person</button>}
+      </div>
+      <fieldset className="invitation-fields" disabled={busy || !!p.result}>
+        <div className="admin-form">
+          <label>Employee full name<input autoComplete="name" value={p.fullName} onChange={e => update(p.id, { fullName: e.target.value })} /></label>
+          <label>Work email<input type="email" autoComplete="email" value={p.email} onChange={e => update(p.id, { email: e.target.value })} /></label>
+        </div>
+        <div className="invitation-section"><h3>App access</h3><p className="admin-muted">Select the apps this person needs.</p>
+          <div className="invitation-apps"><label className="invitation-choice"><input type="checkbox" checked={p.useSales} onChange={e => update(p.id, { useSales: e.target.checked })} /> Sales Tracker</label>
+            <label className="invitation-choice"><input type="checkbox" checked={p.usePtg} onChange={e => update(p.id, { usePtg: e.target.checked })} /> Price Tag Generator</label></div>
+        </div>
+        {p.useSales && <div className="invitation-section"><h3>Sales Tracker access</h3><div className="admin-form">
+          <label>Role<select value={p.salesRole} onChange={e => update(p.id, { salesRole: e.target.value, branchId: "", branchIds: [] })}>
+            <option value="ps">Product Specialist</option><option value="manager">Branch Manager</option><option value="district_manager">District Manager</option><option value="inventory_controller">Inventory Controller</option><option value="stock_custodian">Stock Custodian</option></select></label>
+          <label>{p.salesRole === "ps" ? "Salesperson code" : "Login ID"}<input value={p.login} onChange={e => update(p.id, { login: e.target.value })} /></label>
+          {p.salesRole === "ps" && <label>Assigned brand<input value={p.brand} onChange={e => update(p.id, { brand: e.target.value })} /></label>}
+          {!['inventory_controller', 'stock_custodian'].includes(p.salesRole) ? <><label>District<select value={p.districtId} onChange={e => update(p.id, { districtId: e.target.value, branchId: "" })}><option value="">Choose district</option>{districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
+            {p.salesRole !== "district_manager" && <label>Branch<select value={p.branchId} onChange={e => update(p.id, { branchId: e.target.value })}><option value="">Choose branch</option>{branches.filter(b => b.district_id === p.districtId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}</> :
+            <fieldset className="invitation-branches"><legend>Assigned branches</legend>{branches.map(b => <label className="invitation-choice" key={b.id}><input type="checkbox" checked={p.branchIds.includes(b.id)} onChange={e => update(p.id, { branchIds: e.target.checked ? [...p.branchIds, b.id] : p.branchIds.filter(id => id !== b.id) })} /> {b.name}</label>)}</fieldset>}
+        </div></div>}
+        {p.usePtg && <div className="invitation-section"><h3>Price Tag Generator access</h3><div className="admin-form">
+          <label>Username<input value={p.username} onChange={e => update(p.id, { username: e.target.value })} /></label>
+          <label>Title<select value={p.title} onChange={e => update(p.id, { title: e.target.value, ptgRole: ["BRANCH ADMIN", "BRANCH MANAGER"].includes(e.target.value) ? "BRANCH_ADMIN" : "BRANCH_USER" })}><option value="BRANCH USER">Branch User</option><option value="TEAM LEADER">Team Leader</option><option value="BRANCH ADMIN">Branch Admin</option><option value="BRANCH MANAGER">Branch Manager</option></select></label>
+          <label>Branch<select value={p.ptgBranchId} onChange={e => update(p.id, { ptgBranchId: e.target.value })}><option value="">Choose branch</option>{ptgBranches.map(b => <option key={b.id} value={b.id}>{b.branch_code} — {b.branch_name}</option>)}</select></label>
+        </div></div>}
       </fieldset>
-      {p.result && <p role="status"><strong>{p.result}</strong></p>}
-      {people.length > 1 && !busy && <button type="button" onClick={() => setPeople(rows => rows.filter(row => row.id !== p.id))}>Remove person</button>}
-    </section>)}
-    {message && <p role="alert">{message}</p>}
-    <p><button type="button" disabled={busy} onClick={() => setPeople(rows => [...rows, newPerson(nextId.current++)])}>Add another person</button>{" "}
-      <button type="button" className="admin-button" disabled={busy || !people.some(p => !p.result)} onClick={() => void send()}>{busy ? "Preparing invitations…" : "Send invitations"}</button></p>
+      {p.result && <p className="admin-alert invitations-notice" role="status">{p.result}</p>}
+    </section>)}</div>
+    {message && <p className="admin-alert error" role="alert">{message}</p>}
+    <div className="invitation-actions"><button type="button" className="admin-button secondary" disabled={busy} onClick={() => setPeople(rows => [...rows, newPerson(nextId.current++)])}>+ Add another person</button>
+      <button type="button" className="admin-button" disabled={busy || !people.some(p => !p.result)} onClick={() => void send()}>{busy ? "Preparing invitations…" : "Send invitations"}</button></div>
+    <p className="invitations-drafts"><a className="admin-link" href={withBasePath("/data-desk/?mode=invitation-drafts")}>View saved invitation drafts</a></p>
+    <style jsx>{`
+      .invitations-page .admin-hero { margin-bottom: 20px; }
+      .invitation-list { display: grid; gap: 18px; }
+      .invitation-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+      .invitation-card-heading h2 { margin: 0 0 5px; }
+      .invitation-card-heading p, .invitation-section p { margin: 0; }
+      .invitation-fields, .invitation-branches { border: 0; padding: 0; margin: 0; min-width: 0; }
+      .invitation-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e3eaf2; }
+      .invitation-section h3 { margin: 0 0 6px; font-size: 16px; }
+      .invitation-section .admin-form { margin-top: 14px; }
+      .invitation-apps { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+      .invitation-choice { display: inline-flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #d8e3ef; border-radius: 8px; color: #234468; font-size: 13px; font-weight: 700; }
+      .invitation-choice input { width: 17px; height: 17px; margin: 0; accent-color: #164a8a; }
+      .invitation-branches { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+      .invitation-branches legend { margin-bottom: 8px; color: #344761; font-size: 12px; font-weight: 800; }
+      .invitation-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+      .invitations-notice { background: #eef5fd; color: #294b70; }
+      .invitations-drafts { margin: 24px 0; }
+      @media (max-width: 760px) { .invitation-card-heading { flex-direction: column; } .invitation-actions > button { flex: 1 1 100%; } }
+    `}</style>
   </main>;
 }
 
