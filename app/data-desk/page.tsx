@@ -10,6 +10,7 @@ import BatchImport from "./batch-import";
 import PromotionPdfConverter from "./promotion-pdf-converter";
 import SubdealerMemoImporter from "@/app/price-memos/subdealer/subdealer-memo-importer";
 import UnifiedInvitations from "./unified-invitations";
+import WorkspaceInvitations from "./workspace-invitations";
 import SecurityWorkspace from "@/app/admin/accounts/security-workspace";
 import { deskSalesTools } from "@/lib/ptg/batch-import";
 import { combineCatalogs, destinations, publishCatalog, readCatalog, pilotLimit, workbookLimit, reviewRowLimit, type CatalogRow, type Destination, type ImportResults } from "@/lib/ptg/catalog-pilot";
@@ -253,9 +254,11 @@ function DataDeskView() {
   const promotionPdf = query.get("mode") === "promotion-pdf";
   const subdealerPdf = query.get("mode") === "subdealer";
   const unifiedInvites = query.get("mode") === "invitations";
+  const invitationDrafts = query.get("mode") === "invitation-drafts";
   const tool = deskSalesTools.find(item => item.id === query.get("tool"));
   return <ClientSessionGate allowRoles={["SYSTEM_ADMIN"]}>{() => srp ? <SecurityWorkspace desk /> : catalog ? <CatalogPilot /> :
-    unifiedInvites ? <UnifiedInvitations verifyPtg={verifyPtg} verifySales={verifySales} /> :
+    unifiedInvites ? <WorkspaceInvitations /> :
+    invitationDrafts ? <UnifiedInvitations verifyPtg={verifyPtg} verifySales={verifySales} /> :
     promotionPdf ? <PromotionPdfConverter verifyPtg={verifyPtg} verifySales={verifySales} /> :
     subdealerPdf ? <main className="ptg-main shell admin-shell">
       <section className="hero admin-hero">
@@ -271,3 +274,5 @@ function DataDeskView() {
 export default function DataDeskPage() {
   return <Suspense fallback={null}><DataDeskView /></Suspense>;
 }
+
+
