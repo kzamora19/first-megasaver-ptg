@@ -2,12 +2,14 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
-export default function AppDialog({ title, busy, onClose, children, closeIcon = false }: {
+export default function AppDialog({ title, busy, onClose, children, closeIcon = false, pinned = false, pinnedContent }: {
   title: string;
   closeIcon?: boolean;
   busy: boolean;
   onClose: () => void;
   children: ReactNode;
+  pinned?: boolean;
+  pinnedContent?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -18,12 +20,15 @@ export default function AppDialog({ title, busy, onClose, children, closeIcon = 
     return () => element?.close();
   }, []);
 
-  return <dialog ref={dialog} className="app-dialog" aria-labelledby={titleId}
+  return <dialog ref={dialog} className={"app-dialog" + (pinned ? " app-dialog-pinned" : "")} aria-labelledby={titleId}
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
     <header>
       <h3 id={titleId}>{title}</h3>
       <button type="button" className="admin-button small secondary" disabled={busy} onClick={onClose} aria-label={closeIcon ? "Close" : undefined}>{closeIcon ? "×" : "Cancel"}</button>
+      {pinnedContent && <div className="app-dialog-pinned-content">{pinnedContent}</div>}
     </header>
-    {children}
+    {pinned ? <div className="app-dialog-scroll">{children}</div> : children}
   </dialog>;
 }
+
+
