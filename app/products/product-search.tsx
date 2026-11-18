@@ -13,6 +13,7 @@ import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
 import { visibleOffersForBarcode, memoEntriesForOffer } from "@/lib/ptg/offer-comparison.mjs";
 import { reviewPrintQueue } from "@/lib/ptg/print-preflight.mjs";
 import { appendVisibleBrandOffers } from "@/lib/ptg/queue-selection.mjs";
+import { groupedPrintPlan, expandedPrintBatch, normalizePrintCopies } from "@/lib/ptg/print-batches.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -247,6 +248,9 @@ export default function ProductSearch({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
+  const [batchPlannerEnabled, setBatchPlannerEnabled] = useState(false);
+  const [batchDefaultFormat, setBatchDefaultFormat] = useState<FormatKey>("ONE");
+  const [printPreferences, setPrintPreferences] = useState<Record<string, { format: FormatKey; copies: number }>>({});
   const [bulkBrand, setBulkBrand] = useState("");
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
@@ -517,16 +521,18 @@ export default function ProductSearch({
 
   const compact = format === "SIX" || format === "SMALL_APPS" || format === "CARAVAN";
   const srpOnly = format === "SMALL_APPS" || format === "CARAVAN";
-  const invalidAircon = format === "AIRCON" ? queue.filter(product => airconSlot(product) < 0) : [];
+  const plannedGroups = groupedPrintPlan(queue, printPreferences, batchDefaultFormat);
+  const printQueue = expandedPrintBatch(queue, printPreferences, format, batchDefaultFormat, batchPlannerEnabled);
+  const invalidAircon = format === "AIRCON" ? printQueue.filter(product => airconSlot(product) < 0) : [];
   const printable = invalidAircon.length === 0;
-  const airconPages = format === "AIRCON" ? airconSheets(queue) : [];
+  const airconPages = format === "AIRCON" ? airconSheets(printQueue) : [];
   const tagsPerSheet = sheetSizes[format];
-  const sheets = Array.from({ length: Math.ceil(queue.length / tagsPerSheet) }, (_, index) => queue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
-  const printReview = reviewPrintQueue(queue, format, { airconPages: airconPages.length });
+  const sheets = Array.from({ length: Math.ceil(printQueue.length / tagsPerSheet) }, (_, index) => printQueue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
+  const printReview = reviewPrintQueue(printQueue, format, { airconPages: airconPages.length });
 
   function printTags() {
-    if (!queue.length) {
-      setMessage("Select at least one product before printing.");
+    if (!printQueue.length) {
+      setMessage(batchPlannerEnabled ? "Select a batch with queued products to print." : "Select at least one product before printing.");
       return;
     }
     if (!printable) {
