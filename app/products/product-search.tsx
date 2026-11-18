@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { effectivePayNow, validatePrice } from "@/lib/ptg/price-validation";
 
 type MemoInfo = {
   memo_id: string;
@@ -46,7 +47,7 @@ const formats: { key: FormatKey; label: string }[] = [
 const pageSize = 5;
 const amount = (value: number | null | undefined) => Number(value || 0);
 const peso = (value: number | null | undefined) => "₱ " + amount(value).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const priceNow = (product: Product) => amount(product.tag_this);
+const priceNow = (product: Product) => effectivePayNow(product);
 const memoInfo = (product: Product | null): MemoInfo | null => {
   if (!product) return null;
   return Array.isArray(product.price_memos) ? product.price_memos[0] ?? null : product.price_memos;
@@ -75,11 +76,7 @@ const endDate = (period: string) => {
   }
   return "";
 };
-const displayStatus = (product: Product) => {
-  if (product.eligible_for_price_tag === true || String(product.price_tag_status || "").toUpperCase().includes("ELIGIBLE")) return "YES";
-  if (product.eligible_for_price_tag === false || product.price_tag_status) return "NO";
-  return "NO";
-};
+const displayStatus = (product: Product) => validatePrice(product).some(w => w.severity === "HIGH") ? "CHECK" : "READY";
 const shortText = (value: string, max = 40) => value.length > max ? value.slice(0, max - 1) + "…" : value;
 
 export default function ProductSearch({
@@ -98,6 +95,8 @@ export default function ProductSearch({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
+  const [copies, setCopies] = useState<Record<string, number>>({});
+  const [bulkBrand, setBulkBrand] = useState("");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -148,6 +147,15 @@ export default function ProductSearch({
   const firstResult = total ? (page - 1) * pageSize + 1 : 0;
   const lastResult = Math.min(page * pageSize, total);
   const currentMemo = memoInfo(activeProduct);
+  const selectedWarnings = activeProduct ? validatePrice(activeProduct, results) : [];
+  const visibleBrands = [...new Set(results.map(p => p.brand).filter(Boolean))].sort();
+  const printQueue = queue.flatMap(product =>
+    Array.from({ length: Math.max(1, Math.min(99, copies[product.id] ?? 1)) },
+      (_, copyIndex) => ({ product, copyIndex }))
+  );
+  const duplicatedOffers = queue.filter((p, i) => queue.some((q, j) =>
+    i !== j && !!p.barcode && p.barcode === q.barcode
+  )).length;
   const canImport = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
   const canManageUsers = systemRole === "SYSTEM_ADMIN" || legacyRole.trim().toUpperCase() === "BRANCH ADMIN";
   const isBranchToolsUser = systemRole === "SYSTEM_ADMIN" || ["BRANCH ADMIN", "TEAM LEADER"].includes(legacyRole.trim().toUpperCase());
@@ -171,6 +179,14 @@ export default function ProductSearch({
       : queue.filter(item => !results.some(product => product.id === item.id));
     setQueue(next);
     setActiveProduct(checked ? results[0] ?? activeProduct : (next[next.length - 1] ?? null));
+  }
+
+  function addVisibleBrand() {
+    if (!bulkBrand) return;
+    const matching = results.filter(p => p.brand === bulkBrand);
+    setQueue(previous => [...previous, ...matching.filter(p => !previous.some(q => q.id === p.id))]);
+    if (matching.length) setActiveProduct(matching[0]);
+    setMessage(matching.length + " visible " + bulkBrand + " product(s) selected.");
   }
 
   function setPrintFormat(next: FormatKey) {
@@ -229,6 +245,7 @@ export default function ProductSearch({
               <label>MEMO_ID<input readOnly value={currentMemo?.memo_id || ""} /></label>
               <label>PERIOD<input readOnly value={currentMemo?.period || ""} /></label>
               <label>IMPORT_DATE<input readOnly value={currentMemo?.created_at ? new Date(currentMemo.created_at).toLocaleDateString("en-US") : ""} /></label>
+              <label>OFFER TYPE<input readOnly value={currentMemo?.memo_type || "REGULAR / SRP"} /></label>
             </div>
           </div>
         </div>
@@ -248,6 +265,15 @@ export default function ProductSearch({
         </aside>
       </section>
 
+      {activeProduct && <section className="ptg-review-panel ptg-print-hide" aria-live="polite">
+        <strong>PRICE REVIEW · {activeProduct.brand} {activeProduct.model}</strong>
+        <span>Pay Now: {peso(priceNow(activeProduct))} · {currentMemo?.memo_type || "SRP"} · {currentMemo?.period || "Period not specified"}</span>
+        {selectedWarnings.length
+          ? <ul>{selectedWarnings.map(w => <li key={w.code}><strong>{w.severity}:</strong> {w.message}</li>)}</ul>
+          : <span>No basic price warnings.</span>}
+        <small>Warnings are advisory. SRP-only products remain eligible for review and printing.</small>
+      </section>}
+
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
         <div className="legacy-table-scroll">
@@ -259,7 +285,9 @@ export default function ProductSearch({
             <tbody>
               {loading ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id} onClick={event => { if ((event.target as HTMLElement).tagName !== "INPUT") setActiveProduct(product); }}>
                 <td><input type="checkbox" aria-label={"Select " + product.brand + " " + product.model} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
-                <td><strong>{product.brand || "—"}</strong></td><td title={product.model}>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                <td><strong>{product.brand || "—"}</strong></td><td title={product.model}>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td title={product.remarks}>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "READY" ? "eligible" : "")}>{displayStatus(product)}</span>
+                  {validatePrice(product, results).length > 0 && <span className="ptg-warning-pill" title={validatePrice(product, results).map(w => w.message).join("\n")}>⚠ {validatePrice(product, results).length}</span>}
+                </td>
               </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
               {!loading && Array.from({ length: Math.max(0, pageSize - results.length) }).map((_, index) => <tr className="legacy-blank-row" aria-hidden="true" key={"blank-" + index}><td colSpan={8}> </td></tr>)}
             </tbody>
@@ -277,6 +305,16 @@ export default function ProductSearch({
 
       <section className="legacy-queue-panel ptg-print-hide">
         <h2>2. Selected Products / Print Queue</h2>
+        <div className="ptg-queue-tools">
+          <label>Brand (visible page):
+            <select value={bulkBrand} onChange={event => setBulkBrand(event.target.value)}>
+              <option value="">Select brand</option>
+              {visibleBrands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
+            </select>
+          </label>
+          <button type="button" disabled={!bulkBrand} onClick={addVisibleBrand}>ADD BRAND</button>
+          {duplicatedOffers > 0 && <strong>⚠ {duplicatedOffers} queue entries share a barcode. Check price selection.</strong>}
+        </div>
         <div className="legacy-table-scroll legacy-queue-scroll">
           <table className="legacy-products-table">
             <thead><tr>
@@ -286,12 +324,18 @@ export default function ProductSearch({
             <tbody>
               {queue.length ? queue.map(product => <tr key={product.id}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
-                <td><strong>{product.brand || "—"}</strong></td><td>{shortText(product.model || "", 25)}</td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                <td><strong>{product.brand || "—"}</strong></td><td>{shortText(product.model || "", 25)}<label className="ptg-copies-control">Copies:
+                  <input type="number" min={1} max={99} value={copies[product.id] ?? 1}
+                    aria-label={"Number of copies for " + product.model}
+                    onChange={event => setCopies(current => ({...current, [product.id]: Math.max(1, Math.min(99, Math.trunc(Number(event.target.value)) || 1))}))}/>
+                </label></td><td>{product.barcode}</td><td>{product.remarks ? shortText(product.remarks, 28) : "N/A"}</td><td>{peso(product.srp)}</td><td>{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "READY" ? "eligible" : "")}>{displayStatus(product)}</span>
+                  {validatePrice(product, results).length > 0 && <span className="ptg-warning-pill" title={validatePrice(product, results).map(w => w.message).join("\n")}>⚠ {validatePrice(product, results).length}</span>}
+                </td>
               </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
             </tbody>
           </table>
         </div>
-        <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
+        <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s) · {printQueue.length} print copies</strong><button type="button" onClick={() => { setQueue([]); setActiveProduct(null); setCopies({}); }}>▤ CLEAR ALL</button></div>
       </section>
 
       <section className="legacy-preview-panel">
@@ -308,11 +352,11 @@ export default function ProductSearch({
         </div>
         {format !== "ONE" && <div className="legacy-format-notice">The {formats.find(item => item.key === format)?.label} interface is ready; its print template is being migrated next.</div>}
         {format === "ONE" && queue.length > 0 && <div className="ptg-print-preview" aria-label="Price tag print preview">
-          {queue.map(product => {
+          {printQueue.map(({ product, copyIndex }) => {
             const memo = memoInfo(product);
             const pay = priceNow(product);
             const savings = amount(product.srp) - pay;
-            return <div className="legacy-print-sheet" key={product.id}>
+            return <div className="legacy-print-sheet" key={product.id + "-" + copyIndex}>
               <article className="legacy-price-tag">
                 <div className="legacy-tag-header"><img src={(logos.header?.url || "/legacy-ptg/price-tag-header.png") + (logos.header?.url ? "&" : "?") + "refresh=" + logoVersion} alt="1st Megasaver header" /></div>
                 <div className="legacy-barcode-label">Barcode:</div><div className="legacy-barcode">{product.barcode}</div>
@@ -372,6 +416,18 @@ export default function ProductSearch({
         .legacy-installment-panel table,.legacy-products-table{width:100%;border-collapse:collapse;table-layout:fixed}
         .legacy-installment-panel th{padding:5px 3px;border-top:1px solid #d8e0eb;border-bottom:1px solid #d8e0eb;background:#f4f7fb;color:#0647a7;font-size:8px;text-align:center}
         .legacy-installment-panel td{padding:5px 3px;border-bottom:1px solid #e6e9ee;color:#32445c;font-size:9px;text-align:center}
+        .ptg-review-panel{display:grid;gap:5px;margin-bottom:9px;padding:10px;border:1px solid #dbe3ed;border-radius:6px;background:#f6faff;color:#19467e;font-size:11px}
+        .ptg-review-panel ul{margin:4px 0;padding-left:18px;color:#a05d00}
+        .ptg-review-panel li{padding:2px 0}
+        .ptg-review-panel small{color:#536781}
+        .ptg-warning-pill{margin-left:5px;padding:3px 5px;border-radius:4px;background:#fff0cc;color:#925600;font-size:8px;font-weight:bold}
+        .ptg-queue-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 8px;color:#164a8a;font-size:10px}
+        .ptg-queue-tools label{display:flex;align-items:center;gap:5px}
+        .ptg-queue-tools select{min-width:95px;padding:4px;border:1px solid #cedaea}
+        .ptg-queue-tools button{padding:5px 8px;border:1px solid #2161b6;border-radius:4px;background:#fff;color:#165aaa;font-size:9px;font-weight:700}
+        .ptg-queue-tools button:disabled{opacity:.5}
+        .ptg-copies-control{display:flex;align-items:center;gap:4px;margin-top:2px;font-size:8px}
+        .ptg-copies-control input{width:36px!important;height:18px!important;border:1px solid #cad7e5;border-radius:3px;text-align:center}
         .legacy-results-panel{margin-bottom:10px;padding:8px}
         .legacy-status-message{min-height:0;margin:0;padding:0 2px 5px;color:#536781;font-size:9px}
         .legacy-table-scroll{max-height:211px;overflow:auto;border:1px solid #d6d6d6}
