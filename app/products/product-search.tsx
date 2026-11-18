@@ -8,6 +8,7 @@ import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 import { withBasePath } from "@/lib/base-path";
 import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.mjs";
+import { reviewOfferConflicts, reviewInstallments } from "@/lib/ptg/price-conflicts.mjs";
 import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
 import { visibleOffersForBarcode, memoEntriesForOffer } from "@/lib/ptg/offer-comparison.mjs";
 import { reviewPrintQueue } from "@/lib/ptg/print-preflight.mjs";
@@ -826,7 +827,14 @@ export default function ProductSearch({
             </> : <p role="status">{insightsMessage || "Aggregated activity is unavailable."} PTG prices and printing are unaffected.</p>}
         </section>}
         {(() => {
-          const warnings = checkProductPrice(detailProduct, philippineToday());
+          const visible = visibleOffersForBarcode(detailProduct, results, queue, {
+            includeSubdealer: canSeeCashPrice && showSubdealer,
+          });
+          const warnings = [
+            ...checkProductPrice(detailProduct, philippineToday()),
+            ...reviewInstallments(detailProduct),
+            ...reviewOfferConflicts(detailProduct, visible),
+          ];
           return warnings.length ? <section className="ptg-price-checks" aria-label="Price review warnings">
             <strong>Price checks — review only</strong>
             <ul>{warnings.map(issue => <li className={issue.level === "warning" ? "warn" : "info"} key={issue.code}>{issue.text}</li>)}</ul>
@@ -839,6 +847,10 @@ export default function ProductSearch({
           {detailProduct.category && <><dt>Category</dt><dd>{detailProduct.category}</dd></>}
           {detailProduct.sub_category && <><dt>Subcategory</dt><dd>{detailProduct.sub_category}</dd></>}
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
+          <dt>Offer selected for printing</dt><dd>
+            {queue.some(item => item.id === detailProduct.id) ? <strong>Queued — {format === "SMALL_APPS" || format === "CARAVAN" ? "SRP only" : detailProduct.campaign || "Regular / memo"} · {peso(format === "SMALL_APPS" || format === "CARAVAN" ? detailProduct.srp : detailProduct.tag_this)}</strong>
+              : "Not queued. Select this exact offer in the search results to print it."}
+          </dd>
           {!detailUnitOnly && <>
             <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
             <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
@@ -881,7 +893,8 @@ export default function ProductSearch({
               <table>
                 <thead><tr><th>Offer</th><th>Tag This</th><th>SRP</th><th>Period</th><th>Action</th></tr></thead>
                 <tbody>{offers.map(offer => <tr key={offer.id}>
-                  <td>{offer.id === detailProduct.id ? <strong>Currently selected</strong> : offer.campaign || "Regular / SRP"}</td>
+                  <td>{offer.id === detailProduct.id ? <strong>Viewing · {offer.campaign || "Regular / SRP"}</strong> : offer.campaign || "Regular / SRP"}
+                    {queue.some(item => item.id === offer.id) ? <small className="ptg-offer-queued">Queued for print</small> : null}</td>
                   <td>{peso(offer.tag_this)}</td><td>{peso(offer.srp)}</td>
                   <td>{memoInfo(offer)?.period || (offer.selling_starts_on && offer.selling_ends_on
                     ? offer.selling_starts_on + " to " + offer.selling_ends_on : "—")}</td>
@@ -951,6 +964,7 @@ export default function ProductSearch({
         .ptg-visible-offers :is(th,td){padding:7px 6px;text-align:left;border-bottom:1px solid #dce5ef}
         .ptg-visible-offers th{font-weight:700}
         .ptg-visible-offers td{overflow-wrap:anywhere}
+        .ptg-offer-queued{display:block;color:#176042;font-size:10px;font-weight:700;margin-top:3px}
         .ptg-print-preflight{margin:10px 0;padding:10px 12px;border:1px solid #d7e4f0;border-radius:7px;background:#f4f8fc;color:#244769;font-size:12px;line-height:1.45}
         .ptg-print-preflight strong{font-size:13px}
         .ptg-print-preflight p{margin:6px 0}
