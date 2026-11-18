@@ -119,9 +119,9 @@ function Pagination({ page, totalPages, label, busy = false, onPage }: {
   </form>;
 }
 
-function BlankRows({ used }: { used: number }) {
+function BlankRows({ used, columns = 8 }: { used: number; columns?: number }) {
   return Array.from({ length: Math.max(0, pageSize - used) }, (_, index) =>
-    <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={8}>&nbsp;</td></tr>
+    <tr className="legacy-blank-row" aria-hidden="true" key={index}><td colSpan={columns}>&nbsp;</td></tr>
   );
 }
 const amount = (value: number | null | undefined) => Number(value || 0);
@@ -548,13 +548,13 @@ export default function ProductSearch({
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
         <div className="legacy-table-frame" aria-busy={loading}>
-          <table className="legacy-products-table">
+          <table className="legacy-products-table legacy-search-results-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all visible products" checked={results.length > 0 && results.every(item => queue.some(queued => queued.id === item.id))} onChange={event => toggleVisible(event.target.checked)} /></th>
-              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
-              {loading && !results.length ? <tr><td colSpan={8} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
+              {loading && !results.length ? <tr><td colSpan={7} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
                 className={product.campaign === "SUBDEALER" ? "ptg-search-subdealer" : product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
                 if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
               }}>
@@ -562,12 +562,11 @@ export default function ProductSearch({
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
                   onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><SearchOfferLabel product={product} /></td>
-                <td>{product.remarks || "N/A"}</td>
                 <td className="ptg-srp-amount"><span className="ptg-search-offer-amount">{peso(product.srp)}</span></td>
                 <td className="ptg-tag-this-amount"><span className="ptg-search-offer-amount">{peso(priceNow(product))}</span></td>
                 <td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
-              </tr>) : <tr><td colSpan={8} className="legacy-empty-row">No products found.</td></tr>}
-              <BlankRows used={Math.max(1, results.length)} />
+              </tr>) : <tr><td colSpan={7} className="legacy-empty-row">No products found.</td></tr>}
+              <BlankRows used={Math.max(1, results.length)} columns={7} />
             </tbody>
           </table>
         </div>
@@ -845,10 +844,17 @@ export default function ProductSearch({
         .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
         .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
         .legacy-products-table th:nth-child(2){width:10%}.legacy-products-table th:nth-child(3){width:9%}.legacy-products-table th:nth-child(4){width:33%}.legacy-products-table th:nth-child(5){width:23%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:8%}.legacy-products-table th:nth-child(8){width:6%}
-        .legacy-results-panel .legacy-products-table th:nth-child(5){width:19%}
-        .legacy-results-panel .legacy-products-table :is(th:nth-child(6),th:nth-child(7)){width:10%}
+        /* Search results omit Remarks; the print queue keeps its original columns. */
+        .legacy-results-panel .legacy-search-results-table{min-width:760px}
+        .legacy-results-panel .legacy-search-results-table th:nth-child(2){width:12%}
+        .legacy-results-panel .legacy-search-results-table th:nth-child(3){width:11%}
+        .legacy-results-panel .legacy-search-results-table th:nth-child(4){width:35%}
+        .legacy-results-panel .legacy-search-results-table th:nth-child(5),
+        .legacy-results-panel .legacy-search-results-table th:nth-child(6){width:17%}
+        .legacy-results-panel .legacy-search-results-table th:nth-child(7){width:8%}
         .legacy-products-table td{height:38px;padding:4px 6px;border-bottom:1px solid #d6d6d6;color:#143d75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5),.legacy-products-table .legacy-product-detail-link{white-space:normal;overflow-wrap:anywhere}
+        .legacy-results-panel .legacy-search-results-table :is(td:nth-child(5),td:nth-child(6)){white-space:nowrap}
         .legacy-products-table tbody tr:not(.legacy-blank-row){cursor:pointer}
         .legacy-products-table tbody tr:hover:not(.legacy-blank-row){background:#f5f8fc}
         .legacy-products-table td strong{font-weight:800}
@@ -930,6 +936,7 @@ export default function ProductSearch({
           .legacy-memo-info input{height:32px;font-size:12px}
           .legacy-status-message,.legacy-result-count{font-size:12px}
           .legacy-products-table{min-width:900px;font-size:12px}
+          .legacy-results-panel .legacy-search-results-table{min-width:760px}
           .legacy-products-table th{height:36px;font-size:11px;white-space:normal;line-height:1.25}
           .legacy-products-table td{height:45px;line-height:1.3}
           .legacy-products-table input{width:16px;height:16px}
