@@ -23,6 +23,7 @@ export default function MemoImportHistory() {
   const [appliedId, setAppliedId] = useState("");
   const [events, setEvents] = useState<MemoAuditEvent[]>([]);
   const [selectedRevisionMemo, setSelectedRevisionMemo] = useState("");
+  const [revisionDraft, setRevisionDraft] = useState("");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -81,7 +82,7 @@ export default function MemoImportHistory() {
               <td>{event.memoType || "—"}</td>
               <td>{event.productCount == null ? "—" : event.productCount.toLocaleString()}</td>
               <td>{event.supersededRows == null ? "—" : event.supersededRows.toLocaleString()}</td>
-              <td><button type="button" disabled={!event.memoId || busy} onClick={() => setSelectedRevisionMemo(event.memoId)}>Review revisions</button></td>
+              <td><button type="button" disabled={!event.memoId || busy} onClick={() => { setRevisionDraft(event.memoId); setSelectedRevisionMemo(event.memoId); }}>Review revisions</button></td>
             </tr>) : <tr><td colSpan={10}>No successful import events found for this selection.</td></tr>}</tbody>
           </table></div>
           <div className="ptg-memo-history-pages">
@@ -92,12 +93,14 @@ export default function MemoImportHistory() {
         </>}
         <div className="ptg-history-open">
           <label className="admin-field"><span>Price changes for memo</span>
-            <input type="search" maxLength={120} value={selectedRevisionMemo} placeholder="Select an imported memo or enter a memo number"
-              onChange={event => setSelectedRevisionMemo(event.target.value)} />
+            <input type="search" maxLength={120} value={revisionDraft} placeholder="Select an imported memo or enter a memo number"
+              onChange={event => setRevisionDraft(event.target.value)} />
+            <button type="button" disabled={busy || !revisionDraft.trim()}
+              onClick={() => setSelectedRevisionMemo(revisionDraft.trim())}>View price changes</button>
           </label>
           <p className="admin-muted">Price revision snapshots will be available only for imports after the protected audit migration is approved and installed. Reviewing a memo does not change it.</p>
         </div>
-        {!!selectedRevisionMemo.trim() && <MemoPriceRevisionHistory memoNumber={selectedRevisionMemo.trim()} />}
+        {!!selectedRevisionMemo.trim() && <MemoPriceRevisionHistory key={selectedRevisionMemo} memoNumber={selectedRevisionMemo.trim()} />}
       </>}
   </section>;
 }
