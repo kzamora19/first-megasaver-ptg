@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 import { withBasePath } from "@/lib/base-path";
+import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -576,6 +577,13 @@ export default function ProductSearch({
 
       <section className="legacy-queue-panel ptg-print-hide">
         <h2>Selected Products / Print Queue</h2>
+        {(() => {
+          const today = philippineToday();
+          const needingReview = queue.filter(item => checkProductPrice(item, today).some(issue => issue.level === "warning")).length;
+          return needingReview ? <p className="ptg-price-queue-note" role="status">
+            {needingReview} selected product(s) have price warnings. Open the model details to review before printing; printing is not blocked.
+          </p> : null;
+        })()}
         <div className="legacy-table-frame">
           <table className="legacy-products-table">
             <thead><tr>
@@ -724,6 +732,13 @@ export default function ProductSearch({
               <tbody>{serials.map(item => <tr key={item.branch + ":" + item.serial}><td>{item.serial}</td><td>{item.branch}</td><td>{item.receivedOn || "—"}</td></tr>)}</tbody>
             </table> : <p>No serial numbers currently available.</p>}
         </> : <>
+        {(() => {
+          const warnings = checkProductPrice(detailProduct, philippineToday());
+          return warnings.length ? <section className="ptg-price-checks" aria-label="Price review warnings">
+            <strong>Price checks — review only</strong>
+            <ul>{warnings.map(issue => <li className={issue.level === "warning" ? "warn" : "info"} key={issue.code}>{issue.text}</li>)}</ul>
+          </section> : null;
+        })()}
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
           <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
@@ -799,6 +814,12 @@ export default function ProductSearch({
         .legacy-price-comparison-table th,.legacy-price-comparison-table td{width:33.333%;white-space:normal}
         .legacy-price-comparison-table td.ptg-srp-amount{color:#b42318}
         .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
+        .ptg-price-queue-note{margin:0 0 10px;padding:10px 12px;border:1px solid #ead6a9;border-radius:6px;background:#fffaf0;color:#755215;font-size:12px;line-height:1.4}
+        .ptg-price-checks{margin:10px 0 14px;padding:12px;border:1px solid #ead6a9;border-radius:8px;background:#fffaf0;color:#604815;font-size:12px}
+        .ptg-price-checks>strong{display:block;margin:0 0 8px}
+        .ptg-price-checks ul{margin:0;padding-left:20px}
+        .ptg-price-checks li{margin:4px 0;line-height:1.5}
+        .ptg-price-checks li.info{color:#365b80}
         .legacy-unit-only-queue-button{border:1px solid #2465c3;border-radius:5px;background:#eef5ff;color:#124a9c;padding:7px 12px;font-weight:700;cursor:pointer}
         .legacy-unit-only-queue-button:disabled{opacity:.65;cursor:default}
         .legacy-products-banner-pin{position:sticky;top:0;z-index:4;padding-bottom:9px;background:#f3f6fa}
