@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: node --test lib/ptg/price-validation.test.mjs lib/ptg/print-queue-checks.test.mjs lib/ptg/offer-comparison.test.mjs lib/ptg/print-preflight.test.mjs lib/ptg/memo-audit-and-preflight.test.mjs lib/ptg/sales-insights-contract.test.mjs lib/ptg/responsive-layout.test.mjs
+      - run: node --test lib/ptg/price-validation.test.mjs lib/ptg/print-queue-checks.test.mjs lib/ptg/queue-selection.test.mjs lib/ptg/offer-comparison.test.mjs lib/ptg/print-preflight.test.mjs lib/ptg/memo-audit-and-preflight.test.mjs lib/ptg/sales-insights-contract.test.mjs lib/ptg/responsive-layout.test.mjs
       - run: npx tsc --noEmit
       - uses: denoland/setup-deno@v2
         with:
