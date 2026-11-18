@@ -43,6 +43,8 @@ jobs:
         run: npm install
       - name: Verify Subdealer PDF field extraction
         run: node --test lib/ptg/subdealer-layout.test.mjs
+      - name: Verify PTG responsive screen and print separation
+        run: node --test lib/ptg/responsive-layout.test.mjs
       - name: Build static site
         run: npm run build
       - name: Upload Pages artifact
