@@ -1,0 +1,35 @@
+name: PTG price preflight validation
+on:
+  pull_request:
+    branches: [migration/github-pages]
+    paths:
+      - 'app/products/product-search.tsx'
+      - 'lib/ptg/price-validation.*'
+      - 'lib/ptg/price-validation.test.mjs'
+      - '.github/workflows/ptg-price-check-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node --test lib/ptg/price-validation.test.mjs lib/ptg/responsive-layout.test.mjs
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test
+          NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
