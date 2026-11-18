@@ -157,6 +157,18 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   return respond(origin, { ok: true, products, total: data.total, campaigns: data.campaigns ?? [], page, pageSize: 5 });
 }
 
+async function productInsights(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
+  if (session.mustChangePassword || !["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) {
+    return respond(origin, fail("PTG access is not enabled for this account."), 403);
+  }
+  // Disabled until both the PTG and Sales Tracker endpoints pass coordinated
+  // rollout checks. No new browser keys, service keys, or database grants.
+  if (Deno.env.get("PTG_SALES_INSIGHTS_ENABLED") !== "true")
+    return respond(origin, fail("Read-only product insights are not yet enabled."), 503);
+  const response = await readSalesInventory(request, "insights", clean(body.barcode, 64));
+  return respond(origin, await response.json(), response.status);
+}
+
 async function productInventory(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
   if (session.mustChangePassword || !["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) {
     return respond(origin, fail("PTG access is not enabled for this account."), 403);
@@ -254,6 +266,7 @@ Deno.serve(async request => {
     switch (String(body.action ?? "")) {
       case "search": return await searchMemoProducts(origin, session, body, request);
       case "inventory": return await productInventory(origin, session, body, request);
+      case "insights": return await productInsights(origin, session, body, request);
       case "master-search": return await searchProductMaster(origin, session, body);
       case "master-import": return await importProductMaster(origin, session, body);
       default: return respond(origin, fail("Unknown product action."), 400);
