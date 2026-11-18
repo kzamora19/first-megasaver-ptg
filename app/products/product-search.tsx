@@ -98,6 +98,9 @@ export default function ProductSearch({
   const [copies, setCopies] = useState<Record<string, number>>({});
   const [bulkBrand, setBulkBrand] = useState("");
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [relatedOffers, setRelatedOffers] = useState<Product[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [offerMessage, setOfferMessage] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -142,6 +145,33 @@ export default function ProductSearch({
   }, []);
 
   useEffect(() => { void loadProducts("", 1); }, [loadProducts]);
+
+  useEffect(() => {
+    const barcode = activeProduct?.barcode?.trim();
+    if (!barcode) return;
+    let cancelled = false;
+    void (async () => {
+      setOffersLoading(true);
+      setOfferMessage("");
+      try {
+        const response = await fetch("/api/products/offers?barcode=" + encodeURIComponent(barcode), { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.message || "Offer lookup failed.");
+        if (!cancelled) {
+          setRelatedOffers(payload.products as Product[]);
+          if (payload.limited) setOfferMessage("Offer list is limited to 200 entries; verify additional memo records.");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRelatedOffers([]);
+          setOfferMessage(error instanceof Error ? error.message : "Offer lookup unavailable.");
+        }
+      } finally {
+        if (!cancelled) setOffersLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeProduct?.barcode]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const firstResult = total ? (page - 1) * pageSize + 1 : 0;
@@ -272,6 +302,30 @@ export default function ProductSearch({
           ? <ul>{selectedWarnings.map(w => <li key={w.code}><strong>{w.severity}:</strong> {w.message}</li>)}</ul>
           : <span>No basic price warnings.</span>}
         <small>Warnings are advisory. SRP-only products remain eligible for review and printing.</small>
+      </section>}
+
+      {activeProduct && <section className="ptg-offer-panel ptg-print-hide">
+        <h3>Available price options · {activeProduct.barcode}</h3>
+        <p>Compare regular, promotion and subdealer offers for the same barcode. Selected prices are never changed automatically.</p>
+        {offersLoading && <p>Checking available offers…</p>}
+        {offerMessage && <p role="status">{offerMessage}</p>}
+        {!offersLoading && relatedOffers.length > 0 && <div className="ptg-offer-grid">
+          {relatedOffers.map(offer => {
+            const memo = memoInfo(offer);
+            const selected = activeProduct.id === offer.id;
+            return <article key={offer.id} className={selected ? "selected" : ""}>
+              <strong>{memo?.memo_type || "REGULAR"}</strong>
+              <span>{memo?.memo_id || "SRP"}</span>
+              <span>Period: {memo?.period || "Not specified"}</span>
+              <b>{peso(priceNow(offer))}</b>
+              <button type="button" disabled={selected} onClick={() => setActiveProduct(offer)}>
+                {selected ? "Selected" : "Select offer"}
+              </button>
+              <button type="button" onClick={() => toggleProduct(offer, true)}>Add to print queue</button>
+            </article>;
+          })}
+        </div>}
+        <small>Early-print and selling-date eligibility require structured memo dates. The period above is informational, not an automatic approval.</small>
       </section>}
 
       <section className="legacy-results-panel ptg-print-hide">
@@ -428,6 +482,16 @@ export default function ProductSearch({
         .ptg-queue-tools button:disabled{opacity:.5}
         .ptg-copies-control{display:flex;align-items:center;gap:4px;margin-top:2px;font-size:8px}
         .ptg-copies-control input{width:36px!important;height:18px!important;border:1px solid #cad7e5;border-radius:3px;text-align:center}
+        .ptg-offer-panel{margin-bottom:10px;padding:10px;border:1px solid #dbe3ed;border-radius:6px;background:#fff;color:#18447e;font-size:11px}
+        .ptg-offer-panel h3{margin:0 0 4px;font-size:13px}
+        .ptg-offer-panel p{margin:0 0 7px;color:#526b88}
+        .ptg-offer-panel small{display:block;margin-top:6px;color:#6c7d93}
+        .ptg-offer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:7px}
+        .ptg-offer-grid article{display:grid;gap:4px;padding:8px;border:1px solid #cbd9ec;border-radius:5px;background:#fafcff}
+        .ptg-offer-grid article.selected{border:2px solid #165aaa;background:#eef5ff}
+        .ptg-offer-grid article b{font-size:15px}
+        .ptg-offer-grid button{padding:5px;border:1px solid #165aaa;border-radius:3px;background:white;color:#165aaa;font-size:10px;font-weight:bold}
+        .ptg-offer-grid button:disabled{opacity:.5}
         .legacy-results-panel{margin-bottom:10px;padding:8px}
         .legacy-status-message{min-height:0;margin:0;padding:0 2px 5px;color:#536781;font-size:9px}
         .legacy-table-scroll{max-height:211px;overflow:auto;border:1px solid #d6d6d6}
