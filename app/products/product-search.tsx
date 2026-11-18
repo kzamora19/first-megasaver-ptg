@@ -10,6 +10,7 @@ import { withBasePath } from "@/lib/base-path";
 import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.mjs";
 import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
 import { visibleOffersForBarcode, memoEntriesForOffer } from "@/lib/ptg/offer-comparison.mjs";
+import { reviewPrintQueue } from "@/lib/ptg/print-preflight.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -445,6 +446,7 @@ export default function ProductSearch({
   const airconPages = format === "AIRCON" ? airconSheets(queue) : [];
   const tagsPerSheet = sheetSizes[format];
   const sheets = Array.from({ length: Math.ceil(queue.length / tagsPerSheet) }, (_, index) => queue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
+  const printReview = reviewPrintQueue(queue, format, { airconPages: airconPages.length });
 
   function printTags() {
     if (!queue.length) {
@@ -630,6 +632,16 @@ export default function ProductSearch({
           Check or remove: {invalidAircon.map(product => product.model || product.barcode).join(", ")}.
         </div>}
         {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
+        {queue.length > 0 && <section className="ptg-print-preflight ptg-print-hide" aria-label="Print preflight summary">
+          <strong>Print preflight — {printReview.items} product(s), {printReview.pages} estimated page(s)</strong>
+          {printReview.problems.length ? <>
+            <p>{printReview.problems.length} item check(s) need review. These are advisory checks, not a measured text-fit test. Review the actual print preview before printing.</p>
+            <ul>{printReview.problems.slice(0, 6).map((issue, index) => <li key={issue.code + ":" + index}>
+              <b>{issue.label}:</b> {issue.detail}
+            </li>)}</ul>
+            {printReview.problems.length > 6 && <p>Plus {printReview.problems.length - 6} more checks. Review each queued product in its details modal.</p>}
+          </> : <p>No missing-price or obvious description-length warnings found. Check the browser print preview before printing.</p>}
+        </section>}
         <div className="legacy-output-buttons ptg-print-hide">
           {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
           <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
@@ -870,6 +882,11 @@ export default function ProductSearch({
         .ptg-visible-offers :is(th,td){padding:7px 6px;text-align:left;border-bottom:1px solid #dce5ef}
         .ptg-visible-offers th{font-weight:700}
         .ptg-visible-offers td{overflow-wrap:anywhere}
+        .ptg-print-preflight{margin:10px 0;padding:10px 12px;border:1px solid #d7e4f0;border-radius:7px;background:#f4f8fc;color:#244769;font-size:12px;line-height:1.45}
+        .ptg-print-preflight strong{font-size:13px}
+        .ptg-print-preflight p{margin:6px 0}
+        .ptg-print-preflight ul{margin:7px 0;padding-left:19px}
+        .ptg-print-preflight li{margin:4px 0}
         .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
         .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
         .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
