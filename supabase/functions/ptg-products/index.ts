@@ -157,6 +157,60 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   return respond(origin, { ok: true, products, total: data.total, campaigns: data.campaigns ?? [], page, pageSize: 5 });
 }
 
+async function comparableOffers(origin: string, session: ActiveSession, body: Record<string, unknown>) {
+  if (session.mustChangePassword || !["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role))
+    return respond(origin, fail("PTG access is not enabled for this account."), 403);
+  const requested = clean(body.barcode, 64).toUpperCase();
+  if (!/^[A-Z0-9-]{1,64}$/.test(requested)) return respond(origin, fail("Provide a valid barcode."), 400);
+  const canSeeSubdealer = session.role === "SYSTEM_ADMIN" ||
+    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
+  const includeSubdealer = body.include_subdealer === true;
+  if (includeSubdealer && !canSeeSubdealer)
+    return respond(origin, fail("Subdealer pricing is restricted to authorized managers."), 403);
+  const identity = value => /^\d+$/.test(value)
+    ? value.replace(/^0+(?=\d)/, "") : value;
+  const eligible = [];
+  let count = 0;
+  const maxPages = 10; // Server search is 5 rows/page, so cap at 50 per barcode.
+  for (let page = 1; page <= maxPages; page++) {
+    const params = {
+      p_query: requested, p_branch_id: session.branchId ?? null,
+      p_system_admin: session.role === "SYSTEM_ADMIN",
+      p_page: page, p_stock_barcodes: null,
+      p_promotions_only: false, p_campaign: null, p_regular_only: false,
+    };
+    const { data, error } = includeSubdealer
+      ? await admin.rpc("ptg_ordered_product_search_secure", { ...params, p_include_subdealer: true })
+      : await admin.rpc("ptg_ordered_product_search", params);
+    if (error || !data) return respond(origin, fail("Could not compare searchable offers."), 503);
+    count = Number(data.total || 0);
+    const products = Array.isArray(data.products) ? data.products : [];
+    for (const product of products) {
+      if (identity(clean(product.barcode, 64).toUpperCase()) !== identity(requested)) continue;
+      // Explicit allowlist: do not return cash_payment, internal memo rows or
+      // privileged pricing metadata to the browser.
+      eligible.push({
+        id: clean(product.id, 120), barcode: clean(product.barcode, 64),
+        memo_id: clean(product.memo_id, 120),
+        campaign: clean(product.campaign, 80), remarks: clean(product.remarks, 400),
+        tag_this: Number(product.tag_this || 0), srp: Number(product.srp || 0),
+        months_6: Number(product.months_6 || 0), months_9: Number(product.months_9 || 0),
+        months_12: Number(product.months_12 || 0), months_18: Number(product.months_18 || 0),
+        months_24: Number(product.months_24 || 0),
+        selling_starts_on: product.selling_starts_on || null,
+        selling_ends_on: product.selling_ends_on || null,
+        price_memos: product.price_memos || null,
+      });
+    }
+    if (products.length < 5 || page * 5 >= count) break;
+  }
+  return respond(origin, {
+    ok: true, products: eligible, searchedRows: Math.min(count, maxPages * 5),
+    partial: count > maxPages * 5,
+    note: "Currently searchable offers only; this is not all historical memo revisions.",
+  });
+}
+
 async function productInsights(origin: string, session: ActiveSession, body: Record<string, unknown>, request: Request) {
   if (session.mustChangePassword || !["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) {
     return respond(origin, fail("PTG access is not enabled for this account."), 403);
@@ -265,6 +319,7 @@ Deno.serve(async request => {
     const body = await request.json() as Record<string, unknown>;
     switch (String(body.action ?? "")) {
       case "search": return await searchMemoProducts(origin, session, body, request);
+      case "comparable-offers": return await comparableOffers(origin, session, body);
       case "inventory": return await productInventory(origin, session, body, request);
       case "insights": return await productInsights(origin, session, body, request);
       case "master-search": return await searchProductMaster(origin, session, body);
