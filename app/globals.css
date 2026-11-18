@@ -331,3 +331,12 @@ footer {
 .app-dialog .admin-form { margin-top: 1rem; }
 .app-dialog header { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 .app-confirm-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+
+/* PTG import audit (System Admin only); audit cells contain no live price history. */
+.ptg-memo-history-tools{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:12px 0}
+.ptg-memo-history-tools .admin-field{min-width:min(100%,290px);flex:1}
+.ptg-memo-history-tools .admin-button{min-height:37px}
+.ptg-memo-history-pages{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.ptg-memo-history-pages span{font-size:12px;color:#5c6b80;margin-right:auto}
+.ptg-memo-history-pages button{padding:7px 11px;border-radius:6px;border:1px solid #c5d3e4;background:#fff;color:#1c4a82;cursor:pointer}
+.ptg-memo-history-pages button:disabled{opacity:.5;cursor:default}
