@@ -18,7 +18,8 @@ export async function GET(request: Request) {
   const page = Math.max(1, Math.trunc(Number(params.get("page") || 1)) || 1);
   const admin = createAdminClient();
   let query = admin.from("memo_products")
-    .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,eligible_for_price_tag,price_tag_status,price_memos!inner(branch_id,memo_id,period,memo_type,created_at)", { count: "exact" })
+    .select("id,memo_id,brand,category,barcode,model,srp,cash_payment,tag_this,months_6,months_9,months_12,months_18,months_24,remarks,eligible_for_price_tag,price_tag_status,price_memos!inner(branch_id,memo_id,period,memo_type,created_at,expired_at)", { count: "exact" })
+    .is("price_memos.expired_at", null)
     .order("brand", { ascending: true })
     .order("model", { ascending: true });
 
