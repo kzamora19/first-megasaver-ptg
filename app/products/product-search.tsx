@@ -908,6 +908,55 @@ export default function ProductSearch({
         .legacy-tag-header-with-promo img.legacy-tag-promo{inset:0 0 0 auto;width:20%;object-position:right center}
         .legacy-tag-footer{grid-column:1/10;grid-row:28/34}
         @media(max-width:1050px){.legacy-search-workflow{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "results" "queue" "print"}}
+        /* Display-only: let the available PTG pane width drive the layout, not
+           the outer Branchline Workspace window (which has its own sidebar). */
+        @media screen {
+          .legacy-ptg-main{container-type:inline-size;font-size:14px;line-height:1.4;text-rendering:optimizeLegibility}
+          .legacy-search-card,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{padding:12px}
+          .legacy-search-card h2,.legacy-queue-panel h2,.legacy-preview-heading h2{font-size:17px;line-height:1.3}
+          .legacy-tools-heading{font-size:13px}
+          .legacy-tools-heading small{font-size:11px}
+          .legacy-branch-tools a,.legacy-branch-tools button{min-height:32px;font-size:12px}
+          .legacy-search-form>label,.legacy-format-controls>strong{font-size:12px}
+          .legacy-search-form input{height:38px;font-size:16px}
+          .legacy-search-form button{height:38px;font-size:12px}
+          .legacy-search-form>div{grid-template-columns:minmax(0,1fr) minmax(92px,auto)}
+          .legacy-format-controls button{min-width:72px;height:33px;padding:0 10px;font-size:11px}
+          .legacy-search-filters{gap:9px 15px}
+          .legacy-search-filters .legacy-stock-filter{font-size:13px}
+          .legacy-search-filters input[type=checkbox]{width:16px;height:16px;flex:none}
+          .legacy-memo-info{gap:7px;padding:9px}
+          .legacy-memo-info label{font-size:11px}
+          .legacy-memo-info input{height:32px;font-size:12px}
+          .legacy-status-message,.legacy-result-count{font-size:12px}
+          .legacy-products-table{min-width:900px;font-size:12px}
+          .legacy-products-table th{height:36px;font-size:11px;white-space:normal;line-height:1.25}
+          .legacy-products-table td{height:45px;line-height:1.3}
+          .legacy-products-table input{width:16px;height:16px}
+          .legacy-status-pill{font-size:11px}
+          .legacy-pagination{gap:7px;font-size:12px}
+          .legacy-pagination button{width:35px;height:32px}
+          .legacy-pagination label input{height:32px;font-size:13px}
+          .legacy-queue-footer{font-size:12px}
+          .legacy-queue-footer button{height:34px;font-size:12px}
+          .legacy-output-buttons{gap:7px}
+          .legacy-output-buttons button{min-height:34px;height:auto;padding:7px 10px;font-size:11px}
+          .legacy-format-notice,.legacy-preview-empty{font-size:12px;line-height:1.45}
+          .legacy-table-frame{max-width:100%;overscroll-behavior-x:contain}
+          .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5){overflow-wrap:anywhere}
+        }
+        @container (max-width:1020px){
+          .legacy-search-workflow{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "results" "queue" "print"}
+        }
+        @media screen and (max-width:600px){
+          .legacy-ptg-main{width:calc(100% - 20px)}
+          .legacy-search-card,.legacy-results-panel,.legacy-queue-panel,.legacy-preview-panel{padding:10px}
+          .legacy-memo-info{grid-template-columns:minmax(0,1fr)}
+          .legacy-memo-info label:first-child{grid-column:auto}
+          .legacy-format-controls button{flex:1 1 92px}
+          .legacy-output-buttons{justify-content:stretch}
+          .legacy-output-buttons button{flex:1 1 130px}
+        }
         @media print{
           .ptg-print-preview,.ptg-print-preview *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
           [data-demo] .legacy-print-sheet{position:relative}

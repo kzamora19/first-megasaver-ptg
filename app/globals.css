@@ -305,6 +305,21 @@ footer {
   .ptg-sidebar .ptg-nav-label,.ptg-sidebar .ptg-sidebar-bottom{display:block}
   .ptg-sidebar .ptg-nav-item{display:flex;margin:2px 0}
 }
+/* Screen-only PTG workspace typography and responsive navigation.
+   Never scale the whole page: text remains rendered at native CSS pixels. */
+@media screen{
+  .ptg-nav-label{font-size:11px;letter-spacing:.09em}
+  .ptg-nav-item{font-size:13px;line-height:1.4}
+  .ptg-brand small{font-size:11px}
+  .ptg-user-chip strong{font-size:13px}
+  .ptg-user-chip small{font-size:11px}
+  .ptg-sidebar-bottom .secondary-button{font-size:12px}
+}
+@media screen and (min-width:721px) and (max-width:1340px){
+  .ptg-app{grid-template-columns:clamp(200px,18vw,235px) minmax(0,1fr)}
+  .ptg-sidebar{padding:18px 12px}
+  .ptg-brand{padding:4px 5px 22px}
+}
 @media print{
   .ptg-app,.ptg-workspace-content{display:block!important;min-height:0!important}
   .ptg-sidebar{display:none!important}
