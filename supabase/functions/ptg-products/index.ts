@@ -167,7 +167,7 @@ async function comparableOffers(origin: string, session: ActiveSession, body: Re
   const includeSubdealer = body.include_subdealer === true;
   if (includeSubdealer && !canSeeSubdealer)
     return respond(origin, fail("Subdealer pricing is restricted to authorized managers."), 403);
-  const identity = value => /^\d+$/.test(value)
+  const identity = (value: string) => /^\d+$/.test(value)
     ? value.replace(/^0+(?=\d)/, "") : value;
   const eligible = [];
   let count = 0;
