@@ -40,3 +40,25 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test
           NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
           NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+      - name: Install real browser and PDF inspection tools
+        run: |
+          npm install --no-save --no-audit --no-fund --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends poppler-utils
+      - name: Test all seven real PTG print layouts
+        run: |
+          mkdir -p .ptg-preview
+          ln -s "$PWD/out" .ptg-preview/first-megasaver-ptg
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory .ptg-preview > /tmp/ptg-preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3000/first-megasaver-ptg/demo/ > /dev/null && break
+            sleep 1
+          done
+          node lib/ptg/browser-print-smoke.mjs
+      - name: Upload actual browser print previews and PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptg-seven-format-print-previews
+          path: ptg-print-visual-artifacts/
+          retention-days: 14
