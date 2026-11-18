@@ -13,6 +13,15 @@
 1. **Sales Tracker PR #21:** Product Specialist performance cards + one-person and batch Top 10 PDF certificates. A4 landscape, scope and selected period, positive actual transactions only, exclude test and transferred PS history, no fabricated signatures or performance results.
 2. **PTG PR #28:** read-only price preflight warnings in product-details modal/queue, and smart print queue brand counts and shared-barcode review. The queue never auto-deletes legitimate unit-only/free-installation variants.
 
+## Progress after plan creation
+
+- [x] PTG: staged non-blocking warnings for absent prices, unexpected price relationships and promo selling dates.
+- [x] PTG: staged queue counts by brand and review warnings for shared barcodes without deleting legitimate variants.
+- [x] PTG: staged visible offer comparison for prices on the current search page and already queued offers, with read-only memo references. This is **not** complete memo history.
+- [x] PTG: price validation, offer comparisons, print-queue checks, TypeScript and Next.js build passed in staging.
+- [ ] Complete audit history requires append-only price-change snapshots and controlled backend reads; migration not applied (`docs/memo-audit-history-design-20261118.md`).
+- [ ] Check all seven print layouts visually for clipping and barcode/model correctness before release.
+
 ## Remaining development
 
 ### PTG
