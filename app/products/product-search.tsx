@@ -738,8 +738,8 @@ export default function ProductSearch({
         </section>}
         <div className="legacy-output-buttons ptg-print-hide">
           {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
-          <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE AS PDF</button>
-          <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print Price Tags</button>
+          <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE</button>
+          <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print</button>
         </div>
       </section>
       </div>
