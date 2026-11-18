@@ -245,6 +245,7 @@ export default function ProductSearch({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
+  const [bulkBrand, setBulkBrand] = useState("");
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [inStock, setInStock] = useState(false);
@@ -462,6 +463,23 @@ export default function ProductSearch({
     setActiveProduct(checked ? results[0] ?? activeProduct : (next[next.length - 1] ?? null));
   }
 
+  function addVisibleBrand() {
+    const brand = bulkBrand.trim().toUpperCase();
+    if (!brand) return;
+    // Search response is already branch/role scoped; keep each distinct offer.
+    const matching = results.filter(item => String(item.brand || "").trim().toUpperCase() === brand);
+    if (!matching.length) {
+      setMessage("No visible products match the selected brand on this page.");
+      return;
+    }
+    const additions = matching.filter(item => !queue.some(existing => existing.id === item.id));
+    const next = [...queue, ...additions];
+    setQueue(next);
+    setQueuePage(current => Math.min(current, Math.max(1, Math.ceil(next.length / pageSize))));
+    setActiveProduct(matching[0]);
+    setMessage(additions.length + " new " + bulkBrand + " offer(s) added from the current search page. Other pages are not automatically selected.");
+  }
+
   function setPrintFormat(next: FormatKey) {
     setFormat(next);
     if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
@@ -510,6 +528,8 @@ export default function ProductSearch({
   }
 
   const currentBranchLabel = branchName || ({ CAU: "Cauayan", ILA: "Ilagan", STG: "Santiago", TUG: "Tuguegarao" } as Record<string, string>)[branchCode.toUpperCase()] || branchCode;
+  const visibleBrands = [...new Set(results.map(item => String(item.brand || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
 
   return (
     <main className="ptg-main legacy-ptg-main" data-demo={demo || undefined}>
@@ -580,6 +600,16 @@ export default function ProductSearch({
 
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
+        {!!visibleBrands.length && <div className="ptg-bulk-brand">
+          <label htmlFor="ptg-bulk-brand-select">Add visible brand offers</label>
+          <select id="ptg-bulk-brand-select" value={bulkBrand} onChange={event => setBulkBrand(event.target.value)}>
+            <option value="">Choose a brand</option>
+            {visibleBrands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
+          </select>
+          <button type="button" disabled={!bulkBrand || !visibleBrands.includes(bulkBrand)} onClick={addVisibleBrand}>
+            Add from this page
+          </button>
+        </div>}
         <div className="legacy-table-frame" aria-busy={loading}>
           <table className="legacy-products-table legacy-search-results-table">
             <thead><tr>
@@ -936,6 +966,11 @@ export default function ProductSearch({
         .ptg-product-insights-grid span{display:grid;gap:2px;min-width:0}
         .ptg-product-insights-grid small{font-size:11px;color:#66788f}
         .ptg-product-insights-grid strong{font-size:14px;color:#143b67}
+        .ptg-bulk-brand{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:4px 0 10px;font-size:12px}
+        .ptg-bulk-brand label{font-weight:700}
+        .ptg-bulk-brand select{min-width:125px;min-height:34px;padding:5px 8px;border:1px solid #c9d8ea;border-radius:5px;background:#fff;font-size:12px}
+        .ptg-bulk-brand button{min-height:34px;padding:5px 10px;border:1px solid #225a9d;border-radius:5px;background:#eef5ff;color:#184c87;font-size:12px;font-weight:700;cursor:pointer}
+        .ptg-bulk-brand button:disabled{opacity:.5;cursor:default}
         .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
         .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
         .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
