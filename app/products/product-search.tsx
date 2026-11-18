@@ -257,6 +257,10 @@ export default function ProductSearch({
   const [campaign, setCampaign] = useState("");
   const [stock, setStock] = useState<StockInfo | null>(null);
   const [stockMessage, setStockMessage] = useState("");
+  const [comparableOffers, setComparableOffers] = useState<Product[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonPartial, setComparisonPartial] = useState(false);
+  const [comparisonMessage, setComparisonMessage] = useState("");
   const [insights, setInsights] = useState<ProductSalesInsights | null>(null);
   const [insightsMessage, setInsightsMessage] = useState("");
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -402,6 +406,34 @@ export default function ProductSearch({
       .finally(() => { if (active) setInsightsLoading(false); });
     return () => { active = false; };
   }, [salesInsightsEnabled, detailBarcode]);
+
+  useEffect(() => {
+    if (!usesEdgeData || demo || !detailBarcode) {
+      setComparableOffers([]);
+      setComparisonLoading(false);
+      setComparisonPartial(false);
+      setComparisonMessage("");
+      return;
+    }
+    let current = true;
+    setComparableOffers([]);
+    setComparisonMessage("");
+    setComparisonPartial(false);
+    setComparisonLoading(true);
+    const permittedSubdealer = showSubdealer &&
+      (systemRole === "SYSTEM_ADMIN" || (systemRole === "BRANCH_ADMIN" && legacyRole.trim().toUpperCase() === "BRANCH MANAGER"));
+    void invokePtgData("ptg-products", {
+      action: "comparable-offers", barcode: detailBarcode, include_subdealer: permittedSubdealer,
+    }).then(response => {
+      if (!current) return;
+      const payload = response as { products?: Product[]; partial?: boolean };
+      setComparableOffers(Array.isArray(payload.products) ? payload.products : []);
+      setComparisonPartial(payload.partial === true);
+    }).catch(error => { if (current) setComparisonMessage(
+      error instanceof Error ? error.message : "Additional comparable offers could not be checked."
+    ); }).finally(() => { if (current) setComparisonLoading(false); });
+    return () => { current = false; };
+  }, [detailBarcode, usesEdgeData, demo, showSubdealer, systemRole, legacyRole]);
 
   useEffect(() => {
     if (!inventoryEnabled || !detailBarcode || !showSerials) return;
@@ -827,7 +859,7 @@ export default function ProductSearch({
             </> : <p role="status">{insightsMessage || "Aggregated activity is unavailable."} PTG prices and printing are unaffected.</p>}
         </section>}
         {(() => {
-          const visible = visibleOffersForBarcode(detailProduct, results, queue, {
+          const visible = visibleOffersForBarcode(detailProduct, [...results, ...comparableOffers], queue, {
             includeSubdealer: canSeeCashPrice && showSubdealer,
           });
           const warnings = [
@@ -840,6 +872,12 @@ export default function ProductSearch({
             <ul>{warnings.map(issue => <li className={issue.level === "warning" ? "warn" : "info"} key={issue.code}>{issue.text}</li>)}</ul>
           </section> : null;
         })()}
+        {usesEdgeData && <p className="ptg-compare-status" role="status">
+          {comparisonLoading ? "Checking currently searchable offers for the same barcode…" :
+            comparisonMessage ? "Additional offer check unavailable: " + comparisonMessage + ". Visible offers are shown only." :
+            comparisonPartial ? "Only the first 50 searchable offer rows were checked; results may be incomplete." :
+            "Currently searchable same-barcode offers checked. Older replaced memo prices are not included."}
+        </p>}
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
           <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
@@ -883,7 +921,7 @@ export default function ProductSearch({
           </section> : null;
         })()}
         {(() => {
-          const offers = visibleOffersForBarcode(detailProduct, results, queue, {
+          const offers = visibleOffersForBarcode(detailProduct, [...results, ...comparableOffers], queue, {
             includeSubdealer: canSeeCashPrice && showSubdealer,
           });
           return offers.length > 1 ? <section className="ptg-visible-offers" aria-label="Visible price options">
@@ -898,8 +936,11 @@ export default function ProductSearch({
                   <td>{peso(offer.tag_this)}</td><td>{peso(offer.srp)}</td>
                   <td>{memoInfo(offer)?.period || (offer.selling_starts_on && offer.selling_ends_on
                     ? offer.selling_starts_on + " to " + offer.selling_ends_on : "—")}</td>
-                  <td>{offer.id === detailProduct.id ? "—" : <button type="button" className="legacy-product-detail-link"
-                    onClick={() => openProductDetails(offer)}>Review</button>}</td>
+                  <td>{offer.id === detailProduct.id ? "—"
+                    : [...results, ...queue].some(item => item.id === offer.id)
+                      ? <button type="button" className="legacy-product-detail-link"
+                        onClick={() => openProductDetails([...results, ...queue].find(item => item.id === offer.id)!)}>Review</button>
+                      : "Compare only — search to select"}</td>
                 </tr>)}</tbody>
               </table>
             </div>
@@ -964,6 +1005,7 @@ export default function ProductSearch({
         .ptg-visible-offers :is(th,td){padding:7px 6px;text-align:left;border-bottom:1px solid #dce5ef}
         .ptg-visible-offers th{font-weight:700}
         .ptg-visible-offers td{overflow-wrap:anywhere}
+        .ptg-compare-status{font-size:11px;color:#526c86;line-height:1.45;margin:8px 0}
         .ptg-offer-queued{display:block;color:#176042;font-size:10px;font-weight:700;margin-top:3px}
         .ptg-print-preflight{margin:10px 0;padding:10px 12px;border:1px solid #d7e4f0;border-radius:7px;background:#f4f8fc;color:#244769;font-size:12px;line-height:1.45}
         .ptg-print-preflight strong{font-size:13px}
