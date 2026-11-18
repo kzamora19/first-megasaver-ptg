@@ -11,6 +11,7 @@ import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.m
 import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
 import { visibleOffersForBarcode, memoEntriesForOffer } from "@/lib/ptg/offer-comparison.mjs";
 import { reviewPrintQueue } from "@/lib/ptg/print-preflight.mjs";
+import { appendVisibleBrandOffers } from "@/lib/ptg/queue-selection.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -464,16 +465,12 @@ export default function ProductSearch({
   }
 
   function addVisibleBrand() {
-    const brand = bulkBrand.trim().toUpperCase();
-    if (!brand) return;
-    // Search response is already branch/role scoped; keep each distinct offer.
-    const matching = results.filter(item => String(item.brand || "").trim().toUpperCase() === brand);
+    if (!bulkBrand.trim()) return;
+    const { queue: next, matching, additions } = appendVisibleBrandOffers(queue, results, bulkBrand);
     if (!matching.length) {
       setMessage("No visible products match the selected brand on this page.");
       return;
     }
-    const additions = matching.filter(item => !queue.some(existing => existing.id === item.id));
-    const next = [...queue, ...additions];
     setQueue(next);
     setQueuePage(current => Math.min(current, Math.max(1, Math.ceil(next.length / pageSize))));
     setActiveProduct(matching[0]);
