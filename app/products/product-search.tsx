@@ -52,6 +52,10 @@ type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CAR
 type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
 type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; updatedAt: string }>>;
 type StockInfo = { quantity: number; serialized: boolean; scope: string };
+type ProductSalesInsights = StockInfo & {
+  aggregated: true; source: string; barcode: string;
+  recent: { from: string; to: string; units: number; transactions: number; lastSaleDate: string | null };
+};
 type StockSerial = { serial: string; receivedOn: string | null; branch: string };
 type MemoFilter = "all" | "regular" | "promotion";
 
@@ -250,10 +254,16 @@ export default function ProductSearch({
   const [campaign, setCampaign] = useState("");
   const [stock, setStock] = useState<StockInfo | null>(null);
   const [stockMessage, setStockMessage] = useState("");
+  const [insights, setInsights] = useState<ProductSalesInsights | null>(null);
+  const [insightsMessage, setInsightsMessage] = useState("");
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [showSerials, setShowSerials] = useState(false);
   const [serials, setSerials] = useState<StockSerial[] | null>(null);
   const [serialMessage, setSerialMessage] = useState("");
   const inventoryEnabled = usesEdgeData && !demo;
+  // This feature requires separate opt-in at PTG frontend, PTG Edge and
+  // Sales Tracker Edge. Until then, no sales information is requested.
+  const salesInsightsEnabled = inventoryEnabled && process.env.NEXT_PUBLIC_PTG_SALES_INSIGHTS_ENABLED === "true";
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRequest = useRef(0);
@@ -371,6 +381,24 @@ export default function ProductSearch({
       .catch(error => { if (current) setStockMessage(error instanceof Error ? error.message : "Inventory unavailable."); });
     return () => { current = false; };
   }, [inventoryEnabled, detailBarcode]);
+
+  useEffect(() => {
+    if (!salesInsightsEnabled || !detailBarcode) {
+      setInsights(null);
+      setInsightsMessage("");
+      setInsightsLoading(false);
+      return;
+    }
+    let active = true;
+    setInsights(null);
+    setInsightsMessage("");
+    setInsightsLoading(true);
+    void invokePtgData("ptg-products", { action: "insights", barcode: detailBarcode })
+      .then(data => { if (active) setInsights(data as unknown as ProductSalesInsights); })
+      .catch(error => { if (active) setInsightsMessage(error instanceof Error ? error.message : "Sales activity unavailable."); })
+      .finally(() => { if (active) setInsightsLoading(false); });
+    return () => { active = false; };
+  }, [salesInsightsEnabled, detailBarcode]);
 
   useEffect(() => {
     if (!inventoryEnabled || !detailBarcode || !showSerials) return;
@@ -756,6 +784,20 @@ export default function ProductSearch({
               <tbody>{serials.map(item => <tr key={item.branch + ":" + item.serial}><td>{item.serial}</td><td>{item.branch}</td><td>{item.receivedOn || "—"}</td></tr>)}</tbody>
             </table> : <p>No serial numbers currently available.</p>}
         </> : <>
+        {salesInsightsEnabled && <section className="ptg-product-insights ptg-print-hide" aria-label="Sales Tracker product insights">
+          <strong>Sales Tracker · Product insights</strong>
+          {insightsLoading ? <p role="status">Loading aggregated branch activity…</p>
+            : insights ? <>
+              <p><b>{insights.scope}</b> · {insights.recent.from} to {insights.recent.to}</p>
+              <div className="ptg-product-insights-grid">
+                <span><small>Stock units</small><strong>{insights.quantity.toLocaleString("en-PH")}</strong></span>
+                <span><small>Sold units (30 days)</small><strong>{insights.recent.units.toLocaleString("en-PH")}</strong></span>
+                <span><small>Recorded transactions (30 days)</small><strong>{insights.recent.transactions.toLocaleString("en-PH")}</strong></span>
+                <span><small>Last recorded sale</small><strong>{insights.recent.lastSaleDate || "No sales in period"}</strong></span>
+              </div>
+              <p>Read-only aggregated totals. No customer or Product Specialist identities are shared. Historical sales may not reflect later returns.</p>
+            </> : <p role="status">{insightsMessage || "Aggregated activity is unavailable."} PTG prices and printing are unaffected.</p>}
+        </section>}
         {(() => {
           const warnings = checkProductPrice(detailProduct, philippineToday());
           return warnings.length ? <section className="ptg-price-checks" aria-label="Price review warnings">
@@ -887,6 +929,13 @@ export default function ProductSearch({
         .ptg-print-preflight p{margin:6px 0}
         .ptg-print-preflight ul{margin:7px 0;padding-left:19px}
         .ptg-print-preflight li{margin:4px 0}
+        .ptg-product-insights{margin:10px 0 14px;padding:12px;border:1px solid #cee0f3;border-radius:8px;background:#f4f9ff;color:#25486b;font-size:12px;line-height:1.5}
+        .ptg-product-insights>strong{font-size:13px}
+        .ptg-product-insights>p{margin:7px 0}
+        .ptg-product-insights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+        .ptg-product-insights-grid span{display:grid;gap:2px;min-width:0}
+        .ptg-product-insights-grid small{font-size:11px;color:#66788f}
+        .ptg-product-insights-grid strong{font-size:14px;color:#143b67}
         .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
         .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
         .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
