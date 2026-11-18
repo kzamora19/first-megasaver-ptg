@@ -399,8 +399,8 @@ export default function ProductSearch({
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
             <div className="legacy-output-buttons ptg-print-hide">
               <button type="button" className="refresh-logos" onClick={() => { setLogoVersion(value => value + 1); void refreshLogos(); }}>↻ Refresh Logos</button>
-              <button type="button" className="save-pdf" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ SAVE AS PDF</button>
-              <button type="button" className="print-tags" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ Print Price Tags</button>
+              <button type="button" className="save-pdf" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ SAVE</button>
+              <button type="button" className="print-tags" disabled={!queue.length || format !== "ONE"} onClick={printTags}>▣ Print</button>
             </div>
           </div>
         </div>
