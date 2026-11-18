@@ -43,7 +43,7 @@ jobs:
       - name: Install real browser and PDF inspection tools
         run: |
           npm install --no-save --no-audit --no-fund --ignore-scripts playwright@1.56.1
-          npx playwright install --with-deps chromium
+          google-chrome --version
           sudo apt-get install -y --no-install-recommends poppler-utils
       - name: Test all seven real PTG print layouts
         run: |
