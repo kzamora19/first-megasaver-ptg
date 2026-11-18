@@ -8,6 +8,7 @@ import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 import { withBasePath } from "@/lib/base-path";
 import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.mjs";
+import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -577,6 +578,16 @@ export default function ProductSearch({
 
       <section className="legacy-queue-panel ptg-print-hide">
         <h2>Selected Products / Print Queue</h2>
+        {queue.length > 0 && (() => {
+          const details = summarizePrintQueue(queue);
+          return <div className="ptg-queue-overview" aria-label="Queue by brand">
+            <strong>Queued by brand</strong>
+            <div className="ptg-queue-brand-chips">{details.brands.map(item => <span key={item.brand}>{item.brand}: {item.count}</span>)}</div>
+            {details.sharedBarcodes.length > 0 && <p className="ptg-queue-duplicate-note">
+              {details.sharedBarcodes.length} barcode(s) appear in multiple queued offers. This may be intentional for free-installation and unit-only prices; check each model before printing.
+            </p>}
+          </div>;
+        })()}
         {(() => {
           const today = philippineToday();
           const needingReview = queue.filter(item => checkProductPrice(item, today).some(issue => issue.level === "warning")).length;
@@ -814,6 +825,10 @@ export default function ProductSearch({
         .legacy-price-comparison-table th,.legacy-price-comparison-table td{width:33.333%;white-space:normal}
         .legacy-price-comparison-table td.ptg-srp-amount{color:#b42318}
         .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
+        .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
+        .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
+        .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
+        .ptg-queue-duplicate-note{margin:0;padding:8px 10px;border-radius:6px;background:#fff7e9;color:#795319;line-height:1.5}
         .ptg-price-queue-note{margin:0 0 10px;padding:10px 12px;border:1px solid #ead6a9;border-radius:6px;background:#fffaf0;color:#755215;font-size:12px;line-height:1.4}
         .ptg-price-checks{margin:10px 0 14px;padding:12px;border:1px solid #ead6a9;border-radius:8px;background:#fffaf0;color:#604815;font-size:12px}
         .ptg-price-checks>strong{display:block;margin:0 0 8px}
