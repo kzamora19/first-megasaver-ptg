@@ -9,6 +9,7 @@ import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 import { withBasePath } from "@/lib/base-path";
 import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.mjs";
 import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
+import { visibleOffersForBarcode, memoEntriesForOffer } from "@/lib/ptg/offer-comparison.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -776,6 +777,40 @@ export default function ProductSearch({
             </dd>
           </>}
         </dl>
+        {(() => {
+          const memos = memoEntriesForOffer(detailProduct);
+          return memos.length > 1 ? <section className="ptg-memo-references" aria-label="Loaded memo references">
+            <h3>Memo references on this offer</h3>
+            <p>These are references returned with the selected record, not a complete import or replacement history.</p>
+            <ul>{memos.map((memo, index) => <li key={(memo.memo_id || "memo") + ":" + index}>
+              <strong>{memoLabel(memo, detailProduct) || "Unnumbered memo"}</strong>
+              {memo.period ? " · " + memo.period : ""}
+              {memo.created_at ? " · Imported " + new Date(memo.created_at).toLocaleDateString("en-PH") : ""}
+            </li>)}</ul>
+          </section> : null;
+        })()}
+        {(() => {
+          const offers = visibleOffersForBarcode(detailProduct, results, queue, {
+            includeSubdealer: canSeeCashPrice && showSubdealer,
+          });
+          return offers.length > 1 ? <section className="ptg-visible-offers" aria-label="Visible price options">
+            <h3>Price options for this barcode</h3>
+            <p>Only offers loaded on this search page or already in the print queue are shown. Other regular or promotional prices may exist. Reviewing an option does not change the print queue.</p>
+            <div className="ptg-visible-offer-scroll">
+              <table>
+                <thead><tr><th>Offer</th><th>Tag This</th><th>SRP</th><th>Period</th><th>Action</th></tr></thead>
+                <tbody>{offers.map(offer => <tr key={offer.id}>
+                  <td>{offer.id === detailProduct.id ? <strong>Currently selected</strong> : offer.campaign || "Regular / SRP"}</td>
+                  <td>{peso(offer.tag_this)}</td><td>{peso(offer.srp)}</td>
+                  <td>{memoInfo(offer)?.period || (offer.selling_starts_on && offer.selling_ends_on
+                    ? offer.selling_starts_on + " to " + offer.selling_ends_on : "—")}</td>
+                  <td>{offer.id === detailProduct.id ? "—" : <button type="button" className="legacy-product-detail-link"
+                    onClick={() => openProductDetails(offer)}>Review</button>}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </section> : null;
+        })()}
         {detailUnitOnly && <>
           <table className="legacy-product-installment-table legacy-price-comparison-table">
             <caption>Price options — selected memo</caption>
@@ -825,6 +860,16 @@ export default function ProductSearch({
         .legacy-price-comparison-table th,.legacy-price-comparison-table td{width:33.333%;white-space:normal}
         .legacy-price-comparison-table td.ptg-srp-amount{color:#b42318}
         .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
+        .ptg-visible-offers,.ptg-memo-references{margin:12px 0;padding:10px 12px;border:1px solid #d9e3ef;border-radius:8px;background:#f8fbff;color:#274263;font-size:12px}
+        .ptg-visible-offers h3,.ptg-memo-references h3{margin:0 0 5px;font-size:13px}
+        .ptg-visible-offers p,.ptg-memo-references p{margin:0 0 9px;color:#526987;line-height:1.45}
+        .ptg-memo-references ul{margin:0;padding-left:18px}
+        .ptg-memo-references li{margin:4px 0}
+        .ptg-visible-offer-scroll{max-width:100%;overflow-x:auto}
+        .ptg-visible-offers table{width:100%;border-collapse:collapse;min-width:500px}
+        .ptg-visible-offers :is(th,td){padding:7px 6px;text-align:left;border-bottom:1px solid #dce5ef}
+        .ptg-visible-offers th{font-weight:700}
+        .ptg-visible-offers td{overflow-wrap:anywhere}
         .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
         .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
         .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
