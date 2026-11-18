@@ -4,8 +4,9 @@ on:
     branches: [migration/github-pages]
     paths:
       - 'app/products/product-search.tsx'
-      - 'lib/ptg/price-validation.*'
-      - 'lib/ptg/price-validation.test.mjs'
+      - 'app/price-memos/import/**'
+      - 'lib/ptg/**'
+      - 'supabase/functions/ptg-memos/index.ts'
       - '.github/workflows/ptg-price-check-ci.yml'
   workflow_dispatch:
 
@@ -25,6 +26,11 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: node --test lib/ptg/price-validation.test.mjs lib/ptg/print-queue-checks.test.mjs lib/ptg/offer-comparison.test.mjs lib/ptg/print-preflight.test.mjs lib/ptg/memo-audit-and-preflight.test.mjs lib/ptg/responsive-layout.test.mjs
       - run: npx tsc --noEmit
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check staged Supabase memo audit Edge Function
+        run: deno check supabase/functions/ptg-memos/index.ts
       - run: npm run build
         env:
           GITHUB_PAGES: "true"
