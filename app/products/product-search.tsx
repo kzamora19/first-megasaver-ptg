@@ -655,7 +655,7 @@ export default function ProductSearch({
             <tbody>
               {loading && !results.length ? <tr><td colSpan={7} className="legacy-empty-row">Loading products…</td></tr> : results.length ? results.map(product => <tr key={product.id}
                 className={product.campaign === "SUBDEALER" ? "ptg-search-subdealer" : product.campaign ? "ptg-search-promo" : undefined} onClick={event => {
-                if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
+                if (!(event.target as HTMLElement).closest("input,button,select")) setActiveProduct(product);
               }}>
                 <td><input type="checkbox" aria-label={["Select", product.brand, product.model, memoInfo(product)?.memo_id].filter(Boolean).join(" ")} checked={queue.some(item => item.id === product.id)} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
@@ -675,6 +675,25 @@ export default function ProductSearch({
 
       <section className="legacy-queue-panel ptg-print-hide">
         <h2>Selected Products / Print Queue</h2>
+        <div className="ptg-batch-toolbar">
+          <label><input type="checkbox" checked={batchPlannerEnabled} onChange={event => {
+            setBatchPlannerEnabled(event.target.checked);
+            if (event.target.checked) { setBatchDefaultFormat(format); setPrintPreferences({}); }
+          }} /> Plan print formats and copies per product</label>
+          {batchPlannerEnabled && <div className="ptg-batch-groups" aria-label="Print queue grouped by format">
+            <label>Default print format <select value={batchDefaultFormat} onChange={event => {
+              const next = event.target.value as FormatKey;
+              setBatchDefaultFormat(next);
+              setFormat(next);
+            }}>{formats.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>
+            {plannedGroups.map(group => <button key={group.format} type="button"
+              className={format === group.format ? "active" : ""}
+              onClick={() => setPrintFormat(group.format)}>
+              {formats.find(option => option.key === group.format)?.label || group.format}: {group.products} product(s) / {group.copies} tag(s)
+            </button>)}
+            <span role="status">Choose each group, review its preview, then print. Groups are separate print jobs.</span>
+          </div>}
+        </div>
         {queue.length > 0 && (() => {
           const details = summarizePrintQueue(queue);
           return <div className="ptg-queue-overview" aria-label="Queue by brand">
@@ -696,18 +715,35 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setQueuePage(1); setActiveProduct(null); } }} /></th>
-              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>{batchPlannerEnabled && <><th>Format</th><th>Copies</th></>}
             </tr></thead>
             <tbody>
               {queueRows.length ? queueRows.map(product => <tr key={product.id} onClick={event => {
-                if (!(event.target as HTMLElement).closest("input,button")) setActiveProduct(product);
+                if (!(event.target as HTMLElement).closest("input,button,select")) setActiveProduct(product);
               }}>
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
                   onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
-              </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
-              <BlankRows used={Math.max(1, queueRows.length)} />
+                 {batchPlannerEnabled && <>
+                   <td><select aria-label={"Print format for " + (product.model || product.barcode)}
+                     value={printPreferences[product.id]?.format || batchDefaultFormat}
+                     onChange={event => setPrintPreferences(previous => ({
+                       ...previous, [product.id]: { format: event.target.value as FormatKey, copies: previous[product.id]?.copies || 1 },
+                     }))}>{formats.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></td>
+                   <td><input type="number" min="1" max="20" step="1"
+                     aria-label={"Print copies for " + (product.model || product.barcode)}
+                     value={printPreferences[product.id]?.copies || 1}
+                     onChange={event => {
+                       const copies = Number(event.target.value);
+                       setPrintPreferences(previous => ({
+                         ...previous, [product.id]: { format: previous[product.id]?.format || batchDefaultFormat,
+                           copies: Number.isInteger(copies) && copies >= 1 && copies <= 20 ? copies : 1 },
+                       }));
+                     }} /></td>
+                 </>}
+              </tr>) : <tr><td colSpan={batchPlannerEnabled ? 10 : 8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
+              <BlankRows used={Math.max(1, queueRows.length)} columns={batchPlannerEnabled ? 10 : 8} />
             </tbody>
           </table>
         </div>
@@ -778,8 +814,8 @@ export default function ProductSearch({
                 </div>
               </div>
             </article>
-          </div>) : sheets.map(sheet => <div className={"legacy-print-sheet" + (format === "TWO" ? " legacy-half-sheet" : format === "FOUR" ? " legacy-four-sheet" : compact ? " legacy-six-sheet" : "")} key={sheet[0].id}>
-          {sheet.map(product => {
+          </div>) : sheets.map((sheet, sheetIndex) => <div className={"legacy-print-sheet" + (format === "TWO" ? " legacy-half-sheet" : format === "FOUR" ? " legacy-four-sheet" : compact ? " legacy-six-sheet" : "")} key={format + ":" + sheetIndex}>
+          {sheet.map((product, copyIndex) => {
             const modelDescription = product.description?.trim() || product.model;
             const memo = memoInfo(product);
             const pay = priceNow(product);
@@ -789,7 +825,7 @@ export default function ProductSearch({
               ? Number(/\b(6|9|12|18|24)-MONTH CREDIT CARD ONLY\b/i.exec(product.remarks || "")?.[1] || 0) : 0;
             const termTotal = term ? amount(product["months_" + term as "months_6"]) : 0;
             const priceCaption = termTotal ? `CREDIT CARD · ${term} MONTHS` : "CASH / STRAIGHT";
-            if (compact) return <article className="ptg-compact-tag" key={product.id}>
+            if (compact) return <article className="ptg-compact-tag" key={product.id + ":" + copyIndex}>
               <header className="ptg-compact-header">
                 {logos.header && <img src={artworkUrl("header")} className="ptg-compact-main-logo" alt="Price tag header artwork" />}
                 {logos.promo && <img src={artworkUrl("promo")} className="ptg-compact-promo-logo" alt="Promo artwork" />}
@@ -806,7 +842,7 @@ export default function ProductSearch({
               </div>}
               {logos.social && <div className="ptg-compact-footer"><img src={artworkUrl("social")} alt="Price tag footer artwork" /></div>}
             </article>;
-            return <article className="legacy-price-tag" key={product.id}>
+            return <article className="legacy-price-tag" key={product.id + ":" + copyIndex}>
                 {(logos.header || logos.promo) && <div className={"legacy-tag-header" + (logos.promo ? " legacy-tag-header-with-promo" : "")}>
                   {logos.header && <img src={artworkUrl("header")} alt="Price tag header artwork" />}
                   {logos.promo && <img className="legacy-tag-promo" src={artworkUrl("promo")} alt="Promo artwork" />}
@@ -1030,6 +1066,15 @@ export default function ProductSearch({
         .ptg-bulk-brand select{min-width:125px;min-height:34px;padding:5px 8px;border:1px solid #c9d8ea;border-radius:5px;background:#fff;font-size:12px}
         .ptg-bulk-brand button{min-height:34px;padding:5px 10px;border:1px solid #225a9d;border-radius:5px;background:#eef5ff;color:#184c87;font-size:12px;font-weight:700;cursor:pointer}
         .ptg-bulk-brand button:disabled{opacity:.5;cursor:default}
+        .ptg-batch-toolbar{display:grid;gap:8px;margin:8px 0 12px;padding:9px;border:1px solid #d6e3f3;border-radius:6px;background:#f8fbff;color:#164270;font-size:12px}
+        .ptg-batch-toolbar>label{display:flex;align-items:center;gap:8px;font-weight:700}
+        .ptg-batch-groups{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+        .ptg-batch-groups label{display:flex;align-items:center;gap:6px}
+        .ptg-batch-groups button,.ptg-batch-groups select{min-height:32px;padding:4px 8px;border:1px solid #bdd2ea;border-radius:5px;background:white;color:#184a83;font:inherit;cursor:pointer}
+        .ptg-batch-groups button.active{background:#164c94;color:white}
+        .ptg-batch-groups [role=status]{flex-basis:100%;font-size:11px}
+        .legacy-queue-panel .legacy-products-table select{max-width:125px;padding:5px;border:1px solid #bdd2ea;border-radius:4px;background:white;color:#173e73}
+        .legacy-queue-panel .legacy-products-table input[type=number]{width:60px;padding:5px;border:1px solid #bdd2ea;border-radius:4px;background:white;color:#173e73}
         .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
         .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
         .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
