@@ -7,7 +7,7 @@ const salesInventoryUrl = "https://psoopubvdpwztzkdyifa.supabase.co/functions/v1
 const salesPublicKey = "sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm";
 const allowedOrigins = new Set(
   (Deno.env.get("PTG_ALLOWED_ORIGINS") ?? "https://kzamora19.github.io,http://localhost:3000,http://127.0.0.1:3000")
-    .split(",").map(value => value.trim()).filter(Boolean),
+    .split(",").map(value => value.trim()).filter(Boolean).concat(["https://flyer-studio-ken-s-project5.vercel.app"]),
 );
 const admin = createClient(projectUrl, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
