@@ -694,6 +694,35 @@ export default function ProductSearch({
             <span role="status">Choose each group, review its preview, then print. Groups are separate print jobs.</span>
           </div>}
         </div>
+        {batchPlannerEnabled && queueRows.length > 0 && <section className="ptg-batch-items" aria-label="Format and copies for each product">
+          <strong>Format and copies per product</strong>
+          <p>Set each product's print format and number of copies here. These settings apply to the selected products on this queue page.</p>
+          {queueRows.map(product => <div className="ptg-batch-item" key={product.id}>
+            <div className="ptg-batch-item-name">
+              <strong>{product.brand || "—"} · {product.model || product.description || product.barcode}</strong>
+              <small>BC# {product.barcode}</small>
+            </div>
+            <label>Format
+              <select aria-label={"Print format for " + (product.model || product.barcode)}
+                value={printPreferences[product.id]?.format || batchDefaultFormat}
+                onChange={event => setPrintPreferences(previous => ({
+                  ...previous, [product.id]: { format: event.target.value as FormatKey, copies: previous[product.id]?.copies || 1 },
+                }))}>{formats.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select>
+            </label>
+            <label>Copies
+              <input type="number" min="1" max="20" step="1"
+                aria-label={"Print copies for " + (product.model || product.barcode)}
+                value={printPreferences[product.id]?.copies || 1}
+                onChange={event => {
+                  const copies = Number(event.target.value);
+                  setPrintPreferences(previous => ({
+                    ...previous, [product.id]: { format: previous[product.id]?.format || batchDefaultFormat,
+                      copies: Number.isInteger(copies) && copies >= 1 && copies <= 20 ? copies : 1 },
+                  }));
+                }} />
+            </label>
+          </div>)}
+        </section>}
         {queue.length > 0 && (() => {
           const details = summarizePrintQueue(queue);
           return <div className="ptg-queue-overview" aria-label="Queue by brand">
@@ -715,7 +744,7 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setQueuePage(1); setActiveProduct(null); } }} /></th>
-              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>{batchPlannerEnabled && <><th>Format</th><th>Copies</th></>}
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
             </tr></thead>
             <tbody>
               {queueRows.length ? queueRows.map(product => <tr key={product.id} onClick={event => {
@@ -725,25 +754,9 @@ export default function ProductSearch({
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
                   onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
-                 {batchPlannerEnabled && <>
-                   <td><select aria-label={"Print format for " + (product.model || product.barcode)}
-                     value={printPreferences[product.id]?.format || batchDefaultFormat}
-                     onChange={event => setPrintPreferences(previous => ({
-                       ...previous, [product.id]: { format: event.target.value as FormatKey, copies: previous[product.id]?.copies || 1 },
-                     }))}>{formats.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select></td>
-                   <td><input type="number" min="1" max="20" step="1"
-                     aria-label={"Print copies for " + (product.model || product.barcode)}
-                     value={printPreferences[product.id]?.copies || 1}
-                     onChange={event => {
-                       const copies = Number(event.target.value);
-                       setPrintPreferences(previous => ({
-                         ...previous, [product.id]: { format: previous[product.id]?.format || batchDefaultFormat,
-                           copies: Number.isInteger(copies) && copies >= 1 && copies <= 20 ? copies : 1 },
-                       }));
-                     }} /></td>
-                 </>}
-              </tr>) : <tr><td colSpan={batchPlannerEnabled ? 10 : 8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
-              <BlankRows used={Math.max(1, queueRows.length)} columns={batchPlannerEnabled ? 10 : 8} />
+
+              </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
+              <BlankRows used={Math.max(1, queueRows.length)} />
             </tbody>
           </table>
         </div>
@@ -1066,6 +1079,14 @@ export default function ProductSearch({
         .ptg-bulk-brand select{min-width:125px;min-height:34px;padding:5px 8px;border:1px solid #c9d8ea;border-radius:5px;background:#fff;font-size:12px}
         .ptg-bulk-brand button{min-height:34px;padding:5px 10px;border:1px solid #225a9d;border-radius:5px;background:#eef5ff;color:#184c87;font-size:12px;font-weight:700;cursor:pointer}
         .ptg-bulk-brand button:disabled{opacity:.5;cursor:default}
+        .ptg-batch-items{display:grid;gap:8px;margin:9px 0 12px;padding:10px;border:1px solid #cfdfef;border-radius:7px;background:#f8fbff;color:#183d70;font-size:12px}
+        .ptg-batch-items>p{margin:0;color:#526984;font-size:11px}
+        .ptg-batch-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(116px,145px) 82px;gap:12px;align-items:center;padding:8px 10px;background:white;border:1px solid #e2e9f3;border-radius:6px;min-width:0}
+        .ptg-batch-item-name{min-width:0;display:grid;gap:3px;overflow-wrap:anywhere}
+        .ptg-batch-item-name small{color:#526984}
+        .ptg-batch-item label{display:grid;gap:4px;font-weight:700;min-width:0}
+        .ptg-batch-item select,.ptg-batch-item input{width:100%;min-width:0;min-height:34px;padding:4px 6px;border:1px solid #bdd2ea;border-radius:5px;background:white;color:#173e73;font-size:12px}
+        @media screen and (max-width:600px){.ptg-batch-item{grid-template-columns:minmax(0,1fr) 85px;gap:8px}.ptg-batch-item-name{grid-column:1 / -1}}
         .ptg-batch-toolbar{display:grid;gap:8px;margin:8px 0 12px;padding:9px;border:1px solid #d6e3f3;border-radius:6px;background:#f8fbff;color:#164270;font-size:12px}
         .ptg-batch-toolbar>label{display:flex;align-items:center;gap:8px;font-weight:700}
         .ptg-batch-groups{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
