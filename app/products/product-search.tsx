@@ -1066,6 +1066,15 @@ export default function ProductSearch({
         .ptg-bulk-brand select{min-width:125px;min-height:34px;padding:5px 8px;border:1px solid #c9d8ea;border-radius:5px;background:#fff;font-size:12px}
         .ptg-bulk-brand button{min-height:34px;padding:5px 10px;border:1px solid #225a9d;border-radius:5px;background:#eef5ff;color:#184c87;font-size:12px;font-weight:700;cursor:pointer}
         .ptg-bulk-brand button:disabled{opacity:.5;cursor:default}
+        .ptg-batch-toolbar{display:grid;gap:8px;margin:8px 0 12px;padding:9px;border:1px solid #d6e3f3;border-radius:6px;background:#f8fbff;color:#164270;font-size:12px}
+        .ptg-batch-toolbar>label{display:flex;align-items:center;gap:8px;font-weight:700}
+        .ptg-batch-groups{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+        .ptg-batch-groups label{display:flex;align-items:center;gap:6px}
+        .ptg-batch-groups button,.ptg-batch-groups select{min-height:32px;padding:4px 8px;border:1px solid #bdd2ea;border-radius:5px;background:white;color:#184a83;font:inherit;cursor:pointer}
+        .ptg-batch-groups button.active{background:#164c94;color:white}
+        .ptg-batch-groups [role=status]{flex-basis:100%;font-size:11px}
+        .legacy-queue-panel .legacy-products-table select{max-width:125px;padding:5px;border:1px solid #bdd2ea;border-radius:4px;background:white;color:#173e73}
+        .legacy-queue-panel .legacy-products-table input[type=number]{width:60px;padding:5px;border:1px solid #bdd2ea;border-radius:4px;background:white;color:#173e73}
         .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
         .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
         .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
