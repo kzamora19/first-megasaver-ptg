@@ -96,6 +96,82 @@ Deno.serve(async request => {
       return respond(origin, fail("Only Branch Admin and System Admin can import price memos."), 403);
     }
     const body = await request.json() as Record<string, unknown>;
+    const requestedAction = clean(body.action, 20).toLowerCase();
+    if (requestedAction === "price-revisions") {
+      if (session.role !== "SYSTEM_ADMIN") return respond(origin, fail("System Admin access required."), 403);
+      const memoNumber = clean(body.memoId, 120);
+      const offset = Number(body.offset ?? 0);
+      if (!memoNumber || !Number.isSafeInteger(offset) || offset < 0 || offset > 50000)
+        return respond(origin, fail("Provide a memo number and valid audit page."), 400);
+      const { data, error } = await admin.rpc("ptg_admin_memo_price_revisions", {
+        p_memo_number: memoNumber, p_offset: offset,
+      });
+      if (error || !data) return respond(origin, fail("Memo price revisions are unavailable. The protected audit migration may not be installed."), 503);
+      const rows = Array.isArray(data.events) ? data.events : [];
+      const people = [...new Set(rows.map((row: Record<string, unknown>) =>
+        clean(row.importedById, 120)).filter(Boolean))];
+      const { data: users, error: namesError } = people.length
+        ? await admin.from("user_profiles").select("id,display_name").in("id", people)
+        : { data: [], error: null };
+      if (namesError) return respond(origin, fail("Could not resolve memo importers."), 503);
+      const lookup = new Map((users || []).map(user => [user.id, user.display_name]));
+      const events = rows.map((row: Record<string, unknown>) => {
+        const { importedById, ...rest } = row;
+        return { ...rest, importedBy: clean(lookup.get(importedById) || "Former / unknown user", 120) };
+      });
+      return respond(origin, { ok: true, events, hasMore: data.hasMore === true,
+        nextOffset: data.nextOffset ?? offset + events.length,
+        historyStartsAtInstallation: true });
+    }
+    if (requestedAction === "history") {
+      // Import audit events are security-sensitive. Only a verified System Admin
+      // session may read the curated view; no raw audit metadata is returned.
+      if (session.role !== "SYSTEM_ADMIN") return respond(origin, fail("System Admin access required."), 403);
+      const rawOffset = Number(body.offset);
+      if (!Number.isSafeInteger(rawOffset) || rawOffset < 0 || rawOffset > 50000)
+        return respond(origin, fail("Invalid audit page offset."), 400);
+      const pageSize = 40;
+      const exactMemoId = clean(body.memoId, 120);
+      let query = admin.from("security_audit_logs")
+        .select("id,actor_user_id,action,target_identifier,metadata,created_at")
+        .eq("event_category", "PRICE_MEMO")
+        .eq("outcome", "SUCCESS")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
+      if (exactMemoId) query = query.eq("target_identifier", exactMemoId);
+      const { data: found, error: historyError } = await query.range(rawOffset, rawOffset + pageSize);
+      if (historyError) return respond(origin, fail("Memo import history is unavailable."), 503);
+      const events = (found ?? []).slice(0, pageSize);
+      const people = [...new Set(events.map(event => event.actor_user_id).filter(Boolean))];
+      const { data: users, error: usersError } = people.length
+        ? await admin.from("user_profiles").select("id,display_name").in("id", people)
+        : { data: [], error: null };
+      if (usersError) return respond(origin, fail("Audit identity lookup is unavailable."), 503);
+      const names = new Map((users ?? []).map(user => [user.id, user.display_name]));
+      return respond(origin, {
+        ok: true,
+        events: events.map(event => {
+          const meta = event.metadata && typeof event.metadata === "object" && !Array.isArray(event.metadata)
+            ? event.metadata as Record<string, unknown> : {};
+          return {
+            id: event.id,
+            memoId: clean(event.target_identifier, 120),
+            action: clean(event.action, 30),
+            createdAt: event.created_at,
+            importedBy: clean(names.get(event.actor_user_id) || "Former / unknown user", 120),
+            sourceFile: clean(meta.source_file, 240),
+            period: clean(meta.period, 120),
+            memoType: clean(meta.memo_type, 40),
+            productCount: Number.isFinite(Number(meta.total_products)) ? Number(meta.total_products) : null,
+            supersededRows: Number.isFinite(Number(meta.superseded_product_rows))
+              ? Number(meta.superseded_product_rows) : null,
+          };
+        }),
+        hasMore: (found ?? []).length > pageSize,
+        nextOffset: rawOffset + events.length,
+      });
+    }
+    if (requestedAction !== "import") return respond(origin, fail("Unsupported memo operation."), 400);
     const memoId = clean(body.memoId, 120);
     const sourceFile = clean(body.sourceFile, 240);
     const memoType = clean(body.memoType, 40).toUpperCase();

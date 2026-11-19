@@ -1,0 +1,64 @@
+name: PTG price preflight validation
+on:
+  pull_request:
+    branches: [migration/github-pages]
+    paths:
+      - 'app/products/product-search.tsx'
+      - 'app/price-memos/import/**'
+      - 'lib/ptg/**'
+      - 'supabase/functions/ptg-memos/index.ts'
+      - 'supabase/migrations/20261118093000_append_only_memo_price_revisions.sql'
+      - '.github/workflows/ptg-price-check-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: node --test lib/ptg/price-validation.test.mjs lib/ptg/price-conflicts.test.mjs lib/ptg/revision-diff.test.mjs lib/ptg/revision-security.test.mjs lib/ptg/offer-coverage.test.mjs lib/ptg/print-queue-checks.test.mjs lib/ptg/queue-selection.test.mjs lib/ptg/offer-comparison.test.mjs lib/ptg/print-preflight.test.mjs lib/ptg/memo-audit-and-preflight.test.mjs lib/ptg/sales-insights-contract.test.mjs lib/ptg/responsive-layout.test.mjs lib/ptg/button-labels.test.mjs
+      - run: npx tsc --noEmit
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check staged Supabase memo audit Edge Function
+        run: deno check supabase/functions/ptg-memos/index.ts supabase/functions/ptg-products/index.ts
+      - run: npm run build
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test
+          NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+      - name: Install real browser and PDF inspection tools
+        run: |
+          npm install --no-save --no-audit --no-fund --ignore-scripts playwright@1.56.1
+          google-chrome --version
+          sudo apt-get install -y --no-install-recommends poppler-utils
+      - name: Test all seven real PTG print layouts
+        run: |
+          mkdir -p .ptg-preview
+          ln -s "$PWD/out" .ptg-preview/first-megasaver-ptg
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory .ptg-preview > /tmp/ptg-preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3000/first-megasaver-ptg/demo/ > /dev/null && break
+            sleep 1
+          done
+          node lib/ptg/browser-print-smoke.mjs
+      - name: Upload actual browser print previews and PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptg-seven-format-print-previews
+          path: ptg-print-visual-artifacts/
+          retention-days: 14

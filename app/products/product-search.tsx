@@ -7,6 +7,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { requestPtgLogos, usesEdgeAssets } from "@/lib/ptg/edge-assets";
 import { invokePtgData, usesEdgeData } from "@/lib/ptg/edge-api";
 import { withBasePath } from "@/lib/base-path";
+import { checkProductPrice, philippineToday } from "@/lib/ptg/price-validation.mjs";
+import { reviewOfferConflicts, reviewInstallments } from "@/lib/ptg/price-conflicts.mjs";
+import { summarizePrintQueue } from "@/lib/ptg/print-queue-checks.mjs";
+import { visibleOffersForBarcode, memoEntriesForOffer } from "@/lib/ptg/offer-comparison.mjs";
+import { reviewPrintQueue } from "@/lib/ptg/print-preflight.mjs";
+import { appendVisibleBrandOffers } from "@/lib/ptg/queue-selection.mjs";
+import { groupedPrintPlan, expandedPrintBatch, normalizePrintCopies } from "@/lib/ptg/print-batches.mjs";
 
 type MemoInfo = {
   memo_id: string;
@@ -48,6 +55,10 @@ type FormatKey = "ONE" | "TWO" | "FOUR" | "SIX" | "AIRCON" | "SMALL_APPS" | "CAR
 type LogoKey = "header" | "promo" | "social" | "appHeader" | `aircon:${string}`;
 type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; updatedAt: string }>>;
 type StockInfo = { quantity: number; serialized: boolean; scope: string };
+type ProductSalesInsights = StockInfo & {
+  aggregated: true; source: string; barcode: string;
+  recent: { from: string; to: string; units: number; transactions: number; lastSaleDate: string | null };
+};
 type StockSerial = { serial: string; receivedOn: string | null; branch: string };
 type MemoFilter = "all" | "regular" | "promotion";
 
@@ -237,6 +248,10 @@ export default function ProductSearch({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [queue, setQueue] = useState<Product[]>([]);
+  const [batchPlannerEnabled, setBatchPlannerEnabled] = useState(false);
+  const [batchDefaultFormat, setBatchDefaultFormat] = useState<FormatKey>("ONE");
+  const [printPreferences, setPrintPreferences] = useState<Record<string, { format: FormatKey; copies: number }>>({});
+  const [bulkBrand, setBulkBrand] = useState("");
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [inStock, setInStock] = useState(false);
@@ -246,10 +261,20 @@ export default function ProductSearch({
   const [campaign, setCampaign] = useState("");
   const [stock, setStock] = useState<StockInfo | null>(null);
   const [stockMessage, setStockMessage] = useState("");
+  const [comparableOffers, setComparableOffers] = useState<Product[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonPartial, setComparisonPartial] = useState(false);
+  const [comparisonMessage, setComparisonMessage] = useState("");
+  const [insights, setInsights] = useState<ProductSalesInsights | null>(null);
+  const [insightsMessage, setInsightsMessage] = useState("");
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [showSerials, setShowSerials] = useState(false);
   const [serials, setSerials] = useState<StockSerial[] | null>(null);
   const [serialMessage, setSerialMessage] = useState("");
   const inventoryEnabled = usesEdgeData && !demo;
+  // This feature requires separate opt-in at PTG frontend, PTG Edge and
+  // Sales Tracker Edge. Until then, no sales information is requested.
+  const salesInsightsEnabled = inventoryEnabled && process.env.NEXT_PUBLIC_PTG_SALES_INSIGHTS_ENABLED === "true";
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRequest = useRef(0);
@@ -369,6 +394,52 @@ export default function ProductSearch({
   }, [inventoryEnabled, detailBarcode]);
 
   useEffect(() => {
+    if (!salesInsightsEnabled || !detailBarcode) {
+      setInsights(null);
+      setInsightsMessage("");
+      setInsightsLoading(false);
+      return;
+    }
+    let active = true;
+    setInsights(null);
+    setInsightsMessage("");
+    setInsightsLoading(true);
+    void invokePtgData("ptg-products", { action: "insights", barcode: detailBarcode })
+      .then(data => { if (active) setInsights(data as unknown as ProductSalesInsights); })
+      .catch(error => { if (active) setInsightsMessage(error instanceof Error ? error.message : "Sales activity unavailable."); })
+      .finally(() => { if (active) setInsightsLoading(false); });
+    return () => { active = false; };
+  }, [salesInsightsEnabled, detailBarcode]);
+
+  useEffect(() => {
+    if (!usesEdgeData || demo || !detailBarcode) {
+      setComparableOffers([]);
+      setComparisonLoading(false);
+      setComparisonPartial(false);
+      setComparisonMessage("");
+      return;
+    }
+    let current = true;
+    setComparableOffers([]);
+    setComparisonMessage("");
+    setComparisonPartial(false);
+    setComparisonLoading(true);
+    const permittedSubdealer = showSubdealer &&
+      (systemRole === "SYSTEM_ADMIN" || (systemRole === "BRANCH_ADMIN" && legacyRole.trim().toUpperCase() === "BRANCH MANAGER"));
+    void invokePtgData("ptg-products", {
+      action: "comparable-offers", barcode: detailBarcode, include_subdealer: permittedSubdealer,
+    }).then(response => {
+      if (!current) return;
+      const payload = response as { products?: Product[]; partial?: boolean };
+      setComparableOffers(Array.isArray(payload.products) ? payload.products : []);
+      setComparisonPartial(payload.partial === true);
+    }).catch(error => { if (current) setComparisonMessage(
+      error instanceof Error ? error.message : "Additional comparable offers could not be checked."
+    ); }).finally(() => { if (current) setComparisonLoading(false); });
+    return () => { current = false; };
+  }, [detailBarcode, usesEdgeData, demo, showSubdealer, systemRole, legacyRole]);
+
+  useEffect(() => {
     if (!inventoryEnabled || !detailBarcode || !showSerials) return;
     let current = true;
     void invokePtgData("ptg-products", { action: "inventory", barcode: detailBarcode, include_serials: true })
@@ -430,6 +501,19 @@ export default function ProductSearch({
     setActiveProduct(checked ? results[0] ?? activeProduct : (next[next.length - 1] ?? null));
   }
 
+  function addVisibleBrand() {
+    if (!bulkBrand.trim()) return;
+    const { queue: next, matching, additions } = appendVisibleBrandOffers(queue, results, bulkBrand);
+    if (!matching.length) {
+      setMessage("No visible products match the selected brand on this page.");
+      return;
+    }
+    setQueue(next);
+    setQueuePage(current => Math.min(current, Math.max(1, Math.ceil(next.length / pageSize))));
+    setActiveProduct(matching[0]);
+    setMessage(additions.length + " new " + bulkBrand + " offer(s) added from the current search page. Other pages are not automatically selected.");
+  }
+
   function setPrintFormat(next: FormatKey) {
     setFormat(next);
     if (queue.length) setMessage(queue.length + " selected product(s) ready to print.");
@@ -437,15 +521,18 @@ export default function ProductSearch({
 
   const compact = format === "SIX" || format === "SMALL_APPS" || format === "CARAVAN";
   const srpOnly = format === "SMALL_APPS" || format === "CARAVAN";
-  const invalidAircon = format === "AIRCON" ? queue.filter(product => airconSlot(product) < 0) : [];
+  const plannedGroups = groupedPrintPlan(queue, printPreferences, batchDefaultFormat);
+  const printQueue = expandedPrintBatch(queue, printPreferences, format, batchDefaultFormat, batchPlannerEnabled);
+  const invalidAircon = format === "AIRCON" ? printQueue.filter(product => airconSlot(product) < 0) : [];
   const printable = invalidAircon.length === 0;
-  const airconPages = format === "AIRCON" ? airconSheets(queue) : [];
+  const airconPages = format === "AIRCON" ? airconSheets(printQueue) : [];
   const tagsPerSheet = sheetSizes[format];
-  const sheets = Array.from({ length: Math.ceil(queue.length / tagsPerSheet) }, (_, index) => queue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
+  const sheets = Array.from({ length: Math.ceil(printQueue.length / tagsPerSheet) }, (_, index) => printQueue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
+  const printReview = reviewPrintQueue(printQueue, format, { airconPages: airconPages.length });
 
   function printTags() {
-    if (!queue.length) {
-      setMessage("Select at least one product before printing.");
+    if (!printQueue.length) {
+      setMessage(batchPlannerEnabled ? "Select a batch with queued products to print." : "Select at least one product before printing.");
       return;
     }
     if (!printable) {
@@ -477,6 +564,8 @@ export default function ProductSearch({
   }
 
   const currentBranchLabel = branchName || ({ CAU: "Cauayan", ILA: "Ilagan", STG: "Santiago", TUG: "Tuguegarao" } as Record<string, string>)[branchCode.toUpperCase()] || branchCode;
+  const visibleBrands = [...new Set(results.map(item => String(item.brand || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
 
   return (
     <main className="ptg-main legacy-ptg-main" data-demo={demo || undefined}>
@@ -547,6 +636,16 @@ export default function ProductSearch({
 
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
+        {!!visibleBrands.length && <div className="ptg-bulk-brand">
+          <label htmlFor="ptg-bulk-brand-select">Add visible brand offers</label>
+          <select id="ptg-bulk-brand-select" value={bulkBrand} onChange={event => setBulkBrand(event.target.value)}>
+            <option value="">Choose a brand</option>
+            {visibleBrands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
+          </select>
+          <button type="button" disabled={!bulkBrand || !visibleBrands.includes(bulkBrand)} onClick={addVisibleBrand}>
+            Add from this page
+          </button>
+        </div>}
         <div className="legacy-table-frame" aria-busy={loading}>
           <table className="legacy-products-table legacy-search-results-table">
             <thead><tr>
@@ -576,6 +675,23 @@ export default function ProductSearch({
 
       <section className="legacy-queue-panel ptg-print-hide">
         <h2>Selected Products / Print Queue</h2>
+        {queue.length > 0 && (() => {
+          const details = summarizePrintQueue(queue);
+          return <div className="ptg-queue-overview" aria-label="Queue by brand">
+            <strong>Queued by brand</strong>
+            <div className="ptg-queue-brand-chips">{details.brands.map(item => <span key={item.brand}>{item.brand}: {item.count}</span>)}</div>
+            {details.sharedBarcodes.length > 0 && <p className="ptg-queue-duplicate-note">
+              {details.sharedBarcodes.length} barcode(s) appear in multiple queued offers. This may be intentional for free-installation and unit-only prices; check each model before printing.
+            </p>}
+          </div>;
+        })()}
+        {(() => {
+          const today = philippineToday();
+          const needingReview = queue.filter(item => checkProductPrice(item, today).some(issue => issue.level === "warning")).length;
+          return needingReview ? <p className="ptg-price-queue-note" role="status">
+            {needingReview} selected product(s) have price warnings. Open the model details to review before printing; printing is not blocked.
+          </p> : null;
+        })()}
         <div className="legacy-table-frame">
           <table className="legacy-products-table">
             <thead><tr>
@@ -610,6 +726,16 @@ export default function ProductSearch({
           Check or remove: {invalidAircon.map(product => product.model || product.barcode).join(", ")}.
         </div>}
         {printable && queue.length === 0 && <div className="legacy-preview-empty ptg-print-hide">Select products above to print price tags.</div>}
+        {queue.length > 0 && <section className="ptg-print-preflight ptg-print-hide" aria-label="Print preflight summary">
+          <strong>Print preflight — {printReview.items} product(s), {printReview.pages} estimated page(s)</strong>
+          {printReview.problems.length ? <>
+            <p>{printReview.problems.length} item check(s) need review. These are advisory checks, not a measured text-fit test. Review the actual print preview before printing.</p>
+            <ul>{printReview.problems.slice(0, 6).map((issue, index) => <li key={issue.code + ":" + index}>
+              <b>{issue.label}:</b> {issue.detail}
+            </li>)}</ul>
+            {printReview.problems.length > 6 && <p>Plus {printReview.problems.length - 6} more checks. Review each queued product in its details modal.</p>}
+          </> : <p>No missing-price or obvious description-length warnings found. Check the browser print preview before printing.</p>}
+        </section>}
         <div className="legacy-output-buttons ptg-print-hide">
           {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
           <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE</button>
@@ -724,6 +850,40 @@ export default function ProductSearch({
               <tbody>{serials.map(item => <tr key={item.branch + ":" + item.serial}><td>{item.serial}</td><td>{item.branch}</td><td>{item.receivedOn || "—"}</td></tr>)}</tbody>
             </table> : <p>No serial numbers currently available.</p>}
         </> : <>
+        {salesInsightsEnabled && <section className="ptg-product-insights ptg-print-hide" aria-label="Sales Tracker product insights">
+          <strong>Sales Tracker · Product insights</strong>
+          {insightsLoading ? <p role="status">Loading aggregated branch activity…</p>
+            : insights ? <>
+              <p><b>{insights.scope}</b> · {insights.recent.from} to {insights.recent.to}</p>
+              <div className="ptg-product-insights-grid">
+                <span><small>Stock units</small><strong>{insights.quantity.toLocaleString("en-PH")}</strong></span>
+                <span><small>Sold units (30 days)</small><strong>{insights.recent.units.toLocaleString("en-PH")}</strong></span>
+                <span><small>Recorded transactions (30 days)</small><strong>{insights.recent.transactions.toLocaleString("en-PH")}</strong></span>
+                <span><small>Last recorded sale</small><strong>{insights.recent.lastSaleDate || "No sales in period"}</strong></span>
+              </div>
+              <p>Read-only aggregated totals. No customer or Product Specialist identities are shared. Historical sales may not reflect later returns.</p>
+            </> : <p role="status">{insightsMessage || "Aggregated activity is unavailable."} PTG prices and printing are unaffected.</p>}
+        </section>}
+        {(() => {
+          const visible = visibleOffersForBarcode(detailProduct, [...results, ...comparableOffers], queue, {
+            includeSubdealer: canSeeCashPrice && showSubdealer,
+          });
+          const warnings = [
+            ...checkProductPrice(detailProduct, philippineToday()),
+            ...reviewInstallments(detailProduct),
+            ...reviewOfferConflicts(detailProduct, visible),
+          ];
+          return warnings.length ? <section className="ptg-price-checks" aria-label="Price review warnings">
+            <strong>Price checks — review only</strong>
+            <ul>{warnings.map(issue => <li className={issue.level === "warning" ? "warn" : "info"} key={issue.code}>{issue.text}</li>)}</ul>
+          </section> : null;
+        })()}
+        {usesEdgeData && <p className="ptg-compare-status" role="status">
+          {comparisonLoading ? "Checking currently searchable offers for the same barcode…" :
+            comparisonMessage ? "Additional offer check unavailable: " + comparisonMessage + ". Visible offers are shown only." :
+            comparisonPartial ? "Only the first 50 searchable offer rows were checked; results may be incomplete." :
+            "Currently searchable same-barcode offers checked. Older replaced memo prices are not included."}
+        </p>}
         <dl className="legacy-product-details">
           <dt>Brand</dt><dd>{detailProduct.brand || "—"}</dd>
           <dt>Full description</dt><dd>{detailProduct.description || detailProduct.model || "—"}</dd>
@@ -731,6 +891,10 @@ export default function ProductSearch({
           {detailProduct.category && <><dt>Category</dt><dd>{detailProduct.category}</dd></>}
           {detailProduct.sub_category && <><dt>Subcategory</dt><dd>{detailProduct.sub_category}</dd></>}
           <dt>Remarks</dt><dd>{detailProduct.remarks || "N/A"}</dd>
+          <dt>Offer selected for printing</dt><dd>
+            {queue.some(item => item.id === detailProduct.id) ? <strong>Queued — {format === "SMALL_APPS" || format === "CARAVAN" ? "SRP only" : detailProduct.campaign || "Regular / memo"} · {peso(format === "SMALL_APPS" || format === "CARAVAN" ? detailProduct.srp : detailProduct.tag_this)}</strong>
+              : "Not queued. Select this exact offer in the search results to print it."}
+          </dd>
           {!detailUnitOnly && <>
             <dt>SRP</dt><dd className="ptg-srp-amount">{peso(detailProduct.srp)}</dd>
             <dt>Tag This</dt><dd className="ptg-tag-this-amount">{peso(priceNow(detailProduct))}</dd>
@@ -750,6 +914,44 @@ export default function ProductSearch({
             </dd>
           </>}
         </dl>
+        {(() => {
+          const memos = memoEntriesForOffer(detailProduct);
+          return memos.length > 1 ? <section className="ptg-memo-references" aria-label="Loaded memo references">
+            <h3>Memo references on this offer</h3>
+            <p>These are references returned with the selected record, not a complete import or replacement history.</p>
+            <ul>{memos.map((memo, index) => <li key={(memo.memo_id || "memo") + ":" + index}>
+              <strong>{memoLabel(memo, detailProduct) || "Unnumbered memo"}</strong>
+              {memo.period ? " · " + memo.period : ""}
+              {memo.created_at ? " · Imported " + new Date(memo.created_at).toLocaleDateString("en-PH") : ""}
+            </li>)}</ul>
+          </section> : null;
+        })()}
+        {(() => {
+          const offers = visibleOffersForBarcode(detailProduct, [...results, ...comparableOffers], queue, {
+            includeSubdealer: canSeeCashPrice && showSubdealer,
+          });
+          return offers.length > 1 ? <section className="ptg-visible-offers" aria-label="Visible price options">
+            <h3>Price options for this barcode</h3>
+            <p>Only offers loaded on this search page or already in the print queue are shown. Other regular or promotional prices may exist. Reviewing an option does not change the print queue.</p>
+            <div className="ptg-visible-offer-scroll">
+              <table>
+                <thead><tr><th>Offer</th><th>Tag This</th><th>SRP</th><th>Period</th><th>Action</th></tr></thead>
+                <tbody>{offers.map(offer => <tr key={offer.id}>
+                  <td>{offer.id === detailProduct.id ? <strong>Viewing · {offer.campaign || "Regular / SRP"}</strong> : offer.campaign || "Regular / SRP"}
+                    {queue.some(item => item.id === offer.id) ? <small className="ptg-offer-queued">Queued for print</small> : null}</td>
+                  <td>{peso(offer.tag_this)}</td><td>{peso(offer.srp)}</td>
+                  <td>{memoInfo(offer)?.period || (offer.selling_starts_on && offer.selling_ends_on
+                    ? offer.selling_starts_on + " to " + offer.selling_ends_on : "—")}</td>
+                  <td>{offer.id === detailProduct.id ? "—"
+                    : [...results, ...queue].some(item => item.id === offer.id)
+                      ? <button type="button" className="legacy-product-detail-link"
+                        onClick={() => openProductDetails([...results, ...queue].find(item => item.id === offer.id)!)}>Review</button>
+                      : "Compare only — search to select"}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </section> : null;
+        })()}
         {detailUnitOnly && <>
           <table className="legacy-product-installment-table legacy-price-comparison-table">
             <caption>Price options — selected memo</caption>
@@ -799,6 +1001,45 @@ export default function ProductSearch({
         .legacy-price-comparison-table th,.legacy-price-comparison-table td{width:33.333%;white-space:normal}
         .legacy-price-comparison-table td.ptg-srp-amount{color:#b42318}
         .legacy-price-comparison-table td.ptg-tag-this-amount{color:#12366c;font-weight:800}
+        .ptg-visible-offers,.ptg-memo-references{margin:12px 0;padding:10px 12px;border:1px solid #d9e3ef;border-radius:8px;background:#f8fbff;color:#274263;font-size:12px}
+        .ptg-visible-offers h3,.ptg-memo-references h3{margin:0 0 5px;font-size:13px}
+        .ptg-visible-offers p,.ptg-memo-references p{margin:0 0 9px;color:#526987;line-height:1.45}
+        .ptg-memo-references ul{margin:0;padding-left:18px}
+        .ptg-memo-references li{margin:4px 0}
+        .ptg-visible-offer-scroll{max-width:100%;overflow-x:auto}
+        .ptg-visible-offers table{width:100%;border-collapse:collapse;min-width:500px}
+        .ptg-visible-offers :is(th,td){padding:7px 6px;text-align:left;border-bottom:1px solid #dce5ef}
+        .ptg-visible-offers th{font-weight:700}
+        .ptg-visible-offers td{overflow-wrap:anywhere}
+        .ptg-compare-status{font-size:11px;color:#526c86;line-height:1.45;margin:8px 0}
+        .ptg-offer-queued{display:block;color:#176042;font-size:10px;font-weight:700;margin-top:3px}
+        .ptg-print-preflight{margin:10px 0;padding:10px 12px;border:1px solid #d7e4f0;border-radius:7px;background:#f4f8fc;color:#244769;font-size:12px;line-height:1.45}
+        .ptg-print-preflight strong{font-size:13px}
+        .ptg-print-preflight p{margin:6px 0}
+        .ptg-print-preflight ul{margin:7px 0;padding-left:19px}
+        .ptg-print-preflight li{margin:4px 0}
+        .ptg-product-insights{margin:10px 0 14px;padding:12px;border:1px solid #cee0f3;border-radius:8px;background:#f4f9ff;color:#25486b;font-size:12px;line-height:1.5}
+        .ptg-product-insights>strong{font-size:13px}
+        .ptg-product-insights>p{margin:7px 0}
+        .ptg-product-insights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+        .ptg-product-insights-grid span{display:grid;gap:2px;min-width:0}
+        .ptg-product-insights-grid small{font-size:11px;color:#66788f}
+        .ptg-product-insights-grid strong{font-size:14px;color:#143b67}
+        .ptg-bulk-brand{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:4px 0 10px;font-size:12px}
+        .ptg-bulk-brand label{font-weight:700}
+        .ptg-bulk-brand select{min-width:125px;min-height:34px;padding:5px 8px;border:1px solid #c9d8ea;border-radius:5px;background:#fff;font-size:12px}
+        .ptg-bulk-brand button{min-height:34px;padding:5px 10px;border:1px solid #225a9d;border-radius:5px;background:#eef5ff;color:#184c87;font-size:12px;font-weight:700;cursor:pointer}
+        .ptg-bulk-brand button:disabled{opacity:.5;cursor:default}
+        .ptg-queue-overview{display:grid;gap:6px;margin:8px 0 10px;color:#25486b;font-size:12px}
+        .ptg-queue-brand-chips{display:flex;flex-wrap:wrap;gap:5px}
+        .ptg-queue-brand-chips span{padding:4px 7px;border:1px solid #d6e2ef;border-radius:99px;background:#f2f7fc;color:#244969;font-size:11px}
+        .ptg-queue-duplicate-note{margin:0;padding:8px 10px;border-radius:6px;background:#fff7e9;color:#795319;line-height:1.5}
+        .ptg-price-queue-note{margin:0 0 10px;padding:10px 12px;border:1px solid #ead6a9;border-radius:6px;background:#fffaf0;color:#755215;font-size:12px;line-height:1.4}
+        .ptg-price-checks{margin:10px 0 14px;padding:12px;border:1px solid #ead6a9;border-radius:8px;background:#fffaf0;color:#604815;font-size:12px}
+        .ptg-price-checks>strong{display:block;margin:0 0 8px}
+        .ptg-price-checks ul{margin:0;padding-left:20px}
+        .ptg-price-checks li{margin:4px 0;line-height:1.5}
+        .ptg-price-checks li.info{color:#365b80}
         .legacy-unit-only-queue-button{border:1px solid #2465c3;border-radius:5px;background:#eef5ff;color:#124a9c;padding:7px 12px;font-weight:700;cursor:pointer}
         .legacy-unit-only-queue-button:disabled{opacity:.65;cursor:default}
         .legacy-products-banner-pin{position:sticky;top:0;z-index:4;padding-bottom:9px;background:#f3f6fa}

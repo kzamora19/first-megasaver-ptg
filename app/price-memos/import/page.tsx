@@ -6,6 +6,7 @@ import ClientSessionGate from "@/components/client-session-gate";
 import { withBasePath } from "@/lib/base-path";
 import Link from "next/link";
 import PriceMemoImporter from "./price-memo-importer";
+import MemoImportHistory from "./memo-import-history";
 
 function ImportBackLink({ systemAdmin }: { systemAdmin: boolean }) {
   const workspace = useSearchParams().get("workspace");
@@ -29,6 +30,7 @@ export default function PriceMemoImportPage() {
       </section>
       <p><Link href={session.role === "SYSTEM_ADMIN" ? "/data-desk/?mode=subdealer" : "/price-memos/subdealer/"} className="admin-link">Open SUBDEALER MEMO IMPORTER (PDF)</Link></p>
       <PriceMemoImporter />
+      {session.role === "SYSTEM_ADMIN" && <div className="admin-layout"><MemoImportHistory /></div>}
     </main>}
   </ClientSessionGate>;
 }
