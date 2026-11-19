@@ -27,5 +27,5 @@ jobs:
           node --test tests/studio-access-policy.test.mjs
       - name: Typecheck Next.js launch portal (no deployment)
         run: |
-          npm ci --ignore-scripts
+          npm install --ignore-scripts --no-package-lock
           npx tsc --noEmit
