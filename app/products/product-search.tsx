@@ -642,7 +642,7 @@ export default function ProductSearch({
       <section className="legacy-results-panel ptg-print-hide">
         {message && <p className="legacy-status-message" role="status">{message}</p>}
         {!!visibleBrands.length && <div className="ptg-bulk-brand">
-          <label htmlFor="ptg-bulk-brand-select">Add visible brand offers</label>
+          <label htmlFor="ptg-bulk-brand-select" title="Add matching offers from the current search results page to your print queue. Other pages are not selected.">Add visible brand offers</label>
           <select id="ptg-bulk-brand-select" value={bulkBrand} onChange={event => setBulkBrand(event.target.value)}>
             <option value="">Choose a brand</option>
             {visibleBrands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
@@ -698,11 +698,6 @@ export default function ProductSearch({
             </button>)}
             <span role="status">Choose a format group before printing. Each group is a separate print job.</span>
             {!printable && <p role="alert">Selected AIRCON products require a supported capacity before printing.</p>}
-            <div className="ptg-batch-actions">
-              {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
-              <button type="button" className="save-pdf" disabled={!printQueue.length || !printable} onClick={printTags}>▣ SAVE selected group</button>
-              <button type="button" className="print-tags" disabled={!printQueue.length || !printable} onClick={printTags}>▣ Print selected group</button>
-            </div>
             <small role="status">Selected: {formats.find(option => option.key === format)?.label}; {printReview.items} tag(s), {printReview.pages} estimated page(s).</small>
           </div>}
         </div>
@@ -768,10 +763,10 @@ export default function ProductSearch({
         <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setQueuePage(1); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
       </section>
 
-      {!batchPlannerEnabled && <section id="print-price-tags" className="legacy-preview-panel">
+      <section id="print-price-tags" className="legacy-preview-panel">
         <div className="legacy-preview-heading">
           <h2>Print Price Tags</h2>
-            <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
+            <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" disabled={batchPlannerEnabled} title={batchPlannerEnabled ? "Disable batch planning to change the global print format." : undefined} className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
         </div>
         {logoMessage && <p className="legacy-status-message ptg-print-hide" role="status">{logoMessage}</p>}
         {!printable && <div className="legacy-format-notice" role="alert">
@@ -794,7 +789,7 @@ export default function ProductSearch({
           <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE</button>
           <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print</button>
         </div>
-      </section>}
+      </section>
       </div>
 
         {printable && queue.length > 0 && <div className="ptg-print-preview">
@@ -1134,8 +1129,18 @@ export default function ProductSearch({
         .legacy-products-table thead{background:#0647a7;color:#fff}
         .legacy-products-table th{height:28px;padding:4px 6px;background:#0647a7;color:#fff;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
         .legacy-products-table th:first-child,.legacy-products-table td:first-child{width:36px;text-align:center}
-        .legacy-products-table th:nth-child(2){width:10%}.legacy-products-table th:nth-child(3){width:9%}.legacy-products-table th:nth-child(4){width:33%}.legacy-products-table th:nth-child(5){width:23%}.legacy-products-table th:nth-child(6),.legacy-products-table th:nth-child(7){width:8%}.legacy-products-table th:nth-child(8){width:6%}
-        /* Search results omit Remarks; the print queue keeps its original columns. */
+        /* Queue uses its own explicit widths; original column indices assumed a Remarks column. */
+        .legacy-queue-panel .legacy-products-table{min-width:1020px;table-layout:fixed}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(2){width:100px}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(3){width:110px}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(4){width:auto;min-width:280px}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(5){width:114px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(6){width:118px;white-space:nowrap}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(7){width:78px}
+        .legacy-queue-panel .legacy-products-table :is(th,td):nth-child(8){width:205px}
+        .legacy-queue-panel .legacy-products-table:not(:has(.ptg-queue-print-settings)){min-width:820px}
+        .legacy-queue-panel .legacy-products-table:not(:has(.ptg-queue-print-settings)) :is(th,td):nth-child(8){width:auto}
+        /* Search results and queue omit Remarks; the queue has independent column sizing. */
         .legacy-results-panel .legacy-search-results-table{min-width:760px}
         .legacy-results-panel .legacy-search-results-table th:nth-child(2){width:12%}
         .legacy-results-panel .legacy-search-results-table th:nth-child(3){width:11%}
@@ -1144,7 +1149,7 @@ export default function ProductSearch({
         .legacy-results-panel .legacy-search-results-table th:nth-child(6){width:17%}
         .legacy-results-panel .legacy-search-results-table th:nth-child(7){width:8%}
         .legacy-products-table td{height:38px;padding:4px 6px;border-bottom:1px solid #d6d6d6;color:#143d75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5),.legacy-products-table .legacy-product-detail-link{white-space:normal;overflow-wrap:anywhere}
+        .legacy-products-table td:nth-child(4),.legacy-products-table .legacy-product-detail-link{white-space:normal;overflow-wrap:anywhere}
         .legacy-results-panel .legacy-search-results-table :is(td:nth-child(5),td:nth-child(6)){white-space:nowrap}
         .legacy-products-table tbody tr:not(.legacy-blank-row){cursor:pointer}
         .legacy-products-table tbody tr:hover:not(.legacy-blank-row){background:#f5f8fc}
@@ -1241,7 +1246,7 @@ export default function ProductSearch({
           .legacy-output-buttons button{min-height:34px;height:auto;padding:7px 10px;font-size:11px}
           .legacy-format-notice,.legacy-preview-empty{font-size:12px;line-height:1.45}
           .legacy-table-frame{max-width:100%;overscroll-behavior-x:contain}
-          .legacy-products-table td:nth-child(4),.legacy-products-table td:nth-child(5){overflow-wrap:anywhere}
+          .legacy-products-table td:nth-child(4){overflow-wrap:anywhere}
         }
         @container (max-width:1020px){
           .legacy-search-workflow{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "results" "queue" "print"}
