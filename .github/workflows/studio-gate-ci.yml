@@ -1,0 +1,31 @@
+name: PTG Studio authorization staging tests
+on:
+  push:
+    branches: [feature/ptg-studio-access-gateway-20261119]
+  pull_request:
+    paths:
+      - "supabase/functions/ptg-studio-access/**"
+      - "supabase/functions/_shared/studio-access-policy.mjs"
+      - "app/studios/**"
+      - "components/workspace-nav.tsx"
+      - "supabase/migrations/*ptg_studio*"
+      - "tests/studio-access-policy.test.mjs"
+      - ".github/workflows/studio-gate-ci.yml"
+permissions:
+  contents: read
+jobs:
+  static-checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate PTG studio eligibility policy
+        run: |
+          node --check supabase/functions/_shared/studio-access-policy.mjs
+          node --test tests/studio-access-policy.test.mjs
+      - name: Typecheck Next.js launch portal (no deployment)
+        run: |
+          npm ci --ignore-scripts
+          npx tsc --noEmit
