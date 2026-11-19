@@ -425,8 +425,7 @@ export default function ProductSearch({
     setComparisonMessage("");
     setComparisonPartial(false);
     setComparisonLoading(true);
-    const permittedSubdealer = showSubdealer &&
-      (systemRole === "SYSTEM_ADMIN" || (systemRole === "BRANCH_ADMIN" && legacyRole.trim().toUpperCase() === "BRANCH MANAGER"));
+    const permittedSubdealer = showSubdealer && canSeeSubdealer;
     void invokePtgData("ptg-products", {
       action: "comparable-offers", barcode: detailBarcode, include_subdealer: permittedSubdealer,
     }).then(response => {
@@ -471,8 +470,13 @@ export default function ProductSearch({
     setDetailProduct(product);
   }
   const canManageBranch = systemRole === "BRANCH_ADMIN";
+  const normalizedLegacyRole = legacyRole.trim().toUpperCase();
+  const canSeeSubdealer = systemRole === "SYSTEM_ADMIN" ||
+    (systemRole === "BRANCH_ADMIN" && normalizedLegacyRole === "BRANCH MANAGER") ||
+    (["BRANCH_USER", "BRANCH_ADMIN"].includes(systemRole) && normalizedLegacyRole === "TEAM LEADER");
+  // Team Leaders get subdealer offers, not separate cash-payment metadata.
   const canSeeCashPrice = systemRole === "SYSTEM_ADMIN" ||
-    (canManageBranch && legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
+    (canManageBranch && normalizedLegacyRole === "BRANCH MANAGER");
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -603,7 +607,7 @@ export default function ProductSearch({
                 onChange={event => changeMemoFilter(event.target.checked ? "regular" : "all")} /> Regular memos only</label>
               <label className="legacy-stock-filter"><input type="checkbox" checked={memoFilter === "promotion"} disabled={showSubdealer}
                 onChange={event => changeMemoFilter(event.target.checked ? "promotion" : "all")} /> Promotion memos only</label>
-              {canSeeCashPrice && <label className="legacy-stock-filter ptg-subdealer-filter">
+              {canSeeSubdealer && <label className="legacy-stock-filter ptg-subdealer-filter">
                 <input type="checkbox" checked={showSubdealer} onChange={event => {
                   const enabled = event.target.checked;
                   setShowSubdealer(enabled);
@@ -692,38 +696,16 @@ export default function ProductSearch({
               onClick={() => setPrintFormat(group.format)}>
               {formats.find(option => option.key === group.format)?.label || group.format}: {group.products} product(s) / {group.copies} tag(s)
             </button>)}
-            <span role="status">Choose each group, review its preview, then print. Groups are separate print jobs.</span>
+            <span role="status">Choose a format group before printing. Each group is a separate print job.</span>
+            {!printable && <p role="alert">Selected AIRCON products require a supported capacity before printing.</p>}
+            <div className="ptg-batch-actions">
+              {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
+              <button type="button" className="save-pdf" disabled={!printQueue.length || !printable} onClick={printTags}>▣ SAVE selected group</button>
+              <button type="button" className="print-tags" disabled={!printQueue.length || !printable} onClick={printTags}>▣ Print selected group</button>
+            </div>
+            <small role="status">Selected: {formats.find(option => option.key === format)?.label}; {printReview.items} tag(s), {printReview.pages} estimated page(s).</small>
           </div>}
         </div>
-        {batchPlannerEnabled && queueRows.length > 0 && <section className="ptg-batch-items" aria-label="Format and copies for each product">
-          <strong>Format and copies per product</strong>
-          <p>Set each product's print format and number of copies here. These settings apply to the selected products on this queue page.</p>
-          {queueRows.map(product => <div className="ptg-batch-item" key={product.id}>
-            <div className="ptg-batch-item-name">
-              <strong>{product.brand || "—"} · {product.model || product.description || product.barcode}</strong>
-              <small>BC# {product.barcode}</small>
-            </div>
-            <label>Format
-              <select aria-label={"Print format for " + (product.model || product.barcode)}
-                value={printPreferences[product.id]?.format || batchDefaultFormat}
-                onChange={event => setPrintPreferences(previous => ({
-                  ...previous, [product.id]: { format: event.target.value as FormatKey, copies: previous[product.id]?.copies || 1 },
-                }))}>{formats.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select>
-            </label>
-            <label>Copies
-              <input type="number" min="1" max="20" step="1"
-                aria-label={"Print copies for " + (product.model || product.barcode)}
-                value={printPreferences[product.id]?.copies || 1}
-                onChange={event => {
-                  const copies = Number(event.target.value);
-                  setPrintPreferences(previous => ({
-                    ...previous, [product.id]: { format: previous[product.id]?.format || batchDefaultFormat,
-                      copies: Number.isInteger(copies) && copies >= 1 && copies <= 20 ? copies : 1 },
-                  }));
-                }} />
-            </label>
-          </div>)}
-        </section>}
         {queue.length > 0 && (() => {
           const details = summarizePrintQueue(queue);
           return <div className="ptg-queue-overview" aria-label="Queue by brand">
@@ -745,7 +727,7 @@ export default function ProductSearch({
           <table className="legacy-products-table">
             <thead><tr>
               <th><input type="checkbox" aria-label="Select all queued products" checked={queue.length > 0} onChange={event => { if (!event.target.checked) { setQueue([]); setQueuePage(1); setActiveProduct(null); } }} /></th>
-              <th>Barcode</th><th>Brand</th><th>Model</th><th>Remarks</th><th>SRP</th><th>TAG THIS</th><th>Status</th>
+              <th>Barcode</th><th>Brand</th><th>Model</th><th>SRP</th><th>TAG THIS</th><th>Status</th>{batchPlannerEnabled && <th>Format / Copies</th>}
             </tr></thead>
             <tbody>
               {queueRows.length ? queueRows.map(product => <tr key={product.id} onClick={event => {
@@ -754,10 +736,31 @@ export default function ProductSearch({
                 <td><input type="checkbox" checked aria-label={"Remove " + product.model + " from print queue"} onChange={event => toggleProduct(product, event.target.checked)} /></td>
                 <td>{product.barcode}</td><td><strong>{product.brand || "—"}</strong></td><td><button className="legacy-product-detail-link" type="button" aria-haspopup="dialog"
                   aria-label={"View product details for " + (product.model || product.barcode)}
-                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td>{product.remarks || "N/A"}</td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                  onClick={() => openProductDetails(product)}>{modelLabel(product)}</button><MemoSummary product={product} /></td><td className="ptg-srp-amount">{peso(product.srp)}</td><td className="ptg-tag-this-amount">{peso(priceNow(product))}</td><td><span className={"legacy-status-pill " + (displayStatus(product) === "YES" ? "eligible" : "")}>{displayStatus(product)}</span></td>
+                 {batchPlannerEnabled && <td className="ptg-queue-print-settings">
+                   <label>Format
+                     <select aria-label={"Print format for " + (product.model || product.barcode)}
+                       value={printPreferences[product.id]?.format || batchDefaultFormat}
+                       onChange={event => setPrintPreferences(previous => ({
+                         ...previous, [product.id]: { format: event.target.value as FormatKey, copies: previous[product.id]?.copies || 1 },
+                       }))}>{formats.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}</select>
+                   </label>
+                   <label>Copies
+                     <input type="number" min="1" max="20" step="1"
+                       aria-label={"Print copies for " + (product.model || product.barcode)}
+                       value={printPreferences[product.id]?.copies || 1}
+                       onChange={event => {
+                         const copies = Number(event.target.value);
+                         setPrintPreferences(previous => ({
+                           ...previous, [product.id]: { format: previous[product.id]?.format || batchDefaultFormat,
+                             copies: Number.isInteger(copies) && copies >= 1 && copies <= 20 ? copies : 1 },
+                         }));
+                       }} />
+                   </label>
+                 </td>}
 
-              </tr>) : <tr><td colSpan={8} className="legacy-queue-empty">No products selected for printing.</td></tr>}
-              <BlankRows used={Math.max(1, queueRows.length)} />
+              </tr>) : <tr><td colSpan={batchPlannerEnabled ? 8 : 7} className="legacy-queue-empty">No products selected for printing.</td></tr>}
+              <BlankRows used={Math.max(1, queueRows.length)} columns={batchPlannerEnabled ? 8 : 7} />
             </tbody>
           </table>
         </div>
@@ -765,7 +768,7 @@ export default function ProductSearch({
         <div className="legacy-queue-footer"><strong>Selected: {queue.length} product(s)</strong><button type="button" onClick={() => { setQueue([]); setQueuePage(1); setActiveProduct(null); }}>▤ CLEAR ALL</button></div>
       </section>
 
-      <section id="print-price-tags" className="legacy-preview-panel">
+      {!batchPlannerEnabled && <section id="print-price-tags" className="legacy-preview-panel">
         <div className="legacy-preview-heading">
           <h2>Print Price Tags</h2>
             <div className="legacy-format-controls preview-format-controls"><strong>PRINT FORMAT</strong><div>{formats.map(option => <button key={option.key} type="button" className={format === option.key ? "active" : ""} onClick={() => setPrintFormat(option.key)}>{option.label}</button>)}</div></div>
@@ -791,7 +794,7 @@ export default function ProductSearch({
           <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE</button>
           <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print</button>
         </div>
-      </section>
+      </section>}
       </div>
 
         {printable && queue.length > 0 && <div className="ptg-print-preview">
@@ -925,7 +928,7 @@ export default function ProductSearch({
         </section>}
         {(() => {
           const visible = visibleOffersForBarcode(detailProduct, [...results, ...comparableOffers], queue, {
-            includeSubdealer: canSeeCashPrice && showSubdealer,
+            includeSubdealer: canSeeSubdealer && showSubdealer,
           });
           const warnings = [
             ...checkProductPrice(detailProduct, philippineToday()),
@@ -983,32 +986,6 @@ export default function ProductSearch({
               {memo.period ? " · " + memo.period : ""}
               {memo.created_at ? " · Imported " + new Date(memo.created_at).toLocaleDateString("en-PH") : ""}
             </li>)}</ul>
-          </section> : null;
-        })()}
-        {(() => {
-          const offers = visibleOffersForBarcode(detailProduct, [...results, ...comparableOffers], queue, {
-            includeSubdealer: canSeeCashPrice && showSubdealer,
-          });
-          return offers.length > 1 ? <section className="ptg-visible-offers" aria-label="Visible price options">
-            <h3>Price options for this barcode</h3>
-            <p>Only offers loaded on this search page or already in the print queue are shown. Other regular or promotional prices may exist. Reviewing an option does not change the print queue.</p>
-            <div className="ptg-visible-offer-scroll">
-              <table>
-                <thead><tr><th>Offer</th><th>Tag This</th><th>SRP</th><th>Period</th><th>Action</th></tr></thead>
-                <tbody>{offers.map(offer => <tr key={offer.id}>
-                  <td>{offer.id === detailProduct.id ? <strong>Viewing · {offer.campaign || "Regular / SRP"}</strong> : offer.campaign || "Regular / SRP"}
-                    {queue.some(item => item.id === offer.id) ? <small className="ptg-offer-queued">Queued for print</small> : null}</td>
-                  <td>{peso(offer.tag_this)}</td><td>{peso(offer.srp)}</td>
-                  <td>{memoInfo(offer)?.period || (offer.selling_starts_on && offer.selling_ends_on
-                    ? offer.selling_starts_on + " to " + offer.selling_ends_on : "—")}</td>
-                  <td>{offer.id === detailProduct.id ? "—"
-                    : [...results, ...queue].some(item => item.id === offer.id)
-                      ? <button type="button" className="legacy-product-detail-link"
-                        onClick={() => openProductDetails([...results, ...queue].find(item => item.id === offer.id)!)}>Review</button>
-                      : "Compare only — search to select"}</td>
-                </tr>)}</tbody>
-              </table>
-            </div>
           </section> : null;
         })()}
         {detailUnitOnly && <>
@@ -1089,15 +1066,12 @@ export default function ProductSearch({
         .ptg-bulk-brand select{min-width:125px;min-height:34px;padding:5px 8px;border:1px solid #c9d8ea;border-radius:5px;background:#fff;font-size:12px}
         .ptg-bulk-brand button{min-height:34px;padding:5px 10px;border:1px solid #225a9d;border-radius:5px;background:#eef5ff;color:#184c87;font-size:12px;font-weight:700;cursor:pointer}
         .ptg-bulk-brand button:disabled{opacity:.5;cursor:default}
-        .ptg-batch-items{display:grid;gap:8px;margin:9px 0 12px;padding:10px;border:1px solid #cfdfef;border-radius:7px;background:#f8fbff;color:#183d70;font-size:12px}
-        .ptg-batch-items>p{margin:0;color:#526984;font-size:11px}
-        .ptg-batch-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(116px,145px) 82px;gap:12px;align-items:center;padding:8px 10px;background:white;border:1px solid #e2e9f3;border-radius:6px;min-width:0}
-        .ptg-batch-item-name{min-width:0;display:grid;gap:3px;overflow-wrap:anywhere}
-        .ptg-batch-item-name small{color:#526984}
-        .ptg-batch-item label{display:grid;gap:4px;font-weight:700;min-width:0}
-        .ptg-batch-item select,.ptg-batch-item input{width:100%;min-width:0;min-height:34px;padding:4px 6px;border:1px solid #bdd2ea;border-radius:5px;background:white;color:#173e73;font-size:12px}
-        @media screen and (max-width:600px){.ptg-batch-item{grid-template-columns:minmax(0,1fr) 85px;gap:8px}.ptg-batch-item-name{grid-column:1 / -1}}
-        .ptg-batch-toolbar{display:grid;gap:8px;margin:8px 0 12px;padding:9px;border:1px solid #d6e3f3;border-radius:6px;background:#f8fbff;color:#164270;font-size:12px}
+        .ptg-queue-print-settings{white-space:nowrap;min-width:204px}
+        .ptg-queue-print-settings label{display:inline-flex;flex-direction:column;gap:3px;margin-right:7px;vertical-align:middle;font-size:10px;color:#234b79;font-weight:700}
+        .ptg-queue-print-settings select{width:116px!important;max-width:116px!important}
+        .ptg-queue-print-settings input[type=number]{width:56px!important}
+        .ptg-batch-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+                .ptg-batch-toolbar{display:grid;gap:8px;margin:8px 0 12px;padding:9px;border:1px solid #d6e3f3;border-radius:6px;background:#f8fbff;color:#164270;font-size:12px}
         .ptg-batch-toolbar>label{display:flex;align-items:center;gap:8px;font-weight:700}
         .ptg-batch-groups{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
         .ptg-batch-groups label{display:flex;align-items:center;gap:6px}

@@ -102,7 +102,8 @@ async function searchMemoProducts(origin: string, session: ActiveSession, body: 
   if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
   if (!["SYSTEM_ADMIN", "BRANCH_ADMIN", "BRANCH_USER"].includes(session.role)) return respond(origin, fail("PTG access is not enabled for this account."), 403);
   const canSeeSubdealer = session.role === "SYSTEM_ADMIN" ||
-    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
+    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER") ||
+    (["BRANCH_USER", "BRANCH_ADMIN"].includes(session.role) && session.legacyRole.trim().toUpperCase() === "TEAM LEADER");
   const includeSubdealer = body.include_subdealer === true;
   if (includeSubdealer && !canSeeSubdealer) {
     return respond(origin, fail("Subdealer prices are restricted to authorized managers."), 403);
@@ -163,7 +164,8 @@ async function comparableOffers(origin: string, session: ActiveSession, body: Re
   const requested = clean(body.barcode, 64).toUpperCase();
   if (!/^[A-Z0-9-]{1,64}$/.test(requested)) return respond(origin, fail("Provide a valid barcode."), 400);
   const canSeeSubdealer = session.role === "SYSTEM_ADMIN" ||
-    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER");
+    (session.role === "BRANCH_ADMIN" && session.legacyRole.trim().toUpperCase() === "BRANCH MANAGER") ||
+    (["BRANCH_USER", "BRANCH_ADMIN"].includes(session.role) && session.legacyRole.trim().toUpperCase() === "TEAM LEADER");
   const includeSubdealer = body.include_subdealer === true;
   if (includeSubdealer && !canSeeSubdealer)
     return respond(origin, fail("Subdealer pricing is restricted to authorized managers."), 403);
