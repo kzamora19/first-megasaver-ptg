@@ -57,6 +57,7 @@ type LogoMap = Partial<Record<LogoKey, { url: string; originalFileName: string; 
 type StockInfo = { quantity: number; serialized: boolean; scope: string };
 type ProductSalesInsights = StockInfo & {
   aggregated: true; source: string; barcode: string;
+  stockCoverage?: { trackedBranches: number; linkedBranches: number; complete: boolean; latestReportedOn: string | null };
   recent: { from: string; to: string; units: number; transactions: number; lastSaleDate: string | null };
 };
 type StockSerial = { serial: string; receivedOn: string | null; branch: string };
@@ -905,11 +906,20 @@ export default function ProductSearch({
             : insights ? <>
               <p><b>{insights.scope}</b> · {insights.recent.from} to {insights.recent.to}</p>
               <div className="ptg-product-insights-grid">
-                <span><small>Stock units</small><strong>{insights.quantity.toLocaleString("en-PH")}</strong></span>
+                <span><small>Stock units</small><strong>{insights.stockCoverage?.complete === true ? insights.quantity.toLocaleString("en-PH") : "Unavailable"}</strong></span>
                 <span><small>Sold units (30 days)</small><strong>{insights.recent.units.toLocaleString("en-PH")}</strong></span>
                 <span><small>Recorded transactions (30 days)</small><strong>{insights.recent.transactions.toLocaleString("en-PH")}</strong></span>
                 <span><small>Last recorded sale</small><strong>{insights.recent.lastSaleDate || "No sales in period"}</strong></span>
               </div>
+              <p role="status">{insights.stockCoverage?.complete === true
+                ? "Inventory snapshot available for all " + insights.stockCoverage.linkedBranches
+                  + " authorized branch(es)" + (insights.stockCoverage.latestReportedOn
+                    ? " · Last reported " + insights.stockCoverage.latestReportedOn : "") + "."
+                : insights.stockCoverage
+                  ? "Stock unavailable: only " + insights.stockCoverage.trackedBranches + " of "
+                    + insights.stockCoverage.linkedBranches
+                    + " authorized branch(es) have inventory snapshots. Sales activity remains available."
+                  : "Stock coverage could not be confirmed. Inventory quantity is hidden to avoid showing a misleading zero."}</p>
               <p>Read-only aggregated totals. No customer or Product Specialist identities are shared. Historical sales may not reflect later returns.</p>
             </> : <p role="status">{insightsMessage || "Aggregated activity is unavailable."} PTG prices and printing are unaffected.</p>}
         </section>}
