@@ -535,6 +535,84 @@ export default function ProductSearch({
   const sheets = Array.from({ length: Math.ceil(printQueue.length / tagsPerSheet) }, (_, index) => printQueue.slice(index * tagsPerSheet, (index + 1) * tagsPerSheet));
   const printReview = reviewPrintQueue(printQueue, format, { airconPages: airconPages.length });
 
+  const [savingPdf, setSavingPdf] = useState(false);
+
+  async function saveTagsPdf() {
+    if (!printQueue.length || !printable || savingPdf) return;
+    setSavingPdf(true);
+    setMessage("");
+    try {
+      // Only the browser print layout is the source of truth for this export.
+      const sheets = Array.from(document.querySelectorAll<HTMLElement>(".ptg-print-preview > .legacy-print-sheet"));
+      if (!sheets.length) throw new Error("No printable price-tag sheets were found.");
+      const printRules: string[] = [];
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          for (const rule of Array.from(sheet.cssRules)) {
+            if (!(rule instanceof CSSMediaRule) || !/\\bprint\\b/.test(rule.conditionText)) continue;
+            for (const inner of Array.from(rule.cssRules)) {
+              if (!(inner instanceof CSSStyleRule)) continue;
+              // Print mode hides the rest of the app. Canvas capture instead
+              // targets one existing sheet, so global visibility is excluded.
+              if (/^(?:body\\s*\\*|html\\s*,\\s*body)/.test(inner.selectorText)) continue;
+              printRules.push(inner.cssText);
+            }
+          }
+        } catch {
+          // Browser extensions and cross-origin stylesheets are not readable.
+        }
+      }
+      if (!printRules.some(rule => rule.includes(".legacy-print-sheet"))) {
+        throw new Error("Price-tag print layout styles could not be loaded.");
+      }
+      await document.fonts.ready;
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas-pro"), import("jspdf"),
+      ]);
+      const landscape = format === "TWO" || format === "AIRCON";
+      const widthPt = landscape ? 792 : 612;
+      const heightPt = landscape ? 612 : 792;
+      const pdf = new jsPDF({
+        orientation: landscape ? "landscape" : "portrait",
+        unit: "pt", format: "letter", compress: true,
+      });
+      for (let i = 0; i < sheets.length; i++) {
+        const sheet = sheets[i];
+        const canvas = await html2canvas(sheet, {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: landscape ? 1056 : 816,
+          height: landscape ? 816 : 1056,
+          onclone: clonedDocument => {
+            const style = clonedDocument.createElement("style");
+            style.textContent = printRules.join("\\n") +
+              "\\n.ptg-print-preview{display:block!important;position:relative!important;width:auto!important}" +
+              "\\n.legacy-print-sheet{margin:0!important;box-shadow:none!important}";
+            clonedDocument.head.appendChild(style);
+            const preview = clonedDocument.querySelector<HTMLElement>(".ptg-print-preview");
+            if (preview) preview.style.display = "block";
+          },
+        });
+        if (!canvas.width || !canvas.height) throw new Error("A price-tag sheet could not be rendered.");
+        if (i > 0) pdf.addPage("letter", landscape ? "landscape" : "portrait");
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, widthPt, heightPt);
+      }
+      const today = new Date();
+      const fileName = (demo ? "DEMO_" : "") + "FIRST_MEGASAVER_PRICE_TAGS_" +
+        today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") +
+        "-" + String(today.getDate()).padStart(2, "0") + ".pdf";
+      pdf.save(fileName);
+      setMessage("PDF download requested (" + sheets.length + " sheet(s)). Check your Downloads folder.");
+    } catch (error) {
+      setMessage("Could not save PDF: " + (error instanceof Error ? error.message : "Export failed.") +
+        " No print job was sent.");
+    } finally {
+      setSavingPdf(false);
+    }
+  }
+
   function printTags() {
     if (!printQueue.length) {
       setMessage(batchPlannerEnabled ? "Select a batch with queued products to print." : "Select at least one product before printing.");
@@ -786,7 +864,7 @@ export default function ProductSearch({
         </section>}
         <div className="legacy-output-buttons ptg-print-hide">
           {!demo && <button type="button" className="refresh-logos" disabled={refreshingLogos} onClick={() => void refreshArtwork()}>{refreshingLogos ? "Refreshing…" : "↻ Refresh Logos"}</button>}
-          <button type="button" className="save-pdf" disabled={!queue.length || !printable} onClick={printTags}>▣ SAVE</button>
+          <button type="button" className="save-pdf" disabled={!queue.length || !printable || savingPdf} onClick={() => void saveTagsPdf()}>{savingPdf ? "Saving PDF…" : "▣ SAVE"}</button>
           <button type="button" className="print-tags" disabled={!queue.length || !printable} onClick={printTags}>▣ Print</button>
         </div>
       </section>
