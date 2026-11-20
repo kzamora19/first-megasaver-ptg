@@ -541,60 +541,66 @@ export default function ProductSearch({
     if (!printQueue.length || !printable || savingPdf) return;
     setSavingPdf(true);
     setMessage("");
+    let captureHost: HTMLDivElement | null = null;
+    let captureStyles: HTMLStyleElement | null = null;
     try {
-      // Only the browser print layout is the source of truth for this export.
-      const sheets = Array.from(document.querySelectorAll<HTMLElement>(".ptg-print-preview > .legacy-print-sheet"));
-      if (!sheets.length) throw new Error("No printable price-tag sheets were found.");
-      const printRules: string[] = [];
+      const sourcePreview = document.querySelector<HTMLElement>(".ptg-print-preview");
+      const sourceSheets = sourcePreview?.querySelectorAll<HTMLElement>(":scope > .legacy-print-sheet");
+      if (!sourcePreview || !sourceSheets?.length) throw new Error("No printable price-tag sheets were found.");
+
+      // Reuse the real print CSS, but apply it to a temporary screen-rendered
+      // copy before taking screenshots. Scoping avoids changing the live UI.
+      const scopedRules: string[] = [];
       for (const sheet of Array.from(document.styleSheets)) {
         try {
           for (const rule of Array.from(sheet.cssRules)) {
             if (!(rule instanceof CSSMediaRule) || !/\bprint\b/.test(rule.conditionText)) continue;
             for (const inner of Array.from(rule.cssRules)) {
               if (!(inner instanceof CSSStyleRule)) continue;
-              // Print mode hides the rest of the app. Canvas capture instead
-              // targets one existing sheet, so global visibility is excluded.
               if (/^(?:body\s*\*|html\s*,\s*body)/.test(inner.selectorText)) continue;
-              printRules.push(inner.cssText);
+              const selector = inner.selectorText.split(",")
+                .map(part => ".ptg-pdf-capture " + part.trim()).join(", ");
+              scopedRules.push(selector + "{" + inner.style.cssText + "}");
             }
           }
         } catch {
-          // Browser extensions and cross-origin stylesheets are not readable.
+          // Styles from extensions/cross-origin sources cannot be inspected.
         }
       }
-      if (!printRules.some(rule => rule.includes(".legacy-print-sheet"))) {
-        throw new Error("Price-tag print layout styles could not be loaded.");
+      if (!scopedRules.some(rule => rule.includes(".legacy-print-sheet"))) {
+        throw new Error("Price-tag print styles could not be loaded.");
       }
-      await document.fonts.ready;
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas-pro"), import("jspdf"),
-      ]);
       const landscape = format === "TWO" || format === "AIRCON";
       const widthPt = landscape ? 792 : 612;
       const heightPt = landscape ? 612 : 792;
+      captureStyles = document.createElement("style");
+      captureStyles.textContent = scopedRules.join("\n") +
+        "\n.ptg-pdf-capture .ptg-print-preview{display:block!important;position:static!important;width:auto!important;margin:0!important;padding:0!important}" +
+        "\n.ptg-pdf-capture .legacy-print-sheet{margin:0!important;box-shadow:none!important}";
+      document.head.appendChild(captureStyles);
+
+      captureHost = document.createElement("div");
+      captureHost.className = "ptg-pdf-capture";
+      captureHost.style.cssText = "position:absolute;left:-20000px;top:0;pointer-events:none;z-index:-1;background:#fff;width:" +
+        (landscape ? "1056px" : "816px") + ";";
+      const preview = sourcePreview.cloneNode(true) as HTMLElement;
+      captureHost.appendChild(preview);
+      document.body.appendChild(captureHost);
+      const sheets = Array.from(preview.querySelectorAll<HTMLElement>(":scope > .legacy-print-sheet"));
+      await document.fonts.ready;
+      await Promise.allSettled(Array.from(preview.querySelectorAll("img")).map(img => img.decode()));
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas-pro"), import("jspdf"),
+      ]);
       const pdf = new jsPDF({
         orientation: landscape ? "landscape" : "portrait",
         unit: "pt", format: "letter", compress: true,
       });
       for (let i = 0; i < sheets.length; i++) {
-        const sheet = sheets[i];
-        const canvas = await html2canvas(sheet, {
-          backgroundColor: "#ffffff",
-          scale: 2,
-          useCORS: true,
-          foreignObjectRendering: true,
-          logging: false,
+        const canvas = await html2canvas(sheets[i], {
+          backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false,
           width: landscape ? 1056 : 816,
           height: landscape ? 816 : 1056,
-          onclone: clonedDocument => {
-            const style = clonedDocument.createElement("style");
-            style.textContent = printRules.join("\n") +
-              "\n.ptg-print-preview{display:block!important;position:relative!important;width:auto!important}" +
-              "\n.legacy-print-sheet{margin:0!important;box-shadow:none!important}";
-            clonedDocument.head.appendChild(style);
-            const preview = clonedDocument.querySelector<HTMLElement>(".ptg-print-preview");
-            if (preview) preview.style.display = "block";
-          },
         });
         if (!canvas.width || !canvas.height) throw new Error("A price-tag sheet could not be rendered.");
         if (i > 0) pdf.addPage("letter", landscape ? "landscape" : "portrait");
@@ -610,6 +616,8 @@ export default function ProductSearch({
       setMessage("Could not save PDF: " + (error instanceof Error ? error.message : "Export failed.") +
         " No print job was sent.");
     } finally {
+      captureHost?.remove();
+      captureStyles?.remove();
       setSavingPdf(false);
     }
   }
