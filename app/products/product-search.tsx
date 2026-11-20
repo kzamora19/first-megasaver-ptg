@@ -596,15 +596,60 @@ export default function ProductSearch({
         orientation: landscape ? "landscape" : "portrait",
         unit: "pt", format: "letter", compress: true,
       });
+      // html2canvas does not faithfully reproduce Chrome's CSS zoom on the
+      // 1/2 and 2x2 price-tag grids. Render each tag unscaled at its native
+      // 7.8in x 10.4in size, then position the bitmap at the exact printed
+      // scale in the PDF. All other formats keep their original sheet capture.
+      const nativeTagHost = document.createElement("div");
+      nativeTagHost.style.cssText =
+        "position:absolute;left:0;top:0;width:7.8in;height:10.4in;background:#fff;";
+      captureHost.appendChild(nativeTagHost);
+      const nativeScale = format === "TWO" ? .65 : .47;
+      const tagWidthIn = 7.8 * nativeScale;
+      const tagHeightIn = 10.4 * nativeScale;
+      const columns = 2;
+      const rows = format === "TWO" ? 1 : 2;
+      const startXPt = (widthPt - tagWidthIn * columns * 72) / 2;
+      const startYPt = (heightPt - tagHeightIn * rows * 72) / 2;
+
       for (let i = 0; i < sheets.length; i++) {
-        const canvas = await html2canvas(sheets[i], {
-          backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false,
-          width: landscape ? 1056 : 816,
-          height: landscape ? 816 : 1056,
-        });
-        if (!canvas.width || !canvas.height) throw new Error("A price-tag sheet could not be rendered.");
         if (i > 0) pdf.addPage("letter", landscape ? "landscape" : "portrait");
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, widthPt, heightPt);
+        if (format === "TWO" || format === "FOUR") {
+          const tags = Array.from(sheets[i].querySelectorAll<HTMLElement>(":scope > .legacy-price-tag"));
+          if (!tags.length) throw new Error("No price tags found in PDF sheet.");
+          for (let t = 0; t < tags.length; t++) {
+            const tag = tags[t].cloneNode(true) as HTMLElement;
+            tag.style.zoom = "1";
+            tag.style.transform = "none";
+            nativeTagHost.replaceChildren(tag);
+            await Promise.allSettled(Array.from(tag.querySelectorAll("img")).map(img => img.decode()));
+            const canvas = await html2canvas(tag, {
+              backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false,
+              width: 749, height: 998,
+            });
+            if (!canvas.width || !canvas.height) throw new Error("Could not render the full-size price tag.");
+            const column = t % columns, row = Math.floor(t / columns);
+            pdf.addImage(canvas.toDataURL("image/png"), "PNG",
+              startXPt + column * tagWidthIn * 72,
+              startYPt + row * tagHeightIn * 72,
+              tagWidthIn * 72, tagHeightIn * 72);
+          }
+          if (demo) {
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(12);
+            pdf.setTextColor("#222222");
+            pdf.text("DEMO ONLY - SAMPLE PRICES", widthPt / 2, heightPt - 14.4,
+              { align: "center" });
+          }
+        } else {
+          const canvas = await html2canvas(sheets[i], {
+            backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false,
+            width: landscape ? 1056 : 816,
+            height: landscape ? 816 : 1056,
+          });
+          if (!canvas.width || !canvas.height) throw new Error("A price-tag sheet could not be rendered.");
+          pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, widthPt, heightPt);
+        }
       }
       const today = new Date();
       const fileName = (demo ? "DEMO_" : "") + "FIRST_MEGASAVER_PRICE_TAGS_" +
