@@ -30,3 +30,11 @@ No Supabase project, live Vercel site, or GitHub Pages site has been modified by
 
 ## Rollback
 Keep current production artifacts intact until the new protected sites pass end-to-end tests. If release fails, restore the prior production deployment and rerun the old Pages publishing workflow only with explicit owner approval. Never export PTG refresh tokens to a Studio origin.
+
+## November 20, 2026 — Hosting compatibility hold
+
+The owner now uses **GitHub Pages + Supabase** for PTG and MegaFlyer Studio and does not intend to return to Vercel for this workflow. The hard-coded Vercel PTG portal and Studio proxy URLs in this draft are therefore **unapproved, staging-only placeholders**, not correct live destinations.
+
+The protected editor requires a server-capable hosting solution that can authenticate **every HTML, JavaScript, and image request** before release; a JavaScript-only login screen hosted on public GitHub Pages is not sufficient. Do not replace the Vercel URLs with guessed GitHub Pages URLs as a shortcut, because this would create a direct-link bypass. Verify and approve the actual secure hosting approach, callback domains, and token/session revocation behavior before enabling redirects. GitHub Pages may remain a redirect-only entry page once a protected editor exists.
+
+The portal's user-visible flyer name has been corrected to **MegaFlyer Studio**. No hosting, DNS, deployment, Auth or Supabase credentials were changed by this branding correction.

@@ -10,7 +10,7 @@ import {getPtgAppSessionId, invokePtgAuth} from "@/lib/ptg/auth-client";
 type Studio = "megaframe"|"flyer";
 const destinations:Record<Studio,{name:string,url:string,summary:string}>={
   megaframe:{name:"MegaFrame Studio",url:"https://megaframe-studio.vercel.app/studio-access.html",summary:"Photo framing, collages and personalized layouts"},
-  flyer:{name:"Flyer Studio",url:"https://flyer-studio-ken-s-project5.vercel.app/studio-access.html",summary:"Campaign artwork, product bundles and promotional flyers"},
+  flyer:{name:"MegaFlyer Studio",url:"https://flyer-studio-ken-s-project5.vercel.app/studio-access.html",summary:"Campaign artwork, product bundles and promotional flyers"},
 };
 function allowedRole(account:{role:string;legacyRole:string}|null){
   return !!account && (account.role==="SYSTEM_ADMIN"||account.role==="BRANCH_ADMIN"||
