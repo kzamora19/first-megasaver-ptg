@@ -549,12 +549,12 @@ export default function ProductSearch({
       for (const sheet of Array.from(document.styleSheets)) {
         try {
           for (const rule of Array.from(sheet.cssRules)) {
-            if (!(rule instanceof CSSMediaRule) || !/\\bprint\\b/.test(rule.conditionText)) continue;
+            if (!(rule instanceof CSSMediaRule) || !/\bprint\b/.test(rule.conditionText)) continue;
             for (const inner of Array.from(rule.cssRules)) {
               if (!(inner instanceof CSSStyleRule)) continue;
               // Print mode hides the rest of the app. Canvas capture instead
               // targets one existing sheet, so global visibility is excluded.
-              if (/^(?:body\\s*\\*|html\\s*,\\s*body)/.test(inner.selectorText)) continue;
+              if (/^(?:body\s*\*|html\s*,\s*body)/.test(inner.selectorText)) continue;
               printRules.push(inner.cssText);
             }
           }
@@ -587,9 +587,9 @@ export default function ProductSearch({
           height: landscape ? 816 : 1056,
           onclone: clonedDocument => {
             const style = clonedDocument.createElement("style");
-            style.textContent = printRules.join("\\n") +
-              "\\n.ptg-print-preview{display:block!important;position:relative!important;width:auto!important}" +
-              "\\n.legacy-print-sheet{margin:0!important;box-shadow:none!important}";
+            style.textContent = printRules.join("\n") +
+              "\n.ptg-print-preview{display:block!important;position:relative!important;width:auto!important}" +
+              "\n.legacy-print-sheet{margin:0!important;box-shadow:none!important}";
             clonedDocument.head.appendChild(style);
             const preview = clonedDocument.querySelector<HTMLElement>(".ptg-print-preview");
             if (preview) preview.style.display = "block";
