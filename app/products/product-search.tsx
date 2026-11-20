@@ -589,7 +589,9 @@ export default function ProductSearch({
             const style = clonedDocument.createElement("style");
             style.textContent = printRules.join("\n") +
               "\n.ptg-print-preview{display:block!important;position:relative!important;width:auto!important}" +
-              "\n.legacy-print-sheet{margin:0!important;box-shadow:none!important}";
+              "\n.legacy-print-sheet{margin:0!important;box-shadow:none!important}" +
+              "\n.legacy-half-sheet .legacy-price-tag{zoom:1!important;transform:scale(.65);transform-origin:top left}" +
+              "\n.legacy-four-sheet .legacy-price-tag{zoom:1!important;transform:scale(.47);transform-origin:top left}";
             clonedDocument.head.appendChild(style);
             const preview = clonedDocument.querySelector<HTMLElement>(".ptg-print-preview");
             if (preview) preview.style.display = "block";
