@@ -194,7 +194,11 @@ async function prove(request:Request,body:Record<string,unknown>){
   .gt("challenge_expires_at",new Date().toISOString()).is("revoked_at",null)
   .select("id").maybeSingle();
  if(changeError||!changed)return json({ok:false},403);
- return json({ok:true,sessionId:record.id,challenge:nextChallenge,expiresAt:new Date(expiry).toISOString()});
+ // Service-only identity is returned AFTER a fresh one-use P-256 proof and live PTG role check.
+ // Studio backends must strip actor details from browser-facing delivery replies.
+ return json({ok:true,sessionId:record.id,challenge:nextChallenge,expiresAt:new Date(expiry).toISOString(),
+   actorId:record.user_id,
+   canManage:active.profile.role_key==="SYSTEM_ADMIN"||active.profile.role_key==="BRANCH_ADMIN"});
 }
 
 Deno.serve(async request=>{
