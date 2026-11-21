@@ -13,6 +13,8 @@ on:
       - "supabase/migrations/*ptg_studio*"
       - "tests/studio-access-policy.test.mjs"
       - "tests/studio-continuation-policy.test.mjs"
+      - "tests/studio-db-bootstrap.sql"
+      - "tests/studio-database-acceptance.test.mjs"
       - "tests/studio-hosting-config.test.mjs"
       - ".github/workflows/studio-gate-ci.yml"
 permissions:
@@ -37,3 +39,47 @@ jobs:
           deno check supabase/functions/ptg-studio-access/index.ts
       - name: Typecheck Next.js launch portal (no deployment)
         run: npx tsc --noEmit
+
+  ephemeral-postgres:
+    # Scratch PostgreSQL service created solely for this Actions job.
+    # No Supabase dashboard, production schema, secrets or accounts are contacted.
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: ptg_studio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ptg_studio_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: isolated-ci-only
+      PGDATABASE: ptg_studio_test
+      PTG_EPHEMERAL_DATABASE_TEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare temporary Postgres client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Reproduce real staged migration in disposable database
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT current_database();"
+          psql -X -v ON_ERROR_STOP=1 -f tests/studio-db-bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261119092500_ptg_studio_access_tickets.sql
+      - name: Validate role revocation, RLS, SQL TTLs and concurrent replay prevention
+        run: node --test tests/studio-database-acceptance.test.mjs
