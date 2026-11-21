@@ -8,6 +8,7 @@ import {
 import {validPublicKey,validProofRequest,proofMessage,STUDIO_PROOF_LIFETIME_SECONDS,STUDIO_CHALLENGE_LIFETIME_SECONDS} from "../_shared/studio-continuation-policy.mjs";
 import {studioIssuerOrigin} from "../_shared/studio-issuer-origin.mjs";
 import {studioDraftMaterial} from "../_shared/studio-draft-scope.mjs";
+import {cloudActionValid,cloudKeyAllowed,validateCloudMutation} from "../_shared/studio-cloud-policy.mjs";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const secret = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -201,6 +202,64 @@ async function prove(request:Request,body:Record<string,unknown>){
    canManage:active.profile.role_key==="SYSTEM_ADMIN"||active.profile.role_key==="BRANCH_ADMIN"});
 }
 
+
+/* Explicit opt-in client-side AES-GCM cloud backups; PTG remains the sole
+ * actor authority. Called only by the Studio's server-side delivery gateway.
+ * The Studio's unrelated Supabase Auth user IDs are never treated as PTG IDs.
+ * This service does NOT receive a browser's plaintext customer project. */
+async function cloud(request:Request,body:Record<string,unknown>){
+ const studio=body.studio;
+ if(!validStudioId(studio)||!cloudActionValid(body))return json({ok:false},400);
+ const operation=body.operation;
+ if(operation==="read"&&!cloudKeyAllowed(studio,body.recordKey))
+   return json({ok:false},400);
+ const mutation=operation==="write"?validateCloudMutation(studio,body):null;
+ if(operation==="write"&&!mutation)return json({ok:false},400);
+ // First consume a ONE-USE signed proof and recheck PTG session/role/branch.
+ const proven=await prove(request,body);
+ if(!proven.ok)return proven;
+ const authority=await proven.json();
+ const next={
+   ok:true,sessionId:authority.sessionId,challenge:authority.challenge,
+   expiresAt:authority.expiresAt
+ };
+ const actor=authority.actorId as string;
+ try{
+   if(operation==="list"){
+     const {data,error}=await admin.from("ptg_studio_cloud_backups")
+       .select("record_key,version,updated_at")
+       .eq("studio_id",studio).eq("owner_ptg_id",actor)
+       .order("updated_at",{ascending:false}).limit(30);
+     if(error)throw error;
+     return json({...next,cloud:{status:"ok",items:data??[]}});
+   }
+   if(operation==="read"){
+     const {data,error}=await admin.from("ptg_studio_cloud_backups")
+       .select("iv,encrypted,version,updated_at")
+       .eq("studio_id",studio).eq("owner_ptg_id",actor)
+       .eq("record_key",body.recordKey).maybeSingle();
+     if(error)throw error;
+     return json({...next,cloud:{status:data?"ok":"missing",record:data??null}});
+   }
+   if(mutation){
+     const {data,error}=await admin.rpc("ptg_studio_cloud_write",{
+       p_studio_id:studio,p_user_id:actor,p_record_key:mutation.recordKey,
+       p_iv:mutation.iv,p_encrypted:mutation.encrypted,
+       p_expected_version:mutation.expectedVersion
+     });
+     if(error)throw error;
+     return json({...next,cloud:!Number.isSafeInteger(data)
+       ?{status:"conflict"}:{status:"ok",version:data}});
+   }
+ }catch(error){
+   // The signed challenge has been consumed. Return its replacement even if
+   // a storage service fails, so a valid user never replays an old signature.
+   console.error("PTG Studio cloud storage failed:",error instanceof Error?error.name:"database");
+   return json({...next,cloud:{status:"unavailable"}});
+ }
+ return json({ok:false},400);
+}
+
 Deno.serve(async request=>{
   const origin=request.headers.get("origin")??undefined;
   if(issuerOrigin && request.method==="OPTIONS"&&origin===issuerOrigin)
@@ -213,9 +272,11 @@ Deno.serve(async request=>{
   if(request.method!=="POST")return json({ok:false},405);
   try{
     const raw=await request.text();
-    if(raw.length>4096)return json({ok:false},413);
+    if(raw.length>1_700_000)return json({ok:false},413);
     const body=JSON.parse(raw);
     if(!body||typeof body!=="object"||Array.isArray(body))return json({ok:false},400);
+    if(body.action!=="cloud"&&raw.length>4096)return json({ok:false},413);
+    if(body.action==="cloud")return cloud(request,body);
     if(body.action==="issue")return issue(request,body);
     if(body.action==="verify")return verify(request,body);
     if(body.action==="exchange")return exchange(request,body);

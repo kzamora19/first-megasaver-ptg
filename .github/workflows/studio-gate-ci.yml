@@ -9,12 +9,14 @@ on:
       - "supabase/functions/_shared/studio-continuation-policy.mjs"
       - "supabase/functions/_shared/studio-issuer-origin.mjs"
       - "supabase/functions/_shared/studio-draft-scope.mjs"
+      - "supabase/functions/_shared/studio-cloud-policy.mjs"
       - "app/studios/**"
       - "components/workspace-nav.tsx"
       - "supabase/migrations/*ptg_studio*"
       - "tests/studio-access-policy.test.mjs"
       - "tests/studio-continuation-policy.test.mjs"
       - "tests/studio-draft-scope.test.mjs"
+      - "tests/studio-cloud-policy.test.mjs"
       - "tests/studio-unified-branding.test.mjs"
       - "tests/studio-unified-workspace.test.mjs"
       - "app/workspace/mobile/**"
@@ -42,7 +44,7 @@ jobs:
       - name: Validate PTG studio eligibility policy
         run: |
           node --check supabase/functions/_shared/studio-access-policy.mjs
-          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs tests/studio-continuation-policy.test.mjs tests/studio-draft-scope.test.mjs tests/studio-unified-branding.test.mjs tests/studio-hosted-staging-policy.test.mjs tests/studio-unified-workspace.test.mjs
+          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs tests/studio-continuation-policy.test.mjs tests/studio-draft-scope.test.mjs tests/studio-cloud-policy.test.mjs tests/studio-unified-branding.test.mjs tests/studio-hosted-staging-policy.test.mjs tests/studio-unified-workspace.test.mjs
       - uses: denoland/setup-deno@v2
         with: {deno-version: v2.x}
       - name: Typecheck PTG Studio gate (no deployment)
@@ -115,6 +117,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -c "SELECT current_database();"
           psql -X -v ON_ERROR_STOP=1 -f tests/studio-db-bootstrap.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261119092500_ptg_studio_access_tickets.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261121212700_ptg_studio_cloud_backups.sql
       - name: Validate role revocation, RLS, SQL TTLs and concurrent replay prevention
         run: node --test tests/studio-database-acceptance.test.mjs
   edge-http-local:

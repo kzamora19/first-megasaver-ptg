@@ -46,6 +46,43 @@ function activeSource(i){
  return allowedPtgStudioRole(profile)&&sessionIsLive(session,profile)&&
   (!session.branch_id||(branch?.status==="ACTIVE"&&branch?.operational_status==="ON"));
 }
+
+test("PTG-only encrypted backups cannot be read or written by Studio Auth sessions",()=>{
+ const table="ptg_studio_cloud_backups";
+ assert.equal(psql("SELECT relrowsecurity FROM pg_class WHERE oid='public."+table+"'::regclass"),"t");
+ for(const role of ["anon","authenticated"]){
+   for(const privilege of ["SELECT","INSERT","UPDATE","DELETE"])
+     assert.equal(psql("SELECT has_table_privilege('"+role+"','public."+table+"','"+privilege+"')"),"f");
+   assert.match(psql("SET ROLE "+role+"; SELECT * FROM public."+table+"",{expectFailure:true}),/permission denied/);
+ }
+ for(const privilege of ["SELECT","INSERT","UPDATE"])
+   assert.equal(psql("SELECT has_table_privilege('service_role','public."+table+"','"+privilege+"')"),"t");
+ const f="public.ptg_studio_cloud_write(text,uuid,text,text,text,integer)";
+ for(const role of ["anon","authenticated"])
+  assert.equal(psql("SELECT has_function_privilege('"+role+"','"+f+"','EXECUTE')"),"f");
+ assert.equal(psql("SELECT has_function_privilege('service_role','"+f+"','EXECUTE')"),"t");
+ assert.equal(psql("SELECT prosecdef FROM pg_proc WHERE oid='"+f+"'::regprocedure"),"f");
+});
+test("client-side encrypted cloud snapshots enforce per-PTG actor, Studio scope and revision CAS",async()=>{
+ const fn=(studio,owner,key,iv,encrypted,version)=>`SELECT coalesce(
+  public.ptg_studio_cloud_write('${studio}','${owner}'::uuid,'${key}','${iv}','${encrypted}',${version})::text,'null')`;
+ const owner1=person(1),owner2=person(2),iv="I".repeat(16),cipher="Q".repeat(64),key="project_testABC";
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner1,key,iv,cipher,0)),"1");
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner1,key,iv,cipher,0)),"null",
+   "Second device must not overwrite without an expected version");
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner1,key,iv,cipher,1)),"2");
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner1,key,iv,cipher,1)),"null",
+   "Stale write denied");
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner2,key,iv,cipher,0)),"1",
+   "Second PTG account receives separate encrypted backup");
+ assert.equal(psql("SET ROLE service_role; "+fn("flyer",owner1,"p:current",iv,cipher,0)),"1",
+   "Same PTG user has independent Studio namespace");
+ const count=psql("SELECT count(*) FROM public.ptg_studio_cloud_backups WHERE owner_ptg_id='"+owner1+"'");
+ assert.equal(count,"2");
+ assert.match(psql("SET ROLE service_role; "+fn("flyer",owner1,"p:current",iv,"raw plaintext!",2),
+   {expectFailure:true}),/check constraint/);
+});
+
 test("staging migration enforces RLS and forbids browser-table privileges",()=>{
  for(const table of ["ptg_studio_access_tickets","ptg_studio_proof_sessions"]){
   const security=JSON.parse(psql(`SELECT row_to_json(q) FROM (
