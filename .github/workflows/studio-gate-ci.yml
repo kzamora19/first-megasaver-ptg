@@ -6,11 +6,13 @@ on:
     paths:
       - "supabase/functions/ptg-studio-access/**"
       - "supabase/functions/_shared/studio-access-policy.mjs"
+      - "supabase/functions/_shared/studio-continuation-policy.mjs"
       - "supabase/functions/_shared/studio-issuer-origin.mjs"
       - "app/studios/**"
       - "components/workspace-nav.tsx"
       - "supabase/migrations/*ptg_studio*"
       - "tests/studio-access-policy.test.mjs"
+      - "tests/studio-continuation-policy.test.mjs"
       - "tests/studio-hosting-config.test.mjs"
       - ".github/workflows/studio-gate-ci.yml"
 permissions:
@@ -26,7 +28,11 @@ jobs:
       - name: Validate PTG studio eligibility policy
         run: |
           node --check supabase/functions/_shared/studio-access-policy.mjs
-          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs
+          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs tests/studio-continuation-policy.test.mjs
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - name: Typecheck PTG Studio gate (no deployment)
+        run: deno check supabase/functions/ptg-studio-access/index.ts
       - name: Typecheck Next.js launch portal (no deployment)
         run: |
           npm install --ignore-scripts --no-package-lock
