@@ -66,7 +66,8 @@ export default function StudioLaunchPage(){
       if(!response.ok||payload.ok!==true||typeof payload.ticket!=="string")
         throw Error(payload.message||"Studio access denied.");
       // A location fragment is not sent in HTTP requests or Referer headers.
-      // The studio removes it before exchanging the ticket for a HttpOnly cookie.
+      // The Studio removes the fragment and exchanges this one-use bearer for a
+      // P-256 browser-key-bound proof session; no reusable cookie is created.
       window.location.assign(destinations[studio].url+"#ptg_studio_ticket="+encodeURIComponent(payload.ticket));
     }catch(error){
       setMessage(error instanceof Error?error.message:"Could not open the studio.");
