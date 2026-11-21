@@ -9,6 +9,7 @@ import {validPublicKey,validProofRequest,proofMessage,STUDIO_PROOF_LIFETIME_SECO
 import {studioIssuerOrigin} from "../_shared/studio-issuer-origin.mjs";
 import {studioDraftMaterial} from "../_shared/studio-draft-scope.mjs";
 import {cloudActionValid,cloudKeyAllowed,validateCloudMutation} from "../_shared/studio-cloud-policy.mjs";
+import {centralDriveOperation} from "../_shared/studio-central-drive.mjs";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const secret = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -260,6 +261,34 @@ async function cloud(request:Request,body:Record<string,unknown>){
  return json({ok:false},400);
 }
 
+// The approved owner's Google OAuth refresh credential is a private PTG
+// Edge secret, not a staff password or a value available in GitHub Pages.
+async function drive(request:Request,body:Record<string,unknown>){
+  const studio=body.studio;
+  if(!validStudioId(studio)||!cloudActionValid(body))return json({ok:false},400);
+  if(body.operation==="read"&&(!cloudKeyAllowed(studio,body.recordKey)||
+     typeof body.fileId!=="string"))return json({ok:false},400);
+  if(body.operation==="write"&&!validateCloudMutation(studio,{
+    ...body,expectedVersion:0}))return json({ok:false},400);
+  // AuthN + AuthZ are revalidated immediately before every read/write/list.
+  const verified=await prove(request,body);
+  if(!verified.ok)return verified;
+  const proof=await verified.json();
+  const result=await centralDriveOperation({
+    env:{
+      clientId:Deno.env.get("BRANCHLINE_DRIVE_OAUTH_CLIENT_ID")||"",
+      clientSecret:Deno.env.get("BRANCHLINE_DRIVE_OAUTH_CLIENT_SECRET")||"",
+      refreshToken:Deno.env.get("BRANCHLINE_DRIVE_OAUTH_REFRESH_TOKEN")||""
+    },
+    studio,ownerId:proof.actorId,operation:body.operation,
+    recordKey:body.recordKey,fileId:body.fileId,
+    iv:body.iv,encrypted:body.encrypted
+  });
+  // Strip all internal actor identity and provider credential information.
+  return json({ok:true,sessionId:proof.sessionId,challenge:proof.challenge,
+    expiresAt:proof.expiresAt,drive:result});
+}
+
 Deno.serve(async request=>{
   const origin=request.headers.get("origin")??undefined;
   if(issuerOrigin && request.method==="OPTIONS"&&origin===issuerOrigin)
@@ -275,8 +304,9 @@ Deno.serve(async request=>{
     if(raw.length>1_700_000)return json({ok:false},413);
     const body=JSON.parse(raw);
     if(!body||typeof body!=="object"||Array.isArray(body))return json({ok:false},400);
-    if(body.action!=="cloud"&&raw.length>4096)return json({ok:false},413);
+    if(!["cloud","drive"].includes(body.action)&&raw.length>4096)return json({ok:false},413);
     if(body.action==="cloud")return cloud(request,body);
+    if(body.action==="drive")return drive(request,body);
     if(body.action==="issue")return issue(request,body);
     if(body.action==="verify")return verify(request,body);
     if(body.action==="exchange")return exchange(request,body);
