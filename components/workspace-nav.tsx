@@ -52,7 +52,6 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
   const items = [
     ["/products", "Product Search & Queue"],
     ...(admin ? [["/admin/accounts", "Account Administration"]] : []),
-    ["/studios", "Creative Studios · TL+"],
   ];
   return <nav aria-label="Workspace">
     {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate}
