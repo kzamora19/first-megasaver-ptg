@@ -23,3 +23,13 @@
 .mobile-workspace-choice-icon svg { width: 34px; height: 34px; }
 .mobile-workspace-choice:focus-visible { outline: 3px solid #2b66dc; outline-offset: 3px; }
 
+
+/* Unified Branchline navy/royal blue. Four tabs remain usable on small screens. */
+.mobile-workspace-header { background: #1d2836; }
+.mobile-workspace-header nav { overflow-x: auto; scrollbar-width: thin; padding-bottom: 3px; }
+.mobile-workspace-header nav button { flex: 0 0 auto; white-space: nowrap; background: #2d3b51; border-color: #67758a; }
+.mobile-workspace-header nav button[aria-pressed="true"] { background: #355ee8; border-color: #eef2ff; }
+.mobile-workspace-choice { border-color: #e9edf1; color: #1d2836; }
+.mobile-workspace-choice-icon.ptg { background: #355ee8; }
+.mobile-workspace-choice-icon.megaframe,.mobile-workspace-choice-icon.flyer { background: #eef2ff; }
+.mobile-workspace-choice:focus-visible { outline-color: #355ee8; }

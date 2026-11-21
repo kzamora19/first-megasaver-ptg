@@ -1,0 +1,6 @@
+# PTG Studio access handles Auth JWT verification and server-only gateway
+# credentials inside the function. Supabase's JWT gate must be disabled ONLY
+# for this function, so the trusted Studio-to-PTG verification call can reach it.
+# All other functions retain their existing security settings.
+[functions.ptg-studio-access]
+verify_jwt = false

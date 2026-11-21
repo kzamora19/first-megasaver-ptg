@@ -1,0 +1,196 @@
+name: PTG Studio authorization staging tests
+on:
+  push:
+    branches: [feature/studio-gateway-pages-refresh-20261121]
+  pull_request:
+    paths:
+      - "supabase/functions/ptg-studio-access/**"
+      - "supabase/functions/_shared/studio-access-policy.mjs"
+      - "supabase/functions/_shared/studio-continuation-policy.mjs"
+      - "supabase/functions/_shared/studio-issuer-origin.mjs"
+      - "supabase/functions/_shared/studio-draft-scope.mjs"
+      - "supabase/functions/_shared/studio-cloud-policy.mjs"
+      - "app/studios/**"
+      - "components/workspace-nav.tsx"
+      - "supabase/migrations/*ptg_studio*"
+      - "tests/studio-access-policy.test.mjs"
+      - "tests/studio-continuation-policy.test.mjs"
+      - "tests/studio-draft-scope.test.mjs"
+      - "tests/studio-cloud-policy.test.mjs"
+      - "tests/studio-unified-branding.test.mjs"
+      - "tests/studio-unified-workspace.test.mjs"
+      - "app/workspace/mobile/**"
+      - "app/products/product-search.tsx"
+      - "components/workspace-layout.tsx"
+      - "tests/studio-hosted-staging*.mjs"
+      - ".github/workflows/studio-hosted-staging-acceptance.yml"
+      - "tests/studio-db-bootstrap.sql"
+      - "tests/studio-database-acceptance.test.mjs"
+      - "tests/studio-edge-http-acceptance.mjs"
+      - "tests/studio-real-supabase-bootstrap.sql"
+      - "tests/studio-real-supabase-acceptance.mjs"
+      - "tests/studio-hosting-config.test.mjs"
+      - ".github/workflows/studio-gate-ci.yml"
+permissions:
+  contents: read
+jobs:
+  static-checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate PTG studio eligibility policy
+        run: |
+          node --check supabase/functions/_shared/studio-access-policy.mjs
+          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs tests/studio-continuation-policy.test.mjs tests/studio-draft-scope.test.mjs tests/studio-cloud-policy.test.mjs tests/studio-central-drive.test.mjs tests/studio-unified-branding.test.mjs tests/studio-hosted-staging-policy.test.mjs tests/studio-unified-workspace.test.mjs
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - name: Typecheck PTG Studio gate (no deployment)
+        run: |
+          npm install --ignore-scripts --no-package-lock
+          deno check supabase/functions/ptg-studio-access/index.ts
+      - name: Typecheck Next.js launch portal (no deployment)
+        run: npx tsc --noEmit
+      - name: Verify GitHub Pages static export with Studio destinations disabled (no deployment)
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+          NEXT_PUBLIC_SUPABASE_URL: https://agknxlowackphvwyvxge.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_kv2q3dnNQt4ij0mgkOLbQQ_S2MO9FvG
+          NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_ASSETS: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_ACCOUNTS: "true"
+          NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL: https://psoopubvdpwztzkdyifa.supabase.co
+          NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY: sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm
+          NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: ""
+          NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: ""
+        run: |
+          npm run build
+          # Next.js statically prerenders /studios. Its client-rendered heading
+          # need not occur as literal text in the HTML snapshot (loading state).
+          # Check for a real static page, not a fragile text grep.
+          test -d out
+          test -f out/studios/index.html || test -f out/studios.html
+
+
+  ephemeral-postgres:
+    # Scratch PostgreSQL service created solely for this Actions job.
+    # No Supabase dashboard, production schema, secrets or accounts are contacted.
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: ptg_studio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ptg_studio_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: isolated-ci-only
+      PGDATABASE: ptg_studio_test
+      PTG_EPHEMERAL_DATABASE_TEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare temporary Postgres client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Reproduce real staged migration in disposable database
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT current_database();"
+          psql -X -v ON_ERROR_STOP=1 -f tests/studio-db-bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261119092500_ptg_studio_access_tickets.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261121212700_ptg_studio_cloud_backups.sql
+      - name: Validate role revocation, RLS, SQL TTLs and concurrent replay prevention
+        run: node --test tests/studio-database-acceptance.test.mjs
+  edge-http-local:
+    # Exercise the actual Deno Edge entrypoint and actual supabase-js over HTTP.
+    # Auth/PostgREST are represented by a localhost-only synthetic fixture.
+    # Never talks to any production Supabase project or real user account.
+    runs-on: ubuntu-24.04
+    env:
+      PTG_STUDIO_EDGE_HTTP_TEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - name: Install existing pinned dependencies
+        run: npm install --ignore-scripts --no-package-lock
+      - name: Run isolated Edge HTTP + Auth/PostgREST protocol acceptance
+        run: node tests/studio-edge-http-acceptance.mjs
+
+  local-supabase-real-e2e:
+    # Fresh local GoTrue/Auth, Kong, PostgREST and PostgreSQL in RUNNER_TEMP.
+    # Absolutely no Supabase remote link, hosted project, production secret or deploy.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      PTG_STUDIO_LOCAL_E2E: "1"
+      PTG_STUDIO_LOCAL_STATUS_PATH: /tmp/ptg-studio-local-status.env
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - uses: supabase/setup-cli@v1
+        with: {version: '2.121.0'}
+      - name: Start fresh disposable local Supabase Auth and PostgREST
+        run: |
+          set -euo pipefail
+          supabase start --help >/dev/null
+          supabase status --help >/dev/null
+          mkdir -p "$RUNNER_TEMP/ptg-studio-local"
+          cd "$RUNNER_TEMP/ptg-studio-local"
+          SUPABASE_YES=1 supabase init
+          supabase start -x studio,realtime,storage-api,imgproxy,postgres-meta,mailpit,edge-runtime,logflare,vector,supavisor
+          supabase status -o env > "$PTG_STUDIO_LOCAL_STATUS_PATH"
+      - name: Apply ONLY to local CLI database; reject all remote DB URLs
+        run: |
+          set -euo pipefail
+          test -f "$PTG_STUDIO_LOCAL_STATUS_PATH"
+          set -a
+          source "$PTG_STUDIO_LOCAL_STATUS_PATH"
+          set +a
+          case "$DB_URL" in
+            postgresql://postgres:*@127.0.0.1:54322/postgres) ;;
+            *) echo "REFUSED: not the local disposable Supabase database" >&2; exit 1 ;;
+          esac
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql -X -v ON_ERROR_STOP=1 "$DB_URL" -f tests/studio-real-supabase-bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 "$DB_URL" -f supabase/migrations/20261119092500_ptg_studio_access_tickets.sql
+          psql -X -v ON_ERROR_STOP=1 "$DB_URL" -c "select pg_notify('pgrst','reload schema')"
+      - name: Real local Auth, PostgREST, RLS, ticket and signed-proof tests
+        run: |
+          npm install --ignore-scripts --no-package-lock
+          node tests/studio-real-supabase-acceptance.mjs
+      - name: Clean up disposable stack
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/ptg-studio-local/supabase/config.toml" ]; then
+            cd "$RUNNER_TEMP/ptg-studio-local"
+            supabase stop --no-backup || true
+          fi

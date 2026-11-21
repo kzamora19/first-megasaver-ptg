@@ -1,0 +1,40 @@
+name: Opt-in hosted Studio staging acceptance (never production)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "preflight: negative authorization; full: synthetic PTG accounts and real private bundles"
+        type: choice
+        options: [preflight, full]
+        required: true
+        default: preflight
+permissions:
+  contents: read
+jobs:
+  hosted-staging:
+    if: github.event_name == 'workflow_dispatch' && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: "1"
+      STUDIO_HOSTED_TEST_MODE: ${{ inputs.mode }}
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+      STUDIO_STAGING_ALLOWED_EMAIL: ${{ secrets.STUDIO_STAGING_ALLOWED_EMAIL }}
+      STUDIO_STAGING_ALLOWED_PASSWORD: ${{ secrets.STUDIO_STAGING_ALLOWED_PASSWORD }}
+      STUDIO_STAGING_ALLOWED_APP_SESSION_ID: ${{ secrets.STUDIO_STAGING_ALLOWED_APP_SESSION_ID }}
+      STUDIO_STAGING_DENIED_EMAIL: ${{ secrets.STUDIO_STAGING_DENIED_EMAIL }}
+      STUDIO_STAGING_DENIED_PASSWORD: ${{ secrets.STUDIO_STAGING_DENIED_PASSWORD }}
+      STUDIO_STAGING_DENIED_APP_SESSION_ID: ${{ secrets.STUDIO_STAGING_DENIED_APP_SESSION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Enforce host isolation and synthetic test credentials
+        run: |
+          node --test tests/studio-hosted-staging-policy.test.mjs
+          node --check tests/studio-hosted-staging-acceptance.mjs
+      - name: Test dedicated hosted staging issuer and private Studio functions
+        run: node tests/studio-hosted-staging-acceptance.mjs

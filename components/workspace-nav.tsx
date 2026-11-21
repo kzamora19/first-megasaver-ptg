@@ -8,10 +8,12 @@ const deskPtgTools = [
   ["/product-master", "Product Master"],
   ["/admin/logos", "Logo Manager"],
 ];
-export default function WorkspaceNav({ role, active, desk = false, onNavigate }: {
-  role: string; active: string; desk?: boolean; onNavigate: () => void;
+export default function WorkspaceNav({ role, legacyRole = "", active, desk = false, onNavigate }: {
+  role: string; legacyRole?: string; active: string; desk?: boolean; onNavigate: () => void;
 }) {
   const system = role === "SYSTEM_ADMIN";
+  const studiosAllowed=system||role==="BRANCH_ADMIN"||
+    (role==="BRANCH_USER"&&legacyRole.trim().toUpperCase()==="TEAM LEADER");
   const query = useSearchParams();
   const onDesk = active === "/data-desk";
   const catalog = onDesk && query.get("mode") === "catalog";
@@ -43,6 +45,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     <a href={withBasePath("/data-desk/?mode=srp")} onClick={onNavigate}
       className={"ptg-nav-item" + (srp ? " active" : "")}
       aria-current={srp ? "page" : undefined}>Product SRP Import</a>
+    {studiosAllowed&&<Link href="/studios/" onClick={onNavigate}
+      className={"ptg-nav-item"+(active==="/studios"?" active":"")}
+      aria-current={active==="/studios"?"page":undefined}>Creative Studios</Link>}
     <div className="ptg-nav-label">SALES TRACKER</div>
     {deskSalesTools.map(tool => <a key={tool.id} href={withBasePath("/data-desk/?tool=" + tool.id)}
       onClick={onNavigate} className={"ptg-nav-item" + (tool === salesTool ? " active" : "")}
@@ -57,6 +62,9 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate}
       className={"ptg-nav-item" + (active === path ? " active" : "")}
       aria-current={active === path ? "page" : undefined}>{label}</Link>)}
+    {studiosAllowed&&<Link href="/studios/" onClick={onNavigate}
+      className={"ptg-nav-item"+(active==="/studios"?" active":"")}
+      aria-current={active==="/studios"?"page":undefined}>Creative Studios</Link>}
     {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }
