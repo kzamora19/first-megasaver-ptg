@@ -4,7 +4,7 @@ export function studioIssuerOrigin(value) {
   try {
     const u = new URL(value);
     if(u.protocol !== "https:" || u.username || u.password || u.search || u.hash ||
-       u.pathname !== "/" || !u.hostname || value.trim() !== u.origin && value.trim() !== u.origin + "/")
+       u.pathname !== "/" || !/^[a-z0-9.-]+$/i.test(u.hostname) || u.hostname.includes("..") || (value.trim() !== u.origin && value.trim() !== u.origin + "/"))
       return "";
     return u.origin;
   } catch {
