@@ -26,6 +26,7 @@ const tables={
  app_sessions:[],
  ptg_studio_access_tickets:[],
  ptg_studio_proof_sessions:[],
+ ptg_studio_cloud_backups:[],
 };
 for(let i=1;i<=9;i++){
  tables.user_profiles.push({
@@ -73,6 +74,22 @@ const fakeBackend=createServer(async(req,res)=>{
   quota.set(body.p_user_id,count<12?count+1:count);
   return json(res,count<12,200);
  }
+ if(pathname==="/rest/v1/rpc/ptg_studio_cloud_write"&&req.method==="POST"){
+  let raw="";for await(const part of req)raw+=part;
+  const p=JSON.parse(raw||"{}");
+  const rows=tables.ptg_studio_cloud_backups;
+  let row=rows.find(x=>x.studio_id===p.p_studio_id&&x.owner_ptg_id===p.p_user_id&&
+    x.record_key===p.p_record_key);
+  let version=null;
+  if(!row&&p.p_expected_version===0){
+   row={studio_id:p.p_studio_id,owner_ptg_id:p.p_user_id,record_key:p.p_record_key,
+    iv:p.p_iv,encrypted:p.p_encrypted,version:1,updated_at:now()};
+   rows.push(row);version=1;
+  }else if(row&&row.version===p.p_expected_version){
+   row.iv=p.p_iv;row.encrypted=p.p_encrypted;row.version++;row.updated_at=now();version=row.version;
+  }
+  return json(res,version,200);
+ }
  const table=pathname.split("/").at(-1);
  const rows=tables[table];
  if(!rows)return json(res,{message:"Unknown table"},404);
@@ -116,6 +133,10 @@ const exchange=(ticket,publicKey,studio="flyer",secret=gatewaySecret)=>run("POST
 const prove=(studio,data,signature)=>run("POST",{
  action:"prove",studio,sessionId:data.sessionId,challenge:data.challenge,signature
 },{"x-ptg-studio-secret":gatewaySecret}).then(asJson);
+const cloud=async(studio,session,privateKey,operation,details={},secret=gatewaySecret)=>run("POST",{
+ action:"cloud",studio,sessionId:session.sessionId,challenge:session.challenge,
+ signature:await signature(privateKey,studio,session),operation,...details
+},{"x-ptg-studio-secret":secret}).then(asJson);
 const pair=()=>webcrypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},false,["sign","verify"]);
 const signature=async(privateKey,studio,challengeData)=>{
  const message="ptg-studio-v1|"+studio+"|"+challengeData.sessionId+"|"+challengeData.challenge;
@@ -285,6 +306,53 @@ try{
  assert.equal(accepted.data.draftKey,undefined);
  assert.notEqual(accepted.data.challenge,first.data.challenge);
  assert.equal((await prove("flyer",first.data,sig)).status,403,"Old signed challenge is a replay");
+ // PTG-cloud backups use only the VERIFIED PTG actor, not a Studio Auth ID.
+ // Each request also rotates the P-256 challenge and rejects stale revisions.
+ const cloudPair=await pair();
+ const cloudPublic=await webcrypto.subtle.exportKey("jwk",cloudPair.publicKey);
+ const cloudTicket=await issue(2,"megaframe");
+ assert.equal(cloudTicket.status,200);
+ const cloudLaunch=await exchange(cloudTicket.data.ticket,cloudPublic,"megaframe");
+ assert.equal(cloudLaunch.status,200);
+ const firstList=await cloud("megaframe",cloudLaunch.data,cloudPair.privateKey,"list");
+ assert.equal(firstList.status,200);
+ assert.deepEqual(firstList.data.cloud,{status:"ok",items:[]});
+ assert.equal(firstList.data.actorId,undefined,"PTG actor must not leak to cloud client");
+ const envelope={recordKey:"project_cloudABC",iv:"A".repeat(16),encrypted:"B".repeat(64),expectedVersion:0};
+ assert.equal((await cloud("megaframe",firstList.data,cloudPair.privateKey,"write",envelope,"bad-secret")).status,403);
+ const firstWrite=await cloud("megaframe",firstList.data,cloudPair.privateKey,"write",envelope);
+ assert.equal(firstWrite.status,200);
+ assert.deepEqual(firstWrite.data.cloud,{status:"ok",version:1});
+ assert.equal(firstWrite.data.encrypted,undefined);
+ assert.equal((await cloud("megaframe",firstList.data,cloudPair.privateKey,"read",{recordKey:envelope.recordKey})).status,403,
+  "Consumed challenge cannot read another copy of the cloud project");
+ const readBack=await cloud("megaframe",firstWrite.data,cloudPair.privateKey,"read",{recordKey:envelope.recordKey});
+ assert.equal(readBack.status,200);
+ assert.equal(readBack.data.cloud.record.encrypted,envelope.encrypted);
+ assert.equal(readBack.data.cloud.record.version,1);
+ const stale=await cloud("megaframe",readBack.data,cloudPair.privateKey,"write",envelope);
+ assert.equal(stale.status,200);
+ assert.equal(stale.data.cloud.status,"conflict",
+  "Another device must not silently overwrite a new cloud version");
+ const revised=await cloud("megaframe",stale.data,cloudPair.privateKey,"write",
+  {...envelope,expectedVersion:1});
+ assert.equal(revised.data.cloud.version,2);
+ const separateAccountTicket=await issue(3,"megaframe");
+ const separateAccount=await exchange(separateAccountTicket.data.ticket,cloudPublic,"megaframe");
+ assert.equal(separateAccount.status,200);
+ const deniedRead=await cloud("megaframe",separateAccount.data,cloudPair.privateKey,"read",{recordKey:envelope.recordKey});
+ assert.equal(deniedRead.data.cloud.status,"missing",
+  "Different PTG actor cannot read another user's archive");
+ const separateStudioTicket=await issue(2,"flyer");
+ const separateStudio=await exchange(separateStudioTicket.data.ticket,cloudPublic,"flyer");
+ const otherList=await cloud("flyer",separateStudio.data,cloudPair.privateKey,"list");
+ assert.deepEqual(otherList.data.cloud,{status:"ok",items:[]},
+  "Same account has a separate namespace for each Studio");
+ const invalidCloudKey=await cloud("flyer",otherList.data,cloudPair.privateKey,"read",
+  {recordKey:"project_cloudABC"});
+ assert.equal(invalidCloudKey.status,400,
+  "MegaFrame project IDs may not be read from Flyer Studio");
+
  // Revoking the PTG source account must invalidate a valid outstanding proof.
  const original=tables.user_profiles.find(p=>p.id===userId(3));
  original.is_active=false;
