@@ -32,8 +32,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with: {deno-version: v2.x}
       - name: Typecheck PTG Studio gate (no deployment)
-        run: deno check supabase/functions/ptg-studio-access/index.ts
-      - name: Typecheck Next.js launch portal (no deployment)
         run: |
           npm install --ignore-scripts --no-package-lock
-          npx tsc --noEmit
+          deno check supabase/functions/ptg-studio-access/index.ts
+      - name: Typecheck Next.js launch portal (no deployment)
+        run: npx tsc --noEmit
