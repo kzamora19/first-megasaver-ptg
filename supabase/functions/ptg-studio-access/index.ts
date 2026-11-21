@@ -7,6 +7,7 @@ import {
 } from "../_shared/studio-access-policy.mjs";
 import {validPublicKey,validProofRequest,proofMessage,STUDIO_PROOF_LIFETIME_SECONDS,STUDIO_CHALLENGE_LIFETIME_SECONDS} from "../_shared/studio-continuation-policy.mjs";
 import {studioIssuerOrigin} from "../_shared/studio-issuer-origin.mjs";
+import {studioDraftMaterial} from "../_shared/studio-draft-scope.mjs";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const secret = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -125,6 +126,10 @@ async function exchange(request:Request,body:Record<string,unknown>){
   return json({ok:false},403);
  const active=await validSourceSession(grant.user_id,grant.app_session_id);
  if(!active)return json({ok:false},403);
+ // An account-specific recovery key is available only after a redeemed proof
+ // session. Missing stable server secret must fail closed BEFORE ticket burn.
+ const draftRoot=Deno.env.get("PTG_STUDIO_DRAFT_RECOVERY_SECRET")??"";
+ if(studio==="megaframe" && draftRoot.length<32)return json({ok:false},503);
  // Compare-and-swap: only a single concurrent exchange can burn this launch ticket.
  const {data:burned,error:burnError}=await admin.from("ptg_studio_access_tickets")
   .update({redeemed_at:new Date(now).toISOString()}).eq("ticket_hash",hash)
@@ -142,7 +147,9 @@ async function exchange(request:Request,body:Record<string,unknown>){
     expires_at:new Date(expiry).toISOString()})
   .select("id").single();
  if(sessionError||!session)return json({ok:false},503);
- return json({ok:true,sessionId:session.id,challenge,expiresAt:new Date(expiry).toISOString()});
+ const recovery=studio==="megaframe"
+  ? await studioDraftMaterial(draftRoot,studio,grant.user_id) : {};
+ return json({ok:true,sessionId:session.id,challenge,expiresAt:new Date(expiry).toISOString(),...recovery});
 }
 // Each signed challenge is consumed exactly once; server rechecks PTG role,
 // branch, forced logout and live session version before issuing the next challenge.
