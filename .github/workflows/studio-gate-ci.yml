@@ -15,6 +15,7 @@ on:
       - "tests/studio-continuation-policy.test.mjs"
       - "tests/studio-db-bootstrap.sql"
       - "tests/studio-database-acceptance.test.mjs"
+      - "tests/studio-edge-http-acceptance.mjs"
       - "tests/studio-hosting-config.test.mjs"
       - ".github/workflows/studio-gate-ci.yml"
 permissions:
@@ -83,3 +84,20 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261119092500_ptg_studio_access_tickets.sql
       - name: Validate role revocation, RLS, SQL TTLs and concurrent replay prevention
         run: node --test tests/studio-database-acceptance.test.mjs
+  edge-http-local:
+    # Exercise the actual Deno Edge entrypoint and actual supabase-js over HTTP.
+    # Auth/PostgREST are represented by a localhost-only synthetic fixture.
+    # Never talks to any production Supabase project or real user account.
+    runs-on: ubuntu-24.04
+    env:
+      PTG_STUDIO_EDGE_HTTP_TEST: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - name: Install existing pinned dependencies
+        run: npm install --ignore-scripts --no-package-lock
+      - name: Run isolated Edge HTTP + Auth/PostgREST protocol acceptance
+        run: node tests/studio-edge-http-acceptance.mjs
