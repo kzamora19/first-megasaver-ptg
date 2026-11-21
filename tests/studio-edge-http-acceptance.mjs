@@ -246,6 +246,14 @@ try{
  assert.equal(otherAccount.status,200);
  const otherExchange=await exchange(otherAccount.data.ticket,publicKey);
  assert.equal(otherExchange.status,200);
+ // The one-use exchange must not expose actor permissions before a signed proof.
+ assert.equal(otherExchange.data.actorId,undefined);
+ assert.equal(otherExchange.data.canManage,undefined);
+ const adminProof=await prove("flyer",otherExchange.data,
+  await signature(cryptoPair.privateKey,"flyer",otherExchange.data));
+ assert.equal(adminProof.status,200);
+ assert.equal(adminProof.data.actorId,userId(2));
+ assert.equal(adminProof.data.canManage,true,"Branch Admin may manage shared Studio photos");
  assert.notEqual(otherExchange.data.draftScope,first.data.draftScope);
  assert.notEqual(otherExchange.data.draftKey,first.data.draftKey);
  const otherStudio=await issue(3,"megaframe");
@@ -271,6 +279,8 @@ try{
   "Only one simultaneous signed challenge may succeed");
  const accepted=simultaneous.find(x=>x.status===200);
  assert.equal(accepted.status,200,"Valid signed challenge must rotate: "+JSON.stringify(accepted.data));
+ assert.equal(accepted.data.actorId,userId(3),"Proof identity must come from verified PTG session");
+ assert.equal(accepted.data.canManage,false,"Team Leader may use photos but cannot replace or delete");
  assert.equal(accepted.data.draftScope,undefined);
  assert.equal(accepted.data.draftKey,undefined);
  assert.notEqual(accepted.data.challenge,first.data.challenge);
