@@ -16,6 +16,10 @@ on:
       - "tests/studio-continuation-policy.test.mjs"
       - "tests/studio-draft-scope.test.mjs"
       - "tests/studio-unified-branding.test.mjs"
+      - "tests/studio-unified-workspace.test.mjs"
+      - "app/workspace/mobile/**"
+      - "app/products/product-search.tsx"
+      - "components/workspace-layout.tsx"
       - "tests/studio-hosted-staging*.mjs"
       - ".github/workflows/studio-hosted-staging-acceptance.yml"
       - "tests/studio-db-bootstrap.sql"
@@ -38,7 +42,7 @@ jobs:
       - name: Validate PTG studio eligibility policy
         run: |
           node --check supabase/functions/_shared/studio-access-policy.mjs
-          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs tests/studio-continuation-policy.test.mjs tests/studio-draft-scope.test.mjs tests/studio-unified-branding.test.mjs tests/studio-hosted-staging-policy.test.mjs
+          node --test tests/studio-access-policy.test.mjs tests/studio-hosting-config.test.mjs tests/studio-continuation-policy.test.mjs tests/studio-draft-scope.test.mjs tests/studio-unified-branding.test.mjs tests/studio-hosted-staging-policy.test.mjs tests/studio-unified-workspace.test.mjs
       - uses: denoland/setup-deno@v2
         with: {deno-version: v2.x}
       - name: Typecheck PTG Studio gate (no deployment)

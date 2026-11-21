@@ -30,7 +30,14 @@ export default function StudioLaunchPage(){
   const [checking,setChecking]=useState(true);
   const [account,setAccount]=useState<{role:string;legacyRole:string;displayName:string}|null>(null);
   const [busy,setBusy]=useState<Studio|null>(null);
+  const [requestedStudio,setRequestedStudio]=useState<Studio|null>(null);
   const [message,setMessage]=useState("");
+  useEffect(()=>{
+    // Source app cards identify which Studio the user requested.
+    // This is presentation context ONLY; it does not issue a ticket automatically.
+    const requested=new URLSearchParams(window.location.search).get("studio");
+    if(requested==="megaframe"||requested==="flyer")setRequestedStudio(requested);
+  },[]);
   useEffect(()=>{
     let live=true;
     void invokePtgAuth("session").then(data=>{
@@ -78,6 +85,7 @@ export default function StudioLaunchPage(){
   return <main className="shell"><section className="hero">
     <h1>Creative Studios</h1>
     <p className="intro">Access requires an active PTG Team Leader, Branch Admin or System Admin account.</p>
+    {requestedStudio&&<p role="status">Selected: <strong>{destinations[requestedStudio].name}</strong>. Use the button below to verify your PTG account and open the protected editor.</p>}
   </section>
   <section className="panel install-panel">
     {checking?<p role="status">Checking PTG authorization…</p>:
@@ -85,7 +93,7 @@ export default function StudioLaunchPage(){
       <>
         <p>Signed in as <strong>{account?.displayName||"PTG user"}</strong></p>
         <div style={{display:"grid",gap:16,gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))"}}>
-          {(Object.keys(destinations) as Studio[]).map(studio=><div key={studio} className="panel" style={{padding:16}}>
+          {(Object.keys(destinations) as Studio[]).map(studio=><div key={studio} className="panel" style={{padding:16,outline:requestedStudio===studio?"2px solid #355ee8":undefined}}>
             <h2>{destinations[studio].name}</h2><p>{destinations[studio].summary}</p>
             <button type="button" className="admin-button" disabled={busy!==null||!destinations[studio].url} onClick={()=>void launch(studio)}>
               {!destinations[studio].url?"Launch unavailable until secure hosting is configured":busy===studio?"Checking access…":"Open "+destinations[studio].name}

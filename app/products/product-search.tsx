@@ -471,6 +471,8 @@ export default function ProductSearch({
   }
   const canManageBranch = systemRole === "BRANCH_ADMIN";
   const normalizedLegacyRole = legacyRole.trim().toUpperCase();
+  const canOpenCreativeStudios=systemRole==="SYSTEM_ADMIN"||systemRole==="BRANCH_ADMIN"||
+    (systemRole==="BRANCH_USER"&&normalizedLegacyRole==="TEAM LEADER");
   const canSeeSubdealer = systemRole === "SYSTEM_ADMIN" ||
     (systemRole === "BRANCH_ADMIN" && normalizedLegacyRole === "BRANCH MANAGER") ||
     (["BRANCH_USER", "BRANCH_ADMIN"].includes(systemRole) && normalizedLegacyRole === "TEAM LEADER");
@@ -719,6 +721,7 @@ export default function ProductSearch({
           {canManageBranch && <a href={withBasePath("/change-password/")}>CHANGE PASSWORD</a>}
           {canManageBranch && legacyRole.trim().toUpperCase() === "BRANCH MANAGER" && <a href={withBasePath("/admin/accounts/")}>ACCOUNT ADMINISTRATION</a>}
           {canManageBranch && <a href={withBasePath("/price-memos/import")}>IMPORT PRICE MEMOS</a>}
+          {canOpenCreativeStudios && <a href={withBasePath("/studios/")}>CREATIVE STUDIOS</a>}
         </nav>
       </section>}
 
