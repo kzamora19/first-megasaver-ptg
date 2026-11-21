@@ -156,6 +156,25 @@ try{
  }
  const wrongAudience=await issue(1,"../../admin");
  assert.equal(wrongAudience.status,400);
+ const forgedUser=await run("POST",{action:"issue",studio:"flyer"},{
+  origin:issuer,authorization:"Bearer mock-access-1","x-ptg-session-id":sessionId(3)
+ }).then(asJson);
+ assert.equal(forgedUser.status,403,"PTG session must belong to authenticated user");
+ const invalidBearer=await run("POST",{action:"issue",studio:"flyer"},{
+  origin:issuer,authorization:"Bearer forged-access-token","x-ptg-session-id":sessionId(3)
+ }).then(asJson);
+ assert.equal(invalidBearer.status,401);
+ const currentBranch=tables.branches[0];
+ currentBranch.operational_status="OFF";
+ assert.equal((await issue(3)).status,403,"Closed branch must deny access");
+ currentBranch.operational_status="ON";
+ const liveSession=tables.app_sessions.find(x=>x.id===sessionId(3));
+ liveSession.last_activity_at=ago(31);
+ assert.equal((await issue(3)).status,403,"Timed-out PTG session must not issue tickets");
+ liveSession.last_activity_at=ago(1);
+ liveSession.expires_at=ago(1);
+ assert.equal((await issue(3)).status,403,"Expired source session must be denied");
+ liveSession.expires_at=future(90);
  const issued=await issue(3);
  assert.equal(issued.status,200);
  const cryptoPair=await pair();
@@ -171,8 +190,17 @@ try{
  assert.equal(tampered.status,403,"Tampered signature denied");
  const crossStudio=await prove("megaframe",first.data,await signature(cryptoPair.privateKey,"megaframe",first.data));
  assert.equal(crossStudio.status,403);
+ const stolenPair=await pair();
+ const stolenSignature=await signature(stolenPair.privateKey,"flyer",first.data);
+ assert.equal((await prove("flyer",first.data,stolenSignature)).status,403,
+  "A different signing key cannot continue an existing Studio session");
  const sig=await signature(cryptoPair.privateKey,"flyer",first.data);
- const accepted=await prove("flyer",first.data,sig);
+ const simultaneous=await Promise.all([
+  prove("flyer",first.data,sig),prove("flyer",first.data,sig)
+ ]);
+ assert.deepEqual(simultaneous.map(x=>x.status).sort(),[200,403],
+  "Only one simultaneous signed challenge may succeed");
+ const accepted=simultaneous.find(x=>x.status===200);
  assert.equal(accepted.status,200,"Valid signed challenge must rotate: "+JSON.stringify(accepted.data));
  assert.notEqual(accepted.data.challenge,first.data.challenge);
  assert.equal((await prove("flyer",first.data,sig)).status,403,"Old signed challenge is a replay");
