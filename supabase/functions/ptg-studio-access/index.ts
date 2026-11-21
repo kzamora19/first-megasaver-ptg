@@ -5,13 +5,14 @@ import {
   allowedPtgStudioRole, sessionIsLive, validStudioId,
   STUDIO_GRANT_LIFETIME_SECONDS,
 } from "../_shared/studio-access-policy.mjs";
+import {studioIssuerOrigin} from "../_shared/studio-issuer-origin.mjs";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const secret = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const pub = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const gatewaySecret = Deno.env.get("PTG_STUDIO_GATEWAY_SECRET") ?? "";
-// Issuance from the PTG hostname only. Never use a wildcard/github.io origin.
-const issuerOrigin = "https://first-megasaver-ptg.vercel.app";
+// Exact HTTPS origin set at deployment time. No implicit Vercel host or wildcard.
+const issuerOrigin = studioIssuerOrigin(Deno.env.get("PTG_STUDIO_ISSUER_ORIGIN"));
 const admin = createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 const noStore = {"Cache-Control":"no-store, private","Pragma":"no-cache"};
 function json(body:unknown,status=200,origin?:string) {
@@ -54,6 +55,7 @@ async function validSourceSession(userId:string,sessionId:string){
 }
 async function issue(request:Request,body:Record<string,unknown>){
   const origin=request.headers.get("origin");
+  if(!issuerOrigin)return json({ok:false,message:"Studio issuer origin is not configured."},503);
   if(origin!==issuerOrigin)return json({ok:false,message:"Untrusted issuer origin."},403);
   const studio=body.studio;
   if(!validStudioId(studio))return json({ok:false,message:"Invalid studio."},400,origin);
@@ -102,7 +104,7 @@ async function verify(request:Request,body:Record<string,unknown>){
 }
 Deno.serve(async request=>{
   const origin=request.headers.get("origin")??undefined;
-  if(request.method==="OPTIONS"&&origin===issuerOrigin)
+  if(issuerOrigin && request.method==="OPTIONS"&&origin===issuerOrigin)
     return new Response(null,{status:204,headers:{
       "Access-Control-Allow-Origin":issuerOrigin,"Vary":"Origin",
       "Access-Control-Allow-Methods":"POST, OPTIONS",

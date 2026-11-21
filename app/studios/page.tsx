@@ -8,9 +8,19 @@ import {createClient} from "@/lib/supabase/client";
 import {getPtgAppSessionId, invokePtgAuth} from "@/lib/ptg/auth-client";
 
 type Studio = "megaframe"|"flyer";
+// Build-time URLs only. No guessed protected host or public-editor fallback.
+function studioLaunchUrl(raw:string|undefined){
+  if(!raw)return "";
+  try {
+    const target=new URL(raw);
+    if(target.protocol!=="https:"||target.username||target.password||target.hash||target.search)
+      return "";
+    return target.href;
+  } catch {return "";}
+}
 const destinations:Record<Studio,{name:string,url:string,summary:string}>={
-  megaframe:{name:"MegaFrame Studio",url:"https://megaframe-studio.vercel.app/studio-access.html",summary:"Photo framing, collages and personalized layouts"},
-  flyer:{name:"MegaFlyer Studio",url:"https://flyer-studio-ken-s-project5.vercel.app/studio-access.html",summary:"Campaign artwork, product bundles and promotional flyers"},
+  megaframe:{name:"MegaFrame Studio",url:studioLaunchUrl(process.env.NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL),summary:"Photo framing, collages and personalized layouts"},
+  flyer:{name:"MegaFlyer Studio",url:studioLaunchUrl(process.env.NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL),summary:"Campaign artwork, product bundles and promotional flyers"},
 };
 function allowedRole(account:{role:string;legacyRole:string}|null){
   return !!account && (account.role==="SYSTEM_ADMIN"||account.role==="BRANCH_ADMIN"||
@@ -34,6 +44,7 @@ export default function StudioLaunchPage(){
   async function launch(studio:Studio){
     setBusy(studio);setMessage("");
     try{
+      if(!destinations[studio].url)throw Error("Secure Studio destination has not been configured.");
       // Reverify the existing PTG account immediately before issuing the ticket.
       const check=await invokePtgAuth("session");
       if(!check.account||!allowedRole(check.account))
@@ -75,8 +86,8 @@ export default function StudioLaunchPage(){
         <div style={{display:"grid",gap:16,gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))"}}>
           {(Object.keys(destinations) as Studio[]).map(studio=><div key={studio} className="panel" style={{padding:16}}>
             <h2>{destinations[studio].name}</h2><p>{destinations[studio].summary}</p>
-            <button type="button" className="admin-button" disabled={busy!==null} onClick={()=>void launch(studio)}>
-              {busy===studio?"Checking access…":"Open "+destinations[studio].name}
+            <button type="button" className="admin-button" disabled={busy!==null||!destinations[studio].url} onClick={()=>void launch(studio)}>
+              {!destinations[studio].url?"Launch unavailable until secure hosting is configured":busy===studio?"Checking access…":"Open "+destinations[studio].name}
             </button>
           </div>)}
         </div>

@@ -38,3 +38,12 @@ The owner now uses **GitHub Pages + Supabase** for PTG and MegaFlyer Studio and 
 The protected editor requires a server-capable hosting solution that can authenticate **every HTML, JavaScript, and image request** before release; a JavaScript-only login screen hosted on public GitHub Pages is not sufficient. Do not replace the Vercel URLs with guessed GitHub Pages URLs as a shortcut, because this would create a direct-link bypass. Verify and approve the actual secure hosting approach, callback domains, and token/session revocation behavior before enabling redirects. GitHub Pages may remain a redirect-only entry page once a protected editor exists.
 
 The portal's user-visible flyer name has been corrected to **MegaFlyer Studio**. No hosting, DNS, deployment, Auth or Supabase credentials were changed by this branding correction.
+
+## November 21, 2026 — Deployment-independent PTG issuer and launcher
+
+- **Staged in this draft:** `PTG_STUDIO_ISSUER_ORIGIN` is now a mandatory exact HTTPS **origin** for PTG Studio issuance. Missing/malformed values fail closed, rather than silently using the old Vercel host.
+- Studio destinations are build-time `NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL` and `NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL`, and are disabled if absent/invalid. Do not set them to the current public editor URLs; that would defeat app-wide authorization.
+- The PTG GitHub Pages migration branch uses `/first-megasaver-ptg` as its base path, but the actual Studio release URLs must still be confirmed and deployed coherently. Both apps need secure code delivery beyond static GitHub Pages.
+- GitHub Pages projects under the **same** `kzamora19.github.io` host share a browser origin, even when their paths differ. Do not treat path separation as a secret/token security boundary; review PTG token handling and move protected applications to suitably isolated origins or a hardened server-side delivery model.
+- Supabase's default Edge Functions domain does not directly serve GET HTML as `text/html` without a custom domain. A protected-bundle JSON response is technically possible but does not, by itself, solve full revocation, offline copies or all private asset requests. Do not ship this incomplete approach as a finished TL-only application gate.
+- **No releases, Edge Function deployments, secrets or production SQL changes** were performed in this staging update.
