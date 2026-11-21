@@ -156,6 +156,14 @@ try{
  const frame=await issue(3,"megaframe");
  const frameAuth=await exchange(frame.data.ticket,publicKey,"megaframe");
  assert.equal(frameAuth.status,200);assert.notEqual(frameAuth.data.draftKey,first.draftKey);
+ // Real PostgREST + PostgreSQL quota under concurrent requests, for both
+ // MegaFrame and MegaFlyer: quota is per PTG user, not per browser or app.
+ const burst=await Promise.all(Array.from({length:18},(_,i)=>
+  issue(1,i%2?"flyer":"megaframe")));
+ assert.equal(burst.filter(x=>x.status===200).length,11,
+  "Eleven remaining slots after first issue for the System Admin");
+ assert.equal(burst.filter(x=>x.status===429).length,7,
+  "Atomic quota denies excess simultaneous requests across Studios");
  // PTG forced logout denies signed continuation even with a valid Auth JWT.
  ok(await admin.from("app_sessions").update({revoked_at:new Date().toISOString()})
   .eq("id",uuid(3)),"local forced logout");

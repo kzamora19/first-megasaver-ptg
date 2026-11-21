@@ -45,6 +45,7 @@ const json=(res,value,status=200,headers={})=>{
  res.end(JSON.stringify(value));
 };
 const trace=[];
+const quota=new Map();
 function matches(row,params){
  for(const [key,value] of params){
   if(key==="select"||key==="order"||key==="limit"||key==="offset")continue;
@@ -65,6 +66,13 @@ const fakeBackend=createServer(async(req,res)=>{
  if(!pathname.startsWith("/rest/v1/"))return json(res,{message:"Unknown local route"},404);
  // The server-only API key is mandatory for every PTG table mutation/read.
  if(req.headers.apikey!==serviceKey)return json(res,{message:"Service role required"},403);
+ if(pathname==="/rest/v1/rpc/ptg_studio_reserve_issue_slot"&&req.method==="POST"){
+  let raw="";for await(const part of req)raw+=part;
+  const body=JSON.parse(raw||"{}");
+  const count=quota.get(body.p_user_id)||0;
+  quota.set(body.p_user_id,count<12?count+1:count);
+  return json(res,count<12,200);
+ }
  const table=pathname.split("/").at(-1);
  const rows=tables[table];
  if(!rows)return json(res,{message:"Unknown table"},404);
@@ -286,6 +294,11 @@ try{
  assert.ok(trace.some(t=>t.method==="PATCH"&&t.table==="ptg_studio_proof_sessions"));
  console.log("PASS: actual Deno PTG Edge HTTP entrypoint + real supabase-js requests against isolated local Auth/PostgREST emulator.");
  console.log("PASS: TL/Admin eligibility, ordinary/disabled/forced logout denial, wrong origin/studio/secret, one-time redemption, signed proof, challenge replay, account revocation.");
+ const burst=await Promise.all(Array.from({length:20},(_,i)=>issue(1,i%2?"flyer":"megaframe")));
+ assert.equal(burst.filter(x=>x.status===429).length,9,
+  "Quota must deny excess launches across both Studios for same PTG account");
+ assert.equal(burst.filter(x=>x.status===200).length,11);
+ assert.equal(quota.get(userId(1)),12);
  console.log("PASS: missing recovery root fails before ticket burn; fresh root exchange restores scoped draft keys.");
  console.log("LIMIT: Local Auth/PostgREST is emulated, not a real Supabase staging project or live PTG accounts.");
 } finally {

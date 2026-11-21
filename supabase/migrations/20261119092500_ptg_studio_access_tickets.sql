@@ -40,3 +40,44 @@ revoke all on public.ptg_studio_proof_sessions from public, anon, authenticated;
 grant select, insert, update, delete on public.ptg_studio_proof_sessions to service_role;
 comment on table public.ptg_studio_proof_sessions is
  'Server-only short lived proof-of-possession sessions. Public JWK is not a bearer credential.';
+
+-- Development only: atomic fixed-window Studio issue quota, shared by both Studios.
+-- Twelve successful issue attempts per PTG user in any 60-second window.
+-- Service-only RPC. SECURITY INVOKER avoids a public privileged code path.
+create table if not exists public.ptg_studio_issue_limits (
+ user_id uuid primary key references auth.users(id) on delete cascade,
+ window_started_at timestamptz not null default now(),
+ attempts integer not null default 0 check (attempts between 0 and 12)
+);
+alter table public.ptg_studio_issue_limits enable row level security;
+revoke all on public.ptg_studio_issue_limits from public, anon, authenticated;
+grant select, insert, update, delete on public.ptg_studio_issue_limits to service_role;
+
+create or replace function public.ptg_studio_reserve_issue_slot(p_user_id uuid)
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $quota$
+declare
+ reserved_count integer;
+begin
+ insert into public.ptg_studio_issue_limits as lim (user_id, window_started_at, attempts)
+ values(p_user_id, clock_timestamp(), 1)
+ on conflict(user_id) do update
+ set window_started_at=case
+   when lim.window_started_at <= clock_timestamp()-interval '60 seconds'
+   then clock_timestamp() else lim.window_started_at end,
+     attempts=case
+   when lim.window_started_at <= clock_timestamp()-interval '60 seconds'
+   then 1 else lim.attempts+1 end
+ where lim.window_started_at <= clock_timestamp()-interval '60 seconds'
+    or lim.attempts < 12
+ returning attempts into reserved_count;
+ return reserved_count is not null;
+end
+$quota$;
+revoke all on function public.ptg_studio_reserve_issue_slot(uuid) from public, anon, authenticated;
+grant execute on function public.ptg_studio_reserve_issue_slot(uuid) to service_role;
+comment on function public.ptg_studio_reserve_issue_slot(uuid) is
+ 'Service-only, atomic per-account Studio issue quota. No browser EXECUTE; shared across both Studios.';

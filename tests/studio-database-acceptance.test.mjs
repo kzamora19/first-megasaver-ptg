@@ -155,3 +155,27 @@ test("expired proofs and grants cannot be extended beyond SQL limits",()=>{
  VALUES ('flyer','${person(2)}','${appSession(2)}','{}'::jsonb,
  '${B}',now()+interval '1 minute',now()+interval '3 hours')`,{expectFailure:true}),/check constraint/);
 });
+
+test("only service_role can reserve launch slots; 12/min atomic quota and reset",async()=>{
+ const fn="public.ptg_studio_reserve_issue_slot(uuid)";
+ assert.equal(psql("SELECT has_function_privilege('anon','"+fn+"','EXECUTE')"),"f");
+ assert.equal(psql("SELECT has_function_privilege('authenticated','"+fn+"','EXECUTE')"),"f");
+ assert.equal(psql("SELECT has_function_privilege('service_role','"+fn+"','EXECUTE')"),"t");
+ assert.equal(psql("SELECT prosecdef FROM pg_proc WHERE oid='"+fn+"'::regprocedure"),"f",
+   "Quota function must be SECURITY INVOKER, not SECURITY DEFINER");
+ assert.match(psql("SET ROLE authenticated; SELECT public.ptg_studio_reserve_issue_slot('"+
+   person(1)+"')",{expectFailure:true}),/permission denied/);
+ const call=()=>psqlConcurrent("SET ROLE service_role; SELECT public.ptg_studio_reserve_issue_slot('"+
+  person(1)+"'::uuid)");
+ const replies=await Promise.all(Array.from({length:23},call));
+ assert.equal(replies.filter(x=>x==="t").length,12,"Twelve concurrent launches accepted");
+ assert.equal(replies.filter(x=>x==="f").length,11,"Excess requests denied atomically");
+ const count=psql("SELECT attempts::text FROM public.ptg_studio_issue_limits WHERE user_id='"+
+  person(1)+"'");
+ assert.equal(count,"12");
+ psql("UPDATE public.ptg_studio_issue_limits SET window_started_at=now()-interval '65 seconds' WHERE user_id='"+
+  person(1)+"'");
+ assert.equal(await call(),"t","One new launch allowed in the next window");
+ assert.equal(psql("SELECT attempts::text FROM public.ptg_studio_issue_limits WHERE user_id='"+
+  person(1)+"'"),"1");
+});

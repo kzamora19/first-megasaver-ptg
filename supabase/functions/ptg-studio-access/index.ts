@@ -17,8 +17,8 @@ const gatewaySecret = Deno.env.get("PTG_STUDIO_GATEWAY_SECRET") ?? "";
 const issuerOrigin = studioIssuerOrigin(Deno.env.get("PTG_STUDIO_ISSUER_ORIGIN"));
 const admin = createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 const noStore = {"Cache-Control":"no-store, private","Pragma":"no-cache"};
-function json(body:unknown,status=200,origin?:string) {
-  const headers:Record<string,string>={"Content-Type":"application/json; charset=utf-8",...noStore};
+function json(body:unknown,status=200,origin?:string,extraHeaders:Record<string,string>={}) {
+  const headers:Record<string,string>={"Content-Type":"application/json; charset=utf-8",...noStore,...extraHeaders};
   if(origin===issuerOrigin){
     headers["Access-Control-Allow-Origin"]=issuerOrigin;
     headers["Vary"]="Origin";
@@ -79,6 +79,13 @@ async function issue(request:Request,body:Record<string,unknown>){
   if(error || !user || !id)return json({ok:false,message:"PTG login required."},401,origin);
   const active=await validSourceSession(user.id,id);
   if(!active)return json({ok:false,message:"PTG Team Leader or higher access required."},403,origin);
+  // Atomic DB-backed quota: unlike an in-memory counter it works across Edge
+  // instances and competing tabs. A missing RPC fails closed, never issues a ticket.
+  const {data:reserved,error:quotaError}=await admin.rpc("ptg_studio_reserve_issue_slot",{
+    p_user_id:user.id,
+  });
+  if(quotaError)return json({ok:false,message:"Studio access is temporarily unavailable."},503,origin);
+  if(reserved!==true)return json({ok:false,message:"Too many Studio launches. Try again in one minute."},429,origin,{"Retry-After":"60"});
   const ticket=randomToken();
   const ticketHash=await digest(ticket);
   const expires=new Date(Date.now()+STUDIO_GRANT_LIFETIME_SECONDS*1000).toISOString();
