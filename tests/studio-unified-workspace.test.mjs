@@ -38,3 +38,10 @@ test("Creative Studios menu is limited to PTG Team Leader and higher roles",()=>
  assert.match(products,/canOpenCreativeStudios && <a href=\{withBasePath\("\/studios\/"\)\}>/);
  assert.doesNotMatch(products,/\/megaframe-studio\/studio\/|\/flyer-studio\/studio\//);
 });
+
+test("production Studio destinations must use ticket-only entry paths on existing Pages hosts",()=>{
+  assert.match(portal,/studioLaunchUrl\(process\.env\.NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL,"megaframe"\)/);
+  assert.match(portal,/studioLaunchUrl\(process\.env\.NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL,"flyer"\)/);
+  assert.match(portal,/\/megaframe-studio\/studio\//);
+  assert.match(portal,/\/flyer-studio\/studio\//);
+});

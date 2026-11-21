@@ -9,18 +9,22 @@ import {getPtgAppSessionId, invokePtgAuth} from "@/lib/ptg/auth-client";
 
 type Studio = "megaframe"|"flyer";
 // Build-time URLs only. No guessed protected host or public-editor fallback.
-function studioLaunchUrl(raw:string|undefined){
+function studioLaunchUrl(raw:string|undefined,studio:Studio){
   if(!raw)return "";
   try {
     const target=new URL(raw);
-    if(target.protocol!=="https:"||target.username||target.password||target.hash||target.search)
-      return "";
+    // Fail closed if a release accidentally points at the still-public editor
+    // root, an external host, a wrong Studio, or any unapproved preview URL.
+    const path=studio==="megaframe"?"/megaframe-studio/studio/":"/flyer-studio/studio/";
+    if(target.protocol!=="https:"||target.origin!=="https://kzamora19.github.io"||
+       target.pathname!==path||target.username||target.password||
+       target.hash||target.search)return "";
     return target.href;
   } catch {return "";}
 }
 const destinations:Record<Studio,{name:string,url:string,summary:string}>={
-  megaframe:{name:"MegaFrame Studio",url:studioLaunchUrl(process.env.NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL),summary:"Photo framing, collages and personalized layouts"},
-  flyer:{name:"MegaFlyer Studio",url:studioLaunchUrl(process.env.NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL),summary:"Campaign artwork, product bundles and promotional flyers"},
+  megaframe:{name:"MegaFrame Studio",url:studioLaunchUrl(process.env.NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL,"megaframe"),summary:"Photo framing, collages and personalized layouts"},
+  flyer:{name:"MegaFlyer Studio",url:studioLaunchUrl(process.env.NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL,"flyer"),summary:"Campaign artwork, product bundles and promotional flyers"},
 };
 function allowedRole(account:{role:string;legacyRole:string}|null){
   return !!account && (account.role==="SYSTEM_ADMIN"||account.role==="BRANCH_ADMIN"||
