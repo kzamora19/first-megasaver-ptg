@@ -79,7 +79,7 @@ test("client-side encrypted cloud snapshots enforce per-PTG actor, Studio scope 
    "Same PTG user has independent Studio namespace");
  const count=psql("SELECT count(*) FROM public.ptg_studio_cloud_backups WHERE owner_ptg_id='"+owner1+"'");
  assert.equal(count,"2");
- assert.match(psql("SET ROLE service_role; "+fn("flyer",owner1,"p:current",iv,"raw plaintext!",2),
+ assert.match(psql("SET ROLE service_role; "+fn("flyer",owner1,"p:current",iv,"raw plaintext!",1),
    {expectFailure:true}),/check constraint/);
 });
 
