@@ -35,8 +35,8 @@ test("launcher does not silently fall back to public editor or old Vercel URLs",
 
 test("protected launch URLs must be exact Studio-specific Pages paths, never legacy editor roots",()=>{
   assert.match(portal,/target\.origin!=="https:\/\/kzamora19\.github\.io"/);
-  assert.match(portal,/\/"megaframe-studio\/studio\/"/);
-  assert.match(portal,/\/"flyer-studio\/studio\/"/);
+  assert.match(portal,/\/megaframe-studio\/studio\//);
+  assert.match(portal,/\/flyer-studio\/studio\//);
   assert.match(portal,/target\.pathname!==path/);
   assert.match(portal,/target\.hash\|\|target\.search/);
   assert.doesNotMatch(portal,/studioLaunchUrl\(process\.env\.NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL\)/);
