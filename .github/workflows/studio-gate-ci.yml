@@ -114,7 +114,7 @@ jobs:
     env:
       CI: "true"
       PTG_STUDIO_LOCAL_E2E: "1"
-      PTG_STUDIO_LOCAL_STATUS_PATH: ${{ runner.temp }}/ptg-studio-local-status.env
+      PTG_STUDIO_LOCAL_STATUS_PATH: /tmp/ptg-studio-local-status.env
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
