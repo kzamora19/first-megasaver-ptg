@@ -122,7 +122,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with: {deno-version: v2.x}
       - uses: supabase/setup-cli@v1
-        with: {version: latest}
+        with: {version: '2.121.0'}
       - name: Start fresh disposable local Supabase Auth and PostgREST
         run: |
           set -euo pipefail
