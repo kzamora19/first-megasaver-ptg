@@ -58,3 +58,18 @@ The full runner issues only ephemeral staged tickets; it does not update any hos
 - Coordinated, owner-approved deployment of all four applications.
 
 **Release remains HOLD until these checks pass and owner authorizes the cutover.**
+
+
+## Protected MegaFlyer photo-library proof delegation
+
+The existing standalone MegaFlyer already authenticates directly with PTG bearer and app-session. The future **opaque-origin protected Studio** must never receive either credential. For protected product-photo operations, the Studio launcher signs its current one-use P-256 challenge; the Flyer photo Edge function forwards the proof to this PTG `ptg-studio-access` authority using the service-only shared Studio gateway secret.
+
+After verifying PTG account, branch, role, session expiry and revocation, and **atomically consuming the signed challenge**, `prove` now returns `actorId` and `canManage` in the **server-only** response. The verified role remains the source of truth: TL is permitted to view/use/upload, Branch Admin and System Admin may additionally replace/remove. No caller may supply their own account or role. Browser-facing protected delivery services must strip these fields and return only `sessionId`, next `challenge`, expiry and scoped recovery material as applicable.
+
+- Reuse the same server-side `PTG_STUDIO_GATEWAY_SECRET` for both Flyer protected editor delivery and its proof-verifying photo gateway. Do not copy that secret into GitHub Pages code, JavaScript, PTG user metadata or browser storage.
+- The photo gateway must set `PTG_STUDIO_GATEWAY_URL` to the proper **isolated staging** authority for staging; existing production PTG URL is rejected in staging mode. The `PTG_STUDIO_DEPLOYMENT_MODE` parameter is mandatory.
+- The protected launcher must serialize every photo operation with periodic revocation checks so they do not replay the same one-use PTG challenge.
+- Each photo operation must verify a new server-side proof. Authorization or missing-challenge errors close the private editor. A successful proof still returns a next challenge if the subsequent photo storage operation fails.
+- Existing public MegaFlyer photo Edge behavior must remain backward compatible. This integration code is staged only; never deploy it over the live production function before coordinated acceptance.
+
+[PTG signed-proof tests](https://github.com/kzamora19/first-megasaver-ptg/actions/runs/44889778345) verify actor/scope after signed challenge, account disablement, app-session revocation, wrong Studio, replay and concurrency. [MegaFlyer protected Chromium tests](https://github.com/kzamora19/flyer-studio/actions/runs/44889656108) cover real editor operation with no PTG token in the isolated frame and immediate lock after proof revocation. These are isolated automated tests, **not** hosted live-account evidence.
