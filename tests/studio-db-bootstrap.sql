@@ -6,12 +6,12 @@ BEGIN
   RAISE EXCEPTION 'Studio security fixture must run only in the disposable ptg_studio_test database';
  END IF;
 END $fixture_guard$;
-DO $
+DO $roles_setup$
 BEGIN
  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS; END IF;
-END $$;
+END $roles_setup$;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE TABLE auth.users (id uuid PRIMARY KEY);
 CREATE TABLE public.branches (
