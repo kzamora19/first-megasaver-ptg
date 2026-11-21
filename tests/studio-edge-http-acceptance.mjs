@@ -114,10 +114,11 @@ const signature=async(privateKey,studio,challengeData)=>{
  const bytes=await webcrypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},privateKey,new TextEncoder().encode(message));
  return Buffer.from(bytes).toString("base64url");
 };
+// Exercise the real Edge server twice: first without a recovery root, then
+// with a temporary local-only root. A configuration failure must never burn a ticket.
+const recoveryRoot="local-ephemeral-recovery-"+"R".repeat(48);
 let deno;
-try{
- await listen();
- const backendPort=fakeBackend.address().port;
+async function startEdge(backendPort,recoverySecret){
  deno=spawn("deno",["run","--allow-all","supabase/functions/ptg-studio-access/index.ts"],{
   env:{
    ...process.env,
@@ -126,7 +127,7 @@ try{
    SUPABASE_PUBLISHABLE_KEY:publishableKey,
    PTG_STUDIO_GATEWAY_SECRET:gatewaySecret,
    PTG_STUDIO_ISSUER_ORIGIN:issuer,
-   PTG_STUDIO_DRAFT_RECOVERY_SECRET:"local-ephemeral-recovery-"+"R".repeat(48),
+   PTG_STUDIO_DRAFT_RECOVERY_SECRET:recoverySecret,
   },stdio:["ignore","pipe","pipe"]
  });
  let errors="";
@@ -134,12 +135,52 @@ try{
  deno.stdout.on("data",v=>{errors+=v.toString();});
  let up=false;
  for(let i=0;i<160;i++){
-  if(deno.exitCode!==null)throw Error("Deno exited: "+errors.slice(-1600));
-  try{const res=await fetch("http://127.0.0.1:8000/",{signal:AbortSignal.timeout(150)});if(res.status===405){up=true;break;}}
-  catch{}
+  if(deno.exitCode!==null||deno.signalCode!==null)
+   throw Error("Deno exited: "+errors.slice(-1600));
+  try{
+   const res=await fetch("http://127.0.0.1:8000/",{signal:AbortSignal.timeout(150)});
+   if(res.status===405){up=true;break;}
+  }catch{}
   await pause(200);
  }
  assert.ok(up,"Actual Edge HTTP server should start: "+errors.slice(-1600));
+}
+async function stopEdge(){
+ if(!deno)return;
+ const child=deno;
+ deno=null;
+ if(child.exitCode===null&&child.signalCode===null){
+  const exit=new Promise(resolve=>child.once("exit",resolve));
+  child.kill("SIGTERM");
+  await Promise.race([exit,pause(2500)]);
+  if(child.exitCode===null&&child.signalCode===null){
+   child.kill("SIGKILL");
+   await Promise.race([exit,pause(1000)]);
+  }
+ }
+}
+try{
+ await listen();
+ const backendPort=fakeBackend.address().port;
+ await startEdge(backendPort,"");
+ const issuedWithoutRecovery=await issue(3);
+ assert.equal(issuedWithoutRecovery.status,200,"Ticket issuance must not require disclosure of a draft key");
+ assert.equal(issuedWithoutRecovery.data.draftKey,undefined);
+ assert.equal(issuedWithoutRecovery.data.draftScope,undefined);
+ const recoveryPair=await pair();
+ const recoveryPublic=await webcrypto.subtle.exportKey("jwk",recoveryPair.publicKey);
+ const missingRecovery=await exchange(issuedWithoutRecovery.data.ticket,recoveryPublic);
+ assert.equal(missingRecovery.status,503,"Missing root must deny an otherwise valid exchange");
+ assert.equal(tables.ptg_studio_access_tickets.at(-1).redeemed_at,null,
+  "Missing recovery root must not consume the launch ticket");
+ await stopEdge();
+ await startEdge(backendPort,recoveryRoot);
+ const recovered=await exchange(issuedWithoutRecovery.data.ticket,recoveryPublic);
+ assert.equal(recovered.status,200,"Original ticket remains redeemable once after proper configuration");
+ assert.match(recovered.data.draftScope,/^[A-Za-z0-9_-]{43}$/);
+ assert.match(recovered.data.draftKey,/^[A-Za-z0-9_-]{43}$/);
+ assert.equal((await exchange(issuedWithoutRecovery.data.ticket,recoveryPublic)).status,403,
+  "Ticket remains single-use after successful exchange");
  const badOrigin=await issue(3,"flyer","https://malicious.example");
  assert.equal(badOrigin.status,403,"Other origin cannot issue launch ticket");
  const noSession=await run("POST",{action:"issue",studio:"flyer"},{
@@ -190,6 +231,9 @@ try{
  assert.match(first.data.challenge,/^[A-Za-z0-9_-]{43}$/);
  assert.match(first.data.draftScope,/^[A-Za-z0-9_-]{43}$/);
  assert.match(first.data.draftKey,/^[A-Za-z0-9_-]{43}$/);
+ assert.equal(first.data.draftScope,recovered.data.draftScope,
+  "Same PTG account and Studio must restore same draft scope after relaunch");
+ assert.equal(first.data.draftKey,recovered.data.draftKey);
  const otherAccount=await issue(2,"flyer");
  assert.equal(otherAccount.status,200);
  const otherExchange=await exchange(otherAccount.data.ticket,publicKey);
@@ -242,8 +286,9 @@ try{
  assert.ok(trace.some(t=>t.method==="PATCH"&&t.table==="ptg_studio_proof_sessions"));
  console.log("PASS: actual Deno PTG Edge HTTP entrypoint + real supabase-js requests against isolated local Auth/PostgREST emulator.");
  console.log("PASS: TL/Admin eligibility, ordinary/disabled/forced logout denial, wrong origin/studio/secret, one-time redemption, signed proof, challenge replay, account revocation.");
+ console.log("PASS: missing recovery root fails before ticket burn; fresh root exchange restores scoped draft keys.");
  console.log("LIMIT: Local Auth/PostgREST is emulated, not a real Supabase staging project or live PTG accounts.");
 } finally {
- if(deno){deno.kill("SIGTERM");await Promise.race([new Promise(resolve=>deno.once("exit",resolve)),pause(2000)]);}
+ await stopEdge();
  await new Promise(resolve=>fakeBackend.close(resolve));
 }
