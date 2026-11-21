@@ -42,3 +42,13 @@ test("protected launch URLs must be exact Studio-specific Pages paths, never leg
   assert.doesNotMatch(portal,/studioLaunchUrl\(process\.env\.NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL\)/);
   assert.doesNotMatch(portal,/studioLaunchUrl\(process\.env\.NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL\)/);
 });
+
+const pagesWorkflow=readFileSync(new URL("../.github/workflows/deploy-pages.yml",import.meta.url),"utf8");
+test("PTG Pages Creative Studios cutover is manual-only and fail-closed until explicitly approved",()=>{
+  assert.match(pagesWorkflow,/branches:\\s*\\n\\s*- migration\\/github-pages/);
+  assert.match(pagesWorkflow,/workflow_dispatch:/);
+  assert.match(pagesWorkflow,/deploy:\\s*\\n\\s*#.*(?:\\n\\s*#.*)*\\n\\s*if: github\\.event_name == 'workflow_dispatch' && github\\.ref == 'refs\\/heads\\/migration\\/github-pages' && vars\\.PTG_STUDIOS_CUTOVER_APPROVED == 'true'/);
+  assert.match(pagesWorkflow,/NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL:[^\\n]*PTG_STUDIOS_CUTOVER_APPROVED[^\\n]*megaframe-studio\\/studio\\//);
+  assert.match(pagesWorkflow,/NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL:[^\\n]*PTG_STUDIOS_CUTOVER_APPROVED[^\\n]*flyer-studio\\/studio\\//);
+  assert.doesNotMatch(pagesWorkflow,/NEXT_PUBLIC_STUDIO_(?:MEGAFRAME|FLYER)_LAUNCH_URL: https:\\/\\//);
+});
