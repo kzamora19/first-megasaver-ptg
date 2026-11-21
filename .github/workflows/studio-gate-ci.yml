@@ -51,6 +51,25 @@ jobs:
           deno check supabase/functions/ptg-studio-access/index.ts
       - name: Typecheck Next.js launch portal (no deployment)
         run: npx tsc --noEmit
+      - name: Verify GitHub Pages static export with Studio destinations disabled (no deployment)
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+          NEXT_PUBLIC_SUPABASE_URL: https://agknxlowackphvwyvxge.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_kv2q3dnNQt4ij0mgkOLbQQ_S2MO9FvG
+          NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_ASSETS: "true"
+          NEXT_PUBLIC_PTG_USE_EDGE_ACCOUNTS: "true"
+          NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL: https://psoopubvdpwztzkdyifa.supabase.co
+          NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY: sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm
+          NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: ""
+          NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: ""
+        run: |
+          npm run build
+          test -f out/studios/index.html
+          grep -q 'Creative Studios' out/studios/index.html
+
 
   ephemeral-postgres:
     # Scratch PostgreSQL service created solely for this Actions job.
