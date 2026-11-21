@@ -81,6 +81,16 @@ test("client-side encrypted cloud snapshots enforce per-PTG actor, Studio scope 
  assert.equal(count,"2");
  assert.match(psql("SET ROLE service_role; "+fn("flyer",owner1,"p:current",iv,"raw plaintext!",1),
    {expectFailure:true}),/check constraint/);
+ // A per-account/per-Studio 30-record ceiling must hold under real SQL.
+ // Existing files can still be updated at capacity; new ones fail closed.
+ for(let i=0;i<29;i++){
+   const id="project_quota_"+String(i).padStart(3,"0");
+   assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner2,id,iv,cipher,0)),"1");
+ }
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner2,"project_quota_excess",iv,cipher,0)),
+    "null","Account cannot allocate more than 30 cloud records per Studio");
+ assert.equal(psql("SET ROLE service_role; "+fn("megaframe",owner2,key,iv,cipher,1)),
+    "2","An existing project remains updateable at quota");
 });
 
 test("staging migration enforces RLS and forbids browser-table privileges",()=>{

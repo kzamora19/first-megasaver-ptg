@@ -35,6 +35,13 @@ as $cloud$
 declare new_version integer;
 begin
  if p_expected_version = 0 then
+   -- Hold a per-user/per-Studio transaction lock while enforcing the maximum.
+   -- Without this, concurrent devices could bypass a simple COUNT check.
+   perform pg_advisory_xact_lock(hashtextextended(p_user_id::text||':'||p_studio_id,0));
+   if (select count(*) from public.ptg_studio_cloud_backups
+       where owner_ptg_id=p_user_id and studio_id=p_studio_id) >= 30 then
+     return null;
+   end if;
    insert into public.ptg_studio_cloud_backups
       (studio_id,owner_ptg_id,record_key,iv,encrypted)
    values (p_studio_id,p_user_id,p_record_key,p_iv,p_encrypted)
