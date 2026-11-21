@@ -58,3 +58,19 @@ The portal's user-visible flyer name has been corrected to **MegaFlyer Studio**.
 - The staged SQL adds service-only `ptg_studio_proof_sessions`, and the un-applied staging migration adds `redeemed_at` to Studio tickets. No production SQL, secrets or Edge deployment occurred.
 - CI covers role-policy tests, signature tampering, and Deno/Next typechecks; MegaFlyer Chromium tests cryptographically verify the browser signature with a mock gateway. These are **not** proof of transaction isolation, Postgres replay behavior, live Revocation latency or real account authorization.
 - Outstanding: validate atomic one-use redemption and challenge rotation against a disposable PTG database; test two concurrent checks, multiple tabs/devices, account revocation, expiry, rate limits and the cross-origin hosting boundary. Add monitoring and a safe public-editor cutover before release. Do not merge PR #38 independently.
+
+
+## November 21 — isolated PostgreSQL 16 security acceptance
+
+The development-only CI job `ephemeral-postgres` runs the actual staged Studio migration against a **temporary PostgreSQL 16 service** with synthetic PTG roles, sessions, and branches.
+
+Verified in isolated CI:
+- `anon` and `authenticated` have no Studio grant/proof table access; RLS is enabled, and service_role permissions are restricted to server use.
+- Synthetic System Admin, Branch Admin and Team Leader accounts pass source-session eligibility checks; ordinary, disabled, revoked, expired, password-change-required, stale-session-version, closed-branch and idle accounts fail.
+- Multiple concurrent PostgreSQL sessions attempting to redeem one ticket yield exactly **one** successful redemption. Wrong-Studio redemption, expiry, revocation and repeat redemption all fail.
+- Multiple concurrent challenge-rotation attempts yield exactly **one** successful update. Replayed challenges, revoked proofs and expired proofs fail.
+- SQL enforces the ten-minute launch-ticket TTL and two-hour proof-session maximum.
+
+Tests: `tests/studio-db-bootstrap.sql`, `tests/studio-database-acceptance.test.mjs`, and the `ephemeral-postgres` Actions job. The fixture checks the database name `ptg_studio_test` and the Node test also refuses a non-loopback host.
+
+**Not yet proven:** complete PTG HTTP Edge Function ↔ real PostgREST/Auth behavior; concurrent account revocation *during* exchange, rate-limiting, forced logout propagation timing across real devices, issuer origin/cookie isolation and OAuth handling. No production database was accessed or changed. Maintain draft/HOLD and do not deploy until real-account acceptance and the coordinated cutover.
