@@ -21,6 +21,6 @@ test("PTG navigation adopts actual Branchline colors, without touching print-spe
   assert.match(css,/--branchline-blue-soft:#eef2ff/);
   assert.match(css,/\.ptg-app \.ptg-sidebar/);
   assert.match(css,/\.ptg-app \.ptg-nav-item.active/);
-  assert.doesNotMatch(css,/^\\s*(?:canvas\\b|#previewCanvas\\b|@media print)/m);
+  assert.doesNotMatch(css,/^\s*(?:canvas\b|#previewCanvas\b|@media print)/m);
   assert.match(tracker,/const destinations:Record<Studio/);
 });
