@@ -31,7 +31,7 @@ for(let i=1;i<=9;i++){
  tables.user_profiles.push({
   id:userId(i),role_key:i===1?"SYSTEM_ADMIN":i===2?"BRANCH_ADMIN":"BRANCH_USER",
   legacy_role:i===4?"BRANCH USER":"TEAM LEADER",is_active:i!==5,
-  must_change_password:i!==8,session_version:i===9?2:1
+  must_change_password:i===8,session_version:i===9?2:1
  });
  tables.app_sessions.push({
   id:sessionId(i),user_id:userId(i),branch_id:branchId,
