@@ -1,5 +1,11 @@
 -- Ephemeral CI fixture only. Never apply to a Supabase or production project.
 -- Stub only the PTG tables required by the staged Studio migration.
+DO $
+BEGIN
+ IF current_database()<>'ptg_studio_test' THEN
+  RAISE EXCEPTION 'Studio security fixture must run only in the disposable ptg_studio_test database';
+ END IF;
+END $;
 DO $$
 BEGIN
  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
