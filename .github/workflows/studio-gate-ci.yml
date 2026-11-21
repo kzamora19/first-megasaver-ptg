@@ -18,6 +18,8 @@ on:
       - "tests/studio-db-bootstrap.sql"
       - "tests/studio-database-acceptance.test.mjs"
       - "tests/studio-edge-http-acceptance.mjs"
+      - "tests/studio-real-supabase-bootstrap.sql"
+      - "tests/studio-real-supabase-acceptance.mjs"
       - "tests/studio-hosting-config.test.mjs"
       - ".github/workflows/studio-gate-ci.yml"
 permissions:
@@ -103,3 +105,60 @@ jobs:
         run: npm install --ignore-scripts --no-package-lock
       - name: Run isolated Edge HTTP + Auth/PostgREST protocol acceptance
         run: node tests/studio-edge-http-acceptance.mjs
+
+  local-supabase-real-e2e:
+    # Fresh local GoTrue/Auth, Kong, PostgREST and PostgreSQL in RUNNER_TEMP.
+    # Absolutely no Supabase remote link, hosted project, production secret or deploy.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      PTG_STUDIO_LOCAL_E2E: "1"
+      PTG_STUDIO_LOCAL_STATUS_PATH: ${{ runner.temp }}/ptg-studio-local-status.env
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - uses: supabase/setup-cli@v1
+        with: {version: latest}
+      - name: Start fresh disposable local Supabase Auth and PostgREST
+        run: |
+          set -euo pipefail
+          supabase start --help >/dev/null
+          supabase status --help >/dev/null
+          mkdir -p "$RUNNER_TEMP/ptg-studio-local"
+          cd "$RUNNER_TEMP/ptg-studio-local"
+          SUPABASE_YES=1 supabase init
+          supabase start -x studio,realtime,storage-api,imgproxy,postgres-meta,mailpit,edge-runtime,logflare,vector,supavisor
+          supabase status -o env > "$PTG_STUDIO_LOCAL_STATUS_PATH"
+      - name: Apply ONLY to local CLI database; reject all remote DB URLs
+        run: |
+          set -euo pipefail
+          test -f "$PTG_STUDIO_LOCAL_STATUS_PATH"
+          set -a
+          source "$PTG_STUDIO_LOCAL_STATUS_PATH"
+          set +a
+          case "$DB_URL" in
+            postgresql://postgres:*@127.0.0.1:54322/postgres) ;;
+            *) echo "REFUSED: not the local disposable Supabase database" >&2; exit 1 ;;
+          esac
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql -X -v ON_ERROR_STOP=1 "$DB_URL" -f tests/studio-real-supabase-bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 "$DB_URL" -f supabase/migrations/20261119092500_ptg_studio_access_tickets.sql
+          psql -X -v ON_ERROR_STOP=1 "$DB_URL" -c "select pg_notify('pgrst','reload schema')"
+      - name: Real local Auth, PostgREST, RLS, ticket and signed-proof tests
+        run: |
+          npm install --ignore-scripts --no-package-lock
+          node tests/studio-real-supabase-acceptance.mjs
+      - name: Clean up disposable stack
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/ptg-studio-local/supabase/config.toml" ]; then
+            cd "$RUNNER_TEMP/ptg-studio-local"
+            supabase stop --no-backup || true
+          fi
