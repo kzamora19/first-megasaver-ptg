@@ -22,3 +22,11 @@ This development branch starts from the current migration/github-pages productio
 7. Test build, Edge function, RLS and browser workflows together. Obtain final production-release approval only when all gates pass.
 
 **No Vercel deployments. No Supabase migration, Edge function, branch deployment or user changes in this draft.**
+
+## Encrypted local MegaFrame draft recovery contract (development only)
+- MegaFrame PTG one-time `exchange` now derives `{draftScope,draftKey}` using `PTG_STUDIO_DRAFT_RECOVERY_SECRET` (new server-only setting, minimum 32 characters). Missing secret fails closed **before** consuming the ticket.
+- Material is HMAC-SHA256 domain-separated by account UUID, Studio ID, and purpose; `verify` and `issue` must never provide recovery secrets. No password or service secret is written to browser storage.
+- The trusted Studio Edge service relays the account material only after a burned ticket and live PTG role/branch session check; browser signs follow-up challenges using a non-extractable P-256 key, without replaying the original bearer.
+- PTG CI run 44867793518 passed 12 tests including recovery material. MegaFrame mock-browser run 44868201343 passed AES-GCM local photo save and same-account restore with cross-account isolation. Both are development evidence, not a production acceptance test.
+- Root key rotation requires a planned draft-data re-encryption or secure recovery path. Do not change this secret without a rotation plan.
+- Keep the Vercel-free, GitHub Pages + Supabase cutover on hold until dedicated-origin review, real PTG role/revocation tests, and full print/cloud/Drive acceptance pass.
