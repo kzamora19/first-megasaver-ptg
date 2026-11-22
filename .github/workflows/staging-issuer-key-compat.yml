@@ -1,0 +1,20 @@
+name: Staging PTG issuer Supabase key compatibility (no production)
+on:
+  push:
+    branches: [fix/ptg-staging-named-keys-20261122]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Test new and legacy Supabase key resolution
+        run: node --test tests/studio-supabase-keys.test.mjs
+      - uses: denoland/setup-deno@v2
+        with: {deno-version: v2.x}
+      - name: Typecheck PTG Studio authorization Edge Function
+        run: deno check supabase/functions/ptg-studio-access/index.ts
