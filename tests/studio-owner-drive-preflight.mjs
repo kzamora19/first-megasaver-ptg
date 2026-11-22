@@ -23,7 +23,9 @@ const allowed=new Set(["google_oauth_secrets_missing","google_refresh_invalid_gr
  "google_access_token_missing","google_drive_about_denied",
  "google_drive_owner_not_approved","google_drive_api_or_scope_denied",
  "google_owner_authorized_and_drive_api_ready","connection_unavailable"]);
-const label=allowed.has(report?.status)?report.status:"unexpected_response";
+const label=allowed.has(report?.status)||(
+ typeof report?.status==="string"&&/^google_drive_about_(401|403|404|429)_(accessNotConfigured|insufficientPermissions|forbidden|dailyLimitExceeded|rateLimitExceeded|SERVICE_DISABLED|ACCESS_TOKEN_SCOPE_INSUFFICIENT|PERMISSION_DENIED|other)$/.test(report.status)
+ )?report.status:"unexpected_response";
 console.log("Central Google Drive owner verification:",label,"HTTP",response.status);
 if(response.status!==200||label!=="google_owner_authorized_and_drive_api_ready")
  throw Error("Owner Google Drive connection is not yet ready: "+label);
