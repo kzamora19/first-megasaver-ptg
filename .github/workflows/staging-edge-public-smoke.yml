@@ -1,0 +1,23 @@
+name: Hosted isolated Studio public-denial smoke
+on:
+  pull_request:
+    branches:
+      - feature/studio-gateway-pages-refresh-20261121
+    paths:
+      - "tests/staging-edge-public-smoke.mjs"
+      - ".github/workflows/staging-edge-public-smoke.yml"
+      - "supabase/migrations/20261115090500_ptg_aircon_sort_helpers.sql"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staging-negative-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify public endpoints fail closed (no credentials, no mutations)
+        run: node tests/staging-edge-public-smoke.mjs
