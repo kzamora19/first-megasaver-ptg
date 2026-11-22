@@ -1,0 +1,66 @@
+name: Private Studio release + four-role staging acceptance (HOLD PRODUCTION)
+on:
+  push:
+    branches: [feat/staging-private-bundle-upload-20261122]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type staging-only to upload private editors and run disposable test accounts"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  validate-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Verify exact staging project, SHA pins and deny-public upload policy
+        run: |
+          node --check tests/studio-staging-private-bundle-upload.mjs
+          node --test tests/studio-staging-private-bundle-upload.test.mjs
+          node --test tests/studio-staging-synthetic-auth.test.mjs
+  private-upload-and-hosted-acceptance:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'staging-only' && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true' }}
+    needs: validate-source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: "1"
+      STUDIO_HOSTED_TEST_MODE: "full"
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+      STUDIO_STAGING_MEGAFRAME_BUNDLE_FILE: ${{ runner.temp }}/frame-private/private/studio.html
+      STUDIO_STAGING_FLYER_BUNDLE_FILE: ${{ runner.temp }}/flyer-private/private/studio.html
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out vetted MegaFrame DEV source (never main)
+        uses: actions/checkout@v4
+        with:
+          repository: kzamora19/megaframe-studio
+          ref: feature/ptg-private-pages-package-20261121
+          path: .stage-megaframe
+      - name: Check out vetted MegaFlyer DEV source (never main)
+        uses: actions/checkout@v4
+        with:
+          repository: kzamora19/flyer-studio
+          ref: feature/ptg-private-delivery-poc-20261121
+          path: .stage-flyer
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Compile only PRIVATE editor bundles (not Pages artifacts)
+        run: |
+          node .stage-megaframe/staging/build-private-package.mjs "$RUNNER_TEMP/frame-private"
+          node .stage-flyer/scripts/build-private-flyer.mjs "$RUNNER_TEMP/flyer-private"
+      - name: Install pinned Supabase SDK only on disposable runner
+        run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
+      - name: Verify SHA-256 and upload immutable releases into staging private buckets only
+        run: node tests/studio-staging-private-bundle-upload.mjs
+      - name: Create four synthetic staging accounts, test both Studios and forced logout, then clean up
+        run: node tests/studio-staging-synthetic-auth.mjs
