@@ -132,7 +132,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: "22"}
       - name: Probe deployed PTG + Studio gateway fail-closed configuration
-        run: node tests/studio-deployed-gateway-preflight.mjs
+        run: |
+          node tests/studio-deployed-gateway-preflight.mjs
+          node tests/studio-private-object-live-security.mjs
 
   edge-http-local:
     # Exercise the actual Deno Edge entrypoint and actual supabase-js over HTTP.
