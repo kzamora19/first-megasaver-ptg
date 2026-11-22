@@ -1,0 +1,29 @@
+name: Isolated staging PTG real-role acceptance (no production, auth-only)
+on:
+  push:
+    branches: [test/staging-auth-only-20261122]
+permissions:
+  contents: read
+jobs:
+  auth-only:
+    if: github.repository == 'kzamora19/first-megasaver-ptg' && github.ref == 'refs/heads/test/staging-auth-only-20261122'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: '1'
+      STUDIO_HOSTED_TEST_MODE: full
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Reject production, incorrect role and missing admin credentials
+        run: node --test tests/studio-staging-synthetic-auth.test.mjs
+      - name: Install pinned Supabase SDK for transient synthetic users
+        run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
+      - name: Run live synthetic staging roles and private Studio acceptance; delete test users
+        run: node tests/studio-staging-synthetic-auth.mjs
