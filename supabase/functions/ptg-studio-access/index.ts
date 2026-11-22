@@ -204,6 +204,58 @@ async function prove(request:Request,body:Record<string,unknown>){
 }
 
 
+// PTG Team Leader+ scoped catalog search through a fresh one-use Studio proof.
+// No PTG Auth bearer, password, actor ID, branch identifier or service secret
+// enters the opaque MegaFlyer editor. Use the same PTG memo pricing RPC and
+// redaction rules as ptg-products; never allow subdealer/stock bypass flags.
+async function lookup(request:Request,body:Record<string,unknown>){
+  if(body.studio!=="flyer")return json({ok:false},403);
+  const q=typeof body.q==="string"?body.q.trim():"";
+  const page=body.page;
+  if(!q||q.length>100||!Number.isInteger(page)||Number(page)<1||Number(page)>20)
+    return json({ok:false},400);
+  const proven=await prove(request,body);
+  if(!proven.ok)return proven;
+  const proof=await proven.json();
+  const next={ok:true,sessionId:proof.sessionId,challenge:proof.challenge,expiresAt:proof.expiresAt};
+  try{
+    // Use only the server-stored PTG app session, never a browser-provided
+    // user ID. Repeat active role / branch checks before the database query.
+    const {data:bound,error:boundError}=await admin.from("ptg_studio_proof_sessions")
+      .select("user_id,app_session_id").eq("id",proof.sessionId).eq("studio_id","flyer").maybeSingle();
+    if(boundError||!bound||bound.user_id!==proof.actorId)throw Error("Studio actor unavailable");
+    const active=await validSourceSession(bound.user_id,bound.app_session_id);
+    if(!active)throw Error("PTG session inactive");
+    const params={
+      p_query:q,p_branch_id:active.row.branch_id??null,
+      p_system_admin:active.profile.role_key==="SYSTEM_ADMIN",
+      p_page:Number(page),p_stock_barcodes:null,
+      p_promotions_only:false,p_campaign:null,p_regular_only:false
+    };
+    const {data,error}=await admin.rpc("ptg_ordered_product_search",params);
+    if(error||!data||!Array.isArray(data.products))throw Error("PTG catalog unavailable");
+    const role=active.profile.role_key,legacy=String(active.profile.legacy_role||"").trim().toUpperCase();
+    const canSeeCash=role==="SYSTEM_ADMIN"||(role==="BRANCH_ADMIN"&&legacy==="BRANCH MANAGER");
+    const products=(canSeeCash?data.products:data.products.map((product:Record<string,unknown>)=>{
+      const {cash_payment,unit_only_offer,...visible}=product;
+      let safeUnit=null;
+      if(unit_only_offer&&typeof unit_only_offer==="object"&&!Array.isArray(unit_only_offer)){
+        const {cash_payment:unitCash,...unitFields}=unit_only_offer as Record<string,unknown>;
+        safeUnit={...unitFields,has_cash_payment:Number(unitCash||0)!==0};
+      }
+      return {...visible,has_cash_payment:Number(cash_payment||0)!==0,
+        ...(safeUnit?{unit_only_offer:safeUnit}:{})};
+    })).slice(0,5);
+    return json({...next,catalog:{status:"ok",products,total:Number(data.total||0),
+      page:Number(page),pageSize:5}});
+  }catch(error){
+    console.error("Signed Studio PTG lookup failed:",error instanceof Error?error.name:"unknown");
+    // Proof has already rotated. Always return the fresh challenge so a
+    // transient catalog error does not force a new Studio login.
+    return json({...next,catalog:{status:"unavailable"}});
+  }
+}
+
 /* Explicit opt-in client-side AES-GCM cloud backups; PTG remains the sole
  * actor authority. Called only by the Studio's server-side delivery gateway.
  * The Studio's unrelated Supabase Auth user IDs are never treated as PTG IDs.
@@ -307,6 +359,7 @@ Deno.serve(async request=>{
     if(!["cloud","drive"].includes(body.action)&&raw.length>4096)return json({ok:false},413);
     if(body.action==="cloud")return cloud(request,body);
     if(body.action==="drive")return drive(request,body);
+    if(body.action==="lookup")return lookup(request,body);
     if(body.action==="issue")return issue(request,body);
     if(body.action==="verify")return verify(request,body);
     if(body.action==="exchange")return exchange(request,body);
