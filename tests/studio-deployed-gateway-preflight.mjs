@@ -21,22 +21,25 @@ async function post(name,body,origin=issuer){
  return status;
 }
 async function probe(){
+ const issues=[];
  const issue={action:"issue",studio:"flyer"};
  const unsigned=await post("ptg",issue);
- assert.equal(unsigned,401,
-  "PTG Studio gateway must be configured and reject missing PTG bearer (401). A 503 means issuer/gateway secrets are still missing.");
+ if(unsigned!==401)issues.push("PTG must reject missing bearer with 401. Received "+unsigned+"; check PTG Studio issuer and gateway secrets.");
  const forged=await post("ptg",issue,"https://untrusted.example");
- assert.equal(forged,403,"PTG must deny a forged origin.");
+ if(forged!==403)issues.push("PTG must deny forged origin with 403. Received "+forged);
  for(const studio of ["megaframe","flyer"]){
-  const forgedTicket=await post(studio,{action:"load",ticket:"A".repeat(43),
-   publicKey:{kty:"EC",crv:"P-256",x:"A".repeat(43),y:"A".repeat(43),ext:true}});
-  assert.equal(forgedTicket,403,
-   studio+" must be configured, contact PTG securely, and deny forged ticket (403). A 503 indicates an incomplete Studio secret or private bundle configuration.");
-  const wrongOrigin=await post(studio,{action:"load",ticket:"A".repeat(43),
-   publicKey:{kty:"EC",crv:"P-256",x:"A".repeat(43),y:"A".repeat(43),ext:true}},
-   "https://untrusted.example");
-  assert.equal(wrongOrigin,403,studio+" must reject a spoofed request origin.");
+  const fake={action:"load",ticket:"A".repeat(43),
+   publicKey:{kty:"EC",crv:"P-256",x:"A".repeat(43),y:"A".repeat(43),ext:true}};
+  const forgedTicket=await post(studio,fake);
+  if(forgedTicket!==403)issues.push(studio+" must reject forged ticket with 403; received "+forgedTicket+
+   (forgedTicket===503?" (private bundle path/SHA or other Studio delivery secret likely missing).":""));
+  const wrongOrigin=await post(studio,fake,"https://untrusted.example");
+  if(wrongOrigin!==403)issues.push(studio+" must reject forged origin with 403; got "+wrongOrigin);
  }
- console.log("PASS: Hosted PTG + both Studio gateways deny untrusted requests and report configured readiness. Real user login and private release delivery remain separately gated.");
+ if(issues.length){
+  console.error("CONFIGURATION BLOCKERS:\n- "+issues.join("\n- "));
+  process.exitCode=1;
+ }else console.log("PASS: all three live gateways are configured and reject untrusted requests. Full authenticated and editor recovery tests remain separate release gates.");
 }
+
 await probe();
