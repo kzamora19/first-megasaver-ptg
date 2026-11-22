@@ -1,0 +1,63 @@
+name: ONE-TIME isolated Branchline Studio functional acceptance (no production)
+on:
+  push:
+    branches: [test/isolated-studio-functional-once-20261122]
+permissions:
+  contents: read
+jobs:
+  validate-source:
+    if: github.repository == 'kzamora19/first-megasaver-ptg'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validate staging-only guards and SHA pins without secrets
+        run: |
+          node --check tests/studio-staging-private-bundle-upload.mjs
+          node --check tests/studio-staging-synthetic-auth.mjs
+          node --test tests/studio-staging-private-bundle-upload.test.mjs
+          node --test tests/studio-staging-synthetic-auth.test.mjs
+  hosted-staging-only:
+    if: github.repository == 'kzamora19/first-megasaver-ptg' && github.ref == 'refs/heads/test/isolated-studio-functional-once-20261122'
+    needs: validate-source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: '1'
+      STUDIO_HOSTED_TEST_MODE: full
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out fixed SHA of MegaFrame integration development source
+        uses: actions/checkout@v4
+        with:
+          repository: kzamora19/megaframe-studio
+          ref: b27618b3caab301452cda63e578c29f08b72bd2f
+          path: .stage-megaframe
+      - name: Check out fixed SHA of MegaFlyer integration development source
+        uses: actions/checkout@v4
+        with:
+          repository: kzamora19/flyer-studio
+          ref: 965014ebf744465af54e44d9cd0e4d2b55c3f9a0
+          path: .stage-flyer
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Build private bundles into ephemeral runner filesystem only
+        run: |
+          node .stage-megaframe/staging/build-private-package.mjs "$RUNNER_TEMP/frame-private"
+          node .stage-flyer/scripts/build-private-flyer.mjs "$RUNNER_TEMP/flyer-private"
+      - name: Install pinned Supabase SDK
+        run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
+      - name: Verify exact hashes then upload to isolated private staging Storage
+        env:
+          STUDIO_STAGING_MEGAFRAME_BUNDLE_FILE: ${{ runner.temp }}/frame-private/private/studio.html
+          STUDIO_STAGING_FLYER_BUNDLE_FILE: ${{ runner.temp }}/flyer-private/private/studio.html
+        run: node tests/studio-staging-private-bundle-upload.mjs
+      - name: Test synthetic PTG roles, signed Studio launches and revocation (cleanup in finally)
+        run: node tests/studio-staging-synthetic-auth.mjs
