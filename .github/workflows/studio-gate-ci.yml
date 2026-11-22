@@ -30,6 +30,7 @@ on:
       - "tests/studio-real-supabase-bootstrap.sql"
       - "tests/studio-real-supabase-acceptance.mjs"
       - "tests/studio-hosting-config.test.mjs"
+      - "tests/studio-deployed-gateway-preflight.mjs"
       - ".github/workflows/studio-gate-ci.yml"
 permissions:
   contents: read
@@ -120,6 +121,19 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261121212700_ptg_studio_cloud_backups.sql
       - name: Validate role revocation, RLS, SQL TTLs and concurrent replay prevention
         run: node --test tests/studio-database-acceptance.test.mjs
+  live-gateway-preflight:
+    # Readiness probes only: no bearer token, no live user, no writes.
+    # This job is intentionally required to pass before public launchers can
+    # safely assume that owner-provided Edge secrets and release bundles work.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Probe deployed PTG + Studio gateway fail-closed configuration
+        run: node tests/studio-deployed-gateway-preflight.mjs
+
   edge-http-local:
     # Exercise the actual Deno Edge entrypoint and actual supabase-js over HTTP.
     # Auth/PostgREST are represented by a localhost-only synthetic fixture.
