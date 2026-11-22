@@ -17,7 +17,9 @@ const response=await fetch(
   signal:AbortSignal.timeout(50000)}
 );
 const report=await response.json().catch(()=>({status:"unparseable"}));
-const allowed=new Set(["google_oauth_secrets_missing","google_refresh_rejected",
+const allowed=new Set(["google_oauth_secrets_missing","google_refresh_invalid_grant",
+ "google_refresh_invalid_client","google_refresh_unauthorized_client",
+ "google_refresh_invalid_request","google_refresh_access_denied","google_refresh_other",
  "google_access_token_missing","google_drive_about_denied",
  "google_drive_owner_not_approved","google_drive_api_or_scope_denied",
  "google_owner_authorized_and_drive_api_ready","connection_unavailable"]);
