@@ -7,13 +7,14 @@ import {
 } from "../_shared/studio-access-policy.mjs";
 import {validPublicKey,validProofRequest,proofMessage,STUDIO_PROOF_LIFETIME_SECONDS,STUDIO_CHALLENGE_LIFETIME_SECONDS} from "../_shared/studio-continuation-policy.mjs";
 import {studioIssuerOrigin} from "../_shared/studio-issuer-origin.mjs";
+import {studioSupabaseKey} from "../_shared/studio-supabase-keys.mjs";
 import {studioDraftMaterial} from "../_shared/studio-draft-scope.mjs";
 import {cloudActionValid,cloudKeyAllowed,validateCloudMutation} from "../_shared/studio-cloud-policy.mjs";
 import {centralDriveOperation} from "../_shared/studio-central-drive.mjs";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
-const secret = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const pub = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const secret = studioSupabaseKey((name: string)=>Deno.env.get(name),"secret");
+const pub = studioSupabaseKey((name: string)=>Deno.env.get(name),"publishable");
 const gatewaySecret = Deno.env.get("PTG_STUDIO_GATEWAY_SECRET") ?? "";
 // Exact HTTPS origin set at deployment time. No implicit Vercel host or wildcard.
 const issuerOrigin = studioIssuerOrigin(Deno.env.get("PTG_STUDIO_ISSUER_ORIGIN"));
