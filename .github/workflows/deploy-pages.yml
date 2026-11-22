@@ -32,6 +32,9 @@ jobs:
       NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES: "false"
 
       NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES: "true"
+      # Controlled protected-access test routes; existing editors remain published.
+      NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: https://kzamora19.github.io/megaframe-studio/studio/
+      NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: https://kzamora19.github.io/flyer-studio/studio/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
