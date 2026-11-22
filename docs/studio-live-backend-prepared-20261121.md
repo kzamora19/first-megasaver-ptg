@@ -77,3 +77,16 @@ Security reference: https://supabase.com/docs/guides/functions/secrets
 - The one-time diagnostic Edge endpoint was subsequently **disabled (HTTP 410, JWT required)** and its GitHub Action workflow and runner script removed from the development PR.
 - **Important:** This confirms OAuth and API connectivity, not successful encrypted `centralDriveOperation` writes, restores, cross-device decryption, or long-term token persistence. Google External Testing mode can cause refresh-token expiry; verify OAuth publishing status before relying on permanent backups.
 - The production user-facing Branchline/PTG/Studio release remains on HOLD until real PTG-role sign-in, permission revocation, project migration/restore, photo privacy, PNG/PDF export and printing tests pass. Four development PRs remain unmerged.
+
+
+## Real synthetic Google Drive save/retrieve verification — 22 November 2026
+
+After OAuth/client and Google Drive API activation, a single-use GitHub-OIDC-attested Supabase canary exercised **the same `studio-central-drive.mjs` backend used by PTG** against the real owner's Google Drive:
+
+- MegaFrame: **PASS** `megaframe:ok`.
+- MegaFlyer: **PASS** `flyer:ok`.
+- Both were confirmed by [GitHub Actions run 44978909438](https://github.com/kzamora19/first-megasaver-ptg/actions/runs/44978909438) at HTTP 200.
+- For each Studio, the canary created a random synthetic PTG actor UUID and a random AES-256-GCM encryption key, wrote a small ciphertext backup, listed it by account/studio scope, retrieved and decrypted it, and asserted that another random PTG actor could not read it. No actual PTG account, staff project or customer image was used.
+- The test attempted to delete only each freshly written synthetic file; no cleanup failure was reported. It never deleted any older owner file. The designated central folder may remain in Google Drive for normal future backups.
+- The one-time test Edge function is now **disabled (410, verify_jwt=true)** and the temporary GitHub Action and runner files were removed after passing.
+- Existing Studio encrypted project UI and decryption across **actual staff devices**, real PTG role authorization, inactive/revoked users, older client drafts, photo operations, and physical printing are **still outstanding**. The canary confirms Google Drive API and server-side ciphertext transport, not a full end-to-end authenticated editor workflow.
