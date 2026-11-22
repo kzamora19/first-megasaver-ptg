@@ -1,0 +1,44 @@
+name: Isolated Studio synthetic Auth acceptance (NEVER production)
+on:
+  push:
+    branches: [feature/staging-synthetic-auth-acceptance-20261122]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type exactly staging-only (isolated synthetic users, cleaned after test)"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  validate-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Verify safe synthetic account project guard (no credentials)
+        run: |
+          node --check tests/studio-staging-synthetic-auth.mjs
+          node --test tests/studio-staging-synthetic-auth.test.mjs
+  full-hosted-acceptance:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'staging-only' && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: "1"
+      STUDIO_HOSTED_TEST_MODE: "full"
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Install pinned Supabase client in ephemeral runner
+        run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
+      - name: Create synthetic accounts, verify BOTH Studios and revocation, always clean up
+        run: node tests/studio-staging-synthetic-auth.mjs
