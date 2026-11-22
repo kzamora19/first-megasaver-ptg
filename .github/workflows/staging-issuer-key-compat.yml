@@ -14,6 +14,8 @@ jobs:
         with: {node-version: '22'}
       - name: Test new and legacy Supabase key resolution
         run: node --test tests/studio-supabase-keys.test.mjs
+      - name: Install pinned Supabase SDK for Deno node_modules resolution
+        run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
       - uses: denoland/setup-deno@v2
         with: {deno-version: v2.x}
       - name: Typecheck PTG Studio authorization Edge Function
