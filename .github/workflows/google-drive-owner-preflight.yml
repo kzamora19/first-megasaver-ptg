@@ -1,0 +1,20 @@
+name: Read-only owner Google Drive authorization preflight
+on:
+  push:
+    branches: [feature/studio-gateway-pages-refresh-20261121]
+    paths:
+      - "tests/studio-owner-drive-preflight.mjs"
+      - ".github/workflows/google-drive-owner-preflight.yml"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  verify-owner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Verify approved owner Google refresh and Drive API without listing file metadata
+        run: node tests/studio-owner-drive-preflight.mjs
