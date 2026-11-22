@@ -57,9 +57,21 @@ export async function runFixtureAcceptance(env,createClient) {
       p_auth_email:email
     });
     if(profileError)throw Error("Cannot create synthetic PTG profile: "+profileError.code);
-    const {error:activationError}=await admin.from("user_profiles")
-      .update({must_change_password:false}).eq("id",data.user.id);
-    if(activationError)throw Error("Cannot activate synthetic profile: "+activationError.code);
+    // The production provisioning RPC deliberately starts at PENDING/inactive.
+    // A synthetic CI user must explicitly complete activation, without altering
+    // any production onboarding or bypassing Studio authorization checks.
+    const {data:activated,error:activationError}=await admin.from("user_profiles")
+      .update({
+        is_active:true,
+        must_change_password:false,
+        invitation_status:"ACTIVATED",
+        activated_at:new Date().toISOString()
+      }).eq("id",data.user.id)
+      .select("is_active,must_change_password,invitation_status").single();
+    if(activationError||activated?.is_active!==true||
+       activated?.must_change_password!==false||
+       activated?.invitation_status!=="ACTIVATED")
+      throw Error("Cannot complete isolated synthetic profile activation: "+(activationError?.code??"state mismatch"));
     const now=Date.now();
     const {data:appSession,error:sessionError}=await admin.from("app_sessions")
       .insert({
