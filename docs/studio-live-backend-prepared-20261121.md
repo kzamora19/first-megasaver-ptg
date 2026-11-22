@@ -90,3 +90,15 @@ After OAuth/client and Google Drive API activation, a single-use GitHub-OIDC-att
 - The test attempted to delete only each freshly written synthetic file; no cleanup failure was reported. It never deleted any older owner file. The designated central folder may remain in Google Drive for normal future backups.
 - The one-time test Edge function is now **disabled (410, verify_jwt=true)** and the temporary GitHub Action and runner files were removed after passing.
 - Existing Studio encrypted project UI and decryption across **actual staff devices**, real PTG role authorization, inactive/revoked users, older client drafts, photo operations, and physical printing are **still outstanding**. The canary confirms Google Drive API and server-side ciphertext transport, not a full end-to-end authenticated editor workflow.
+
+
+## Additive live Pages test launchers — 22 November 2026 (NO FULL CUTOVER)
+
+A controlled, non-destructive Pages deployment has completed successfully:
+- MegaFrame `main` commit `4c4c4ebcde2ef6921d14db23af933de3b1fecbdf` added only `studio/{index.html,launch.js,draft-vault.js,central-drive.js}` and a copy step in `scripts/build_pages_site.py`. Root editor/PWA remains public and byte-for-byte unchanged. [Deploy run 44980279851](https://github.com/kzamora19/megaframe-studio/actions/runs/44980279851) succeeded.
+- MegaFlyer `main` commit `61463a196176ca5d8214da9f553b4e36bf819cb3` added only four files under `site/studio/`; original editor files were untouched. [Deploy run 44980327956](https://github.com/kzamora19/flyer-studio/actions/runs/44980327956) succeeded.
+- PTG production GitHub Pages branch `migration/github-pages` commit `5518c0f87ae8825fb69fdd43735555a7a2e18a3d` added only the `app/studios/page.tsx` portal and protected endpoint URLs in the existing Pages build environment. It did not publish unified Branchline navigation or retire old editor routes. [Deploy run 44980413172](https://github.com/kzamora19/first-megasaver-ptg/actions/runs/44980413172) succeeded.
+- [Live HTTP smoke run 44980539481](https://github.com/kzamora19/first-megasaver-ptg/actions/runs/44980539481) confirmed HTTP 200 for PTG portal, both secured launcher URLs and their JS, and both original editor URLs. It verified that original editors were not replaced. Additional unsigned Chromium gate is in progress separately.
+- The live **test** URL is `https://kzamora19.github.io/first-megasaver-ptg/studios/`. PTG Team Leader or higher must authenticate using their **existing** account; public/direct users cannot redeem a private ticket.
+
+**Important:** This is a limited LIVE TEST ROUTE, not the synchronized Branchline four-app public release. Old direct public editor URLs remain available as before; do not represent them as gated until atomic source-retirement cutover is approved. Real PTG user flows, saved project restoration on devices, force logout, printers and legacy browser storage migration remain release blockers. No production account, customer file, PWA draft or Supabase user table was modified by the additive Pages commits.
