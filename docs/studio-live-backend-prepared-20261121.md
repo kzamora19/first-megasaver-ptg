@@ -67,3 +67,13 @@ Use https://supabase.com/dashboard/project/tzklsscoiwnmeantcefw/functions/secret
 > The historical GitHub migration filenames differ from the version IDs produced by the Supabase migration connector; reconcile migration history before running automated `db push` against PTG.
 
 Security reference: https://supabase.com/docs/guides/functions/secrets
+
+
+## Live Google OAuth verification — 22 November 2026
+
+- The user confirmed completing Google Drive API activation in the correct Google Cloud project and saving matching OAuth client credentials and refresh token in PTG Edge Secrets.
+- A signed, read-only Google Drive verification on the deployed PTG backend returned **HTTP 200**, status `google_owner_authorized_and_drive_api_ready`.
+- The diagnostic checked that Google's refresh-token endpoint issued an access token, that Drive `about.get` returned the **approved owner address**, and that the Drive `files.list` endpoint was callable. It did not download, modify, create or upload any Drive file.
+- The one-time diagnostic Edge endpoint was subsequently **disabled (HTTP 410, JWT required)** and its GitHub Action workflow and runner script removed from the development PR.
+- **Important:** This confirms OAuth and API connectivity, not successful encrypted `centralDriveOperation` writes, restores, cross-device decryption, or long-term token persistence. Google External Testing mode can cause refresh-token expiry; verify OAuth publishing status before relying on permanent backups.
+- The production user-facing Branchline/PTG/Studio release remains on HOLD until real PTG-role sign-in, permission revocation, project migration/restore, photo privacy, PNG/PDF export and printing tests pass. Four development PRs remain unmerged.
