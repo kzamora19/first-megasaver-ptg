@@ -1,4 +1,4 @@
-/* Official navigation candidate: app rail outermost; existing workspace hamburger independent. */
+/* Official navigation: app rail outermost; existing workspace hamburger independent. */
 .ptg-unified-host{--ptg-outer-rail:78px;padding-left:var(--ptg-outer-rail);position:relative;min-height:100dvh}
 .ptg-universal-app-rail{position:fixed;z-index:41;inset:0 auto 0 0;width:var(--ptg-outer-rail);
  background:linear-gradient(180deg,#0d3466,#082853);border-right:1px solid #2b5687;
@@ -52,4 +52,25 @@
 @media print{
  .ptg-unified-host{padding-left:0;min-height:0}
  .ptg-universal-app-rail,.ptg-official-mobile-logo,.ptg-universal-drawer-backdrop{display:none!important}
+}
+
+/* Windows Workspace directive: ☰ owns the PTG workspace sidebar on desktop,
+   while the fixed left application rail is never hidden. */
+@media(min-width:721px){
+ .ptg-unified-host .ptg-sidebar-header{display:flex;align-items:center;flex-direction:column;gap:9px}
+ .ptg-unified-host .ptg-menu-toggle{display:grid;place-items:center;align-self:flex-end;
+   width:42px;height:42px;flex:0 0 42px;cursor:pointer;border:1px solid #79b9ee;
+   border-radius:9px;background:#123e73;color:#fff;font-size:23px;line-height:1}
+ .ptg-unified-host .ptg-menu-toggle:hover{border-color:#0dd9eb;background:#184e89}
+ .ptg-unified-host .ptg-app.ptg-workspace-collapsed{grid-template-columns:62px minmax(0,1fr)}
+ .ptg-unified-host .ptg-workspace-collapsed .ptg-sidebar{padding:12px 8px}
+ .ptg-unified-host .ptg-workspace-collapsed .ptg-sidebar-header .ptg-brand,
+ .ptg-unified-host .ptg-workspace-collapsed .ptg-sidebar-content{display:none}
+ .ptg-unified-host .ptg-workspace-collapsed .ptg-menu-toggle{align-self:center}
+}
+.ptg-unified-host .ptg-menu-toggle:focus-visible{outline:3px solid #0dd9eb;outline-offset:2px}
+@media(max-width:720px){
+ .ptg-unified-host .ptg-app.ptg-workspace-collapsed{grid-template-columns:1fr}
+ .ptg-unified-host .ptg-workspace-collapsed .ptg-sidebar-header .ptg-brand{display:block}
+ .ptg-unified-host .ptg-workspace-collapsed .ptg-sidebar[data-menu-open="true"] .ptg-sidebar-content{display:flex}
 }

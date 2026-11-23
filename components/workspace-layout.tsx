@@ -16,21 +16,29 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   const [openOnPath, setOpenOnPath] = useState<string | null>(null);
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [desktopMode, setDesktopMode] = useState(false);
   const query = useSearchParams();
   const router = useRouter();
   const desk = path === "/data-desk" || (deskTools.has(path) && query.get("workspace") === "data-desk");
   const open = openOnPath === path;
   const home = session.role === "SYSTEM_ADMIN" ? "/admin/accounts/" : "/products/";
   const BrandLink = desk ? "a" : Link;
-  const activeApp = desk ? "data-desk" : "price-tag-generator";
+  // Data Desk is a PTG workspace tool, not a fifth Branchline application.
+  const activeApp = "price-tag-generator";
   const apps = [
     {id:"price-tag-generator",name:"Price Tag Generator",label:"PTG",href:withBasePath("/products/")},
     {id:"sales-tracker",name:"Sales Tracker",label:"Sales",href:"/branchline/"},
-    ...(session.role === "SYSTEM_ADMIN" ? [{id:"data-desk",name:"Data Desk",label:"Data",href:withBasePath("/data-desk/")}] : []),
     {id:"megaframe-studio",name:"MegaFrame Studio",label:"Frame",href:withBasePath("/studios/?studio=megaframe")},
     {id:"flyer-studio",name:"MegaFlyer Studio",label:"Flyer",href:withBasePath("/studios/?studio=flyer")}
   ];
   const toggleAppMenu = () => {setOpenOnPath(null);setAppMenuOpen(value=>!value);};
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 721px)");
+    const update = () => setDesktopMode(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
   useEffect(()=>{
     const key=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;if(appMenuOpen){event.preventDefault();setAppMenuOpen(false);}else if(openOnPath===path){event.preventDefault();setOpenOnPath(null);}};
     document.addEventListener("keydown",key);
@@ -63,7 +71,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>
       </a>)}
     </nav>
-    <div className="ptg-app">
+    <div className={"ptg-app" + (railCollapsed ? " ptg-workspace-collapsed" : "")}>
     <aside className={"ptg-sidebar ptg-print-hide" + (railCollapsed && !desk ? " ptg-sidebar-compact" : "")} data-menu-open={open}>
       <div className="ptg-sidebar-header">
         <button type="button" className="ptg-official-mobile-logo" aria-label={appMenuOpen?"Close application list":"Open application list"}
@@ -77,16 +85,17 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
             <small>{desk ? "DATA DESK" : "PRICE TAG GENERATOR"}</small>
           </span>
         </BrandLink>
-        <button className="ptg-menu-toggle" type="button" aria-label={open ? "Close workspace menu" : "Open workspace menu"}
-          aria-expanded={open} aria-controls="ptg-workspace-links" onClick={() => {setAppMenuOpen(false);setOpenOnPath(open ? null : path);}}>
+        <button className="ptg-menu-toggle" type="button"
+          aria-label={(desktopMode ? !railCollapsed : open) ? "Close workspace menu" : "Open workspace menu"}
+          aria-expanded={desktopMode ? !railCollapsed : open} aria-controls="ptg-workspace-links"
+          onClick={() => {
+            setAppMenuOpen(false);
+            if (desktopMode) setRailCollapsed(value => !value);
+            else setOpenOnPath(open ? null : path);
+          }}>
           <span aria-hidden="true">☰</span>
         </button>
       </div>
-      {!desk && <button className="ptg-desktop-collapse" type="button"
-        aria-label={railCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
-        aria-expanded={!railCollapsed} aria-controls="ptg-workspace-links"
-        title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        onClick={() => setRailCollapsed(value => !value)}><span aria-hidden="true">{railCollapsed ? "»" : "«"}</span><span className="ptg-collapse-label">{railCollapsed ? "Expand" : "Collapse"}</span></button>}
       <div className="ptg-sidebar-content" id="ptg-workspace-links">
         <div className="ptg-sidebar-menu">
           <div className="ptg-nav-label">{desk ? "IMPORT TOOLS" : "WORKSPACE"}</div>
