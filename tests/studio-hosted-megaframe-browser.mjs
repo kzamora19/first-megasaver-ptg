@@ -7,7 +7,6 @@ import {runFixtureAcceptance} from './studio-staging-synthetic-auth.mjs';
 const origin = 'https://branchline-staging.github.io';
 const backend = 'https://rlfdvmiqkbitetatxkju.supabase.co';
 const title = 'Browser staging frame ' + randomBytes(6).toString('hex');
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jz1sAAAAASUVORK5CYII=', 'base64');
 
 async function openFrame(browser, account) {
   const context = await browser.newContext({serviceWorkers:'block'});
@@ -41,6 +40,16 @@ await runFixtureAcceptance({
   try {
     const first = await openFrame(browser, account);
     await first.editor.getByRole('button',{name:/Create New Project/}).click();
+    const dataUrl = await first.page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#2557dd';
+      ctx.fillRect(0, 0, 64, 64);
+      return canvas.toDataURL('image/png');
+    });
+    const png = Buffer.from(dataUrl.split(',')[1], 'base64');
     await first.editor.locator('#photosInput').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:png});
     await first.editor.getByText(/1 photo/i).first().waitFor();
     await first.editor.locator('#pinNav button[data-panel="0"]').click();
@@ -49,7 +58,7 @@ await runFixtureAcceptance({
     await first.editor.locator('#actionModalConfirm').click();
     await first.editor.locator('#projectSaveStatus').getByText(title,{exact:false}).waitFor();
     await first.page.locator('#cloudRefresh').click();
-    await first.page.locator('#cloudLocalProject option').getByText(title,{exact:true}).waitFor({state:'attached'});
+    await first.page.locator('#cloudLocalProject option').filter({hasText:title}).waitFor({state:'attached'});
     await first.page.locator('#cloudLocalProject').selectOption({label:title});
     await first.page.locator('#cloudBackup').click();
     await first.page.getByText(/Encrypted backup saved/).waitFor();
