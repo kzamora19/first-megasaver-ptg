@@ -73,6 +73,29 @@ try {
   await page.locator(".ptg-official-mobile-logo").click();
   assert.equal(await page.locator("#ptg-universal-app-drawer").isVisible(),false);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),true);
+  // Verify the shared navigation also renders for a real PTG role shape
+  // below System Admin, while the PTG workspace menu keeps its own role gate.
+  account.role="BRANCH_USER";
+  account.legacyRole="TEAM LEADER";
+  account.branchCode="STG";
+  account.branchName="Santiago";
+  const teamLeader=await context.newPage();
+  teamLeader.on("pageerror",error=>failures.push(error.message));
+  await teamLeader.goto(root,{waitUntil:"domcontentloaded"});
+  await teamLeader.locator(".ptg-universal-app-rail").waitFor({state:"visible"});
+  assert.equal(await teamLeader.locator(".ptg-universal-app-rail .ptg-official-app-choice").count(),4);
+  assert.equal(await teamLeader.locator('nav[aria-label="Workspace"] a[title="Creative Studios"]').count(),1);
+  assert.equal(await teamLeader.locator('nav[aria-label="Workspace"] a[title="Account Administration"]').count(),0);
+  await teamLeader.screenshot({path:join(out,"ptg-team-leader-desktop.png"),fullPage:true});
+  await teamLeader.close();
+  account.legacyRole="BRANCH USER";
+  const branchUser=await context.newPage();
+  branchUser.on("pageerror",error=>failures.push(error.message));
+  await branchUser.goto(root,{waitUntil:"domcontentloaded"});
+  await branchUser.locator(".ptg-universal-app-rail").waitFor({state:"visible"});
+  assert.equal(await branchUser.locator('nav[aria-label="Workspace"] a[title="Creative Studios"]').count(),0);
+  await branchUser.close();
+
   assert.deepEqual(failures,[]);
-  console.log("PASS: PTG authorized synthetic preview four-app rail, independent drawers, Studio destinations and screenshots");
+  console.log("PASS: PTG synthetic System Admin, Team Leader and Branch User desktop/mobile app rail, workspace role restrictions, secure Studio URLs and screenshots");
 }finally{await browser.close();}
