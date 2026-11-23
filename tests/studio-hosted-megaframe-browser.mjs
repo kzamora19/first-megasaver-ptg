@@ -70,6 +70,17 @@ await runFixtureAcceptance({
   const browser = await chromium.launch();
   try {
     const flyer = await openStudio(browser, account, 'MegaFlyer');
+    await flyer.editor.locator('#studioNav [data-nav="review"]').click();
+    const [flyerDownload] = await Promise.all([
+      flyer.page.waitForEvent('download',{timeout:90000}),
+      flyer.editor.locator('#png').click()
+    ]);
+    const flyerPng = await readFile(await flyerDownload.path());
+    assert.equal(flyerPng.subarray(0,8).toString('hex'), '89504e470d0a1a0a');
+    const flyerWidth = flyerPng.readUInt32BE(16);
+    const flyerHeight = flyerPng.readUInt32BE(20);
+    assert.ok(flyerWidth >= 2000 && flyerHeight >= 2800, 'Expected full-resolution Flyer PNG');
+    console.log(`PASS: actual staging MegaFlyer exported a PNG (${flyerWidth} × ${flyerHeight})`);
     await flyer.context.close();
     const first = await openStudio(browser, account);
     await first.editor.getByRole('button',{name:/Create New Project/}).click();
