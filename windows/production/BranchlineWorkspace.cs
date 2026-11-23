@@ -206,48 +206,27 @@ internal sealed class BranchlineWorkspace : Form
 		{
 			Graphics graphics = e.Graphics;
 			graphics.Clear(Navy);
+			if (Width < 3 || Height < 3) return;
 			graphics.SmoothingMode = SmoothingMode.AntiAlias;
+			graphics.CompositingQuality = CompositingQuality.HighQuality;
 			graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
 			graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-			if (base.Width < 3 || base.Height < 3)
-			{
-				return;
-			}
 			if (Selected || (Focused && ShowFocusCues))
 			{
-				using Pen pen = new Pen((Focused && ShowFocusCues) ? Color.White : Cyan);
-				graphics.DrawRectangle(pen, 2, 1, base.Width - 5, base.Height - 3);
+				using Pen pen = new Pen((Focused && ShowFocusCues) ? Cyan : Color.FromArgb(38, 185, 213), 1.5f);
+				graphics.DrawRectangle(pen, 1.5f, 1.5f, Width - 3f, Height - 3f);
 			}
-			bool isBrand = base.AccessibleName == "Toggle current application workspace menu";
-			int maxIcon = isBrand ? 59 : 62;
-			int num = Math.Min(maxIcon, Math.Min(base.Height - 12, base.Width - 12));
-			if (num > 0)
+			// Draw the COMPLETE 360px icon; the source PNGs have already had their
+			// white matte removed. Never crop or clip their text or rounded corners.
+			int inset = Math.Max(4, (int)Math.Ceiling((double)DeviceDpi / 96 * 5));
+			int size = Math.Max(0, Math.Min(Height - 2 * inset, Width - 2 * inset));
+			if (size > 0)
 			{
-				int y = ((shortLabel.Length == 0) ? ((base.Height - num) / 2) : 5);
-				Rectangle destRect = new Rectangle((base.Width - num) / 2, y, num, num);
-				GraphicsState gstate = graphics.Save();
-				using (GraphicsPath graphicsPath = new GraphicsPath())
-				{
-					int num2 = Math.Max(2, num / 4);
-					int x = destRect.X;
-					int y2 = destRect.Y;
-					int x2 = destRect.Right - num2;
-					int y3 = destRect.Bottom - num2;
-					graphicsPath.AddArc(x, y2, num2, num2, 180f, 90f);
-					graphicsPath.AddArc(x2, y2, num2, num2, 270f, 90f);
-					graphicsPath.AddArc(x2, y3, num2, num2, 0f, 90f);
-					graphicsPath.AddArc(x, y3, num2, num2, 90f, 90f);
-					graphicsPath.CloseFigure();
-					graphics.SetClip(graphicsPath);
-					graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-					int num3 = Math.Max(1, icon.Width / 28);
-					graphics.DrawImage(icon, destRect, new Rectangle(num3, num3, icon.Width - 2 * num3, icon.Height - 2 * num3), GraphicsUnit.Pixel);
-				}
-				graphics.Restore(gstate);
-				if (shortLabel.Length != 0)
-					TextRenderer.DrawText(graphics, shortLabel, Font, new Rectangle(0, num + 5, base.Width, base.Height - num - 5), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+				Rectangle destination = new Rectangle((Width - size) / 2, (Height - size) / 2, size, size);
+				graphics.DrawImage(icon, destination, 0, 0, icon.Width, icon.Height, GraphicsUnit.Pixel);
 			}
 		}
+
 	}
 
 	private const string Origin = "https://kzamora19.github.io";
@@ -305,17 +284,23 @@ internal sealed class BranchlineWorkspace : Form
 
 	private readonly Image megasaverHeaderImage;
 
+	private readonly Image brandWordartImage;
+
 	private readonly PictureBox megasaverHeader = new PictureBox();
 
 	private readonly Label activeTitle = new Label();
 
-	private readonly Label brandTitle = new Label();
+	private readonly PictureBox brandWordart = new PictureBox();
 
 	private string frameScript;
 
 	private readonly string themeScript;
 
 	private readonly string salesImportScript;
+
+	private readonly string studioMenuScript;
+
+	private readonly Dictionary<WebView2, List<CoreWebView2Frame>> studioFrames = new Dictionary<WebView2, List<CoreWebView2Frame>>();
 
 	private bool ready;
 
@@ -382,6 +367,11 @@ internal sealed class BranchlineWorkspace : Form
 			using Image original = Image.FromStream(stream);
 			wordmark = new Bitmap(original);
 		}
+		using (Stream stream = executingAssembly.GetManifestResourceStream("BranchlineWordartFull.png"))
+		{
+			using Image original = Image.FromStream(stream);
+			brandWordartImage = new Bitmap(original);
+		}
 		using (Stream stream = executingAssembly.GetManifestResourceStream("FirstMegasaverHeader.png"))
 		{
 			using Image original = Image.FromStream(stream);
@@ -399,6 +389,11 @@ internal sealed class BranchlineWorkspace : Form
 			wordmark.Save(memoryStream, ImageFormat.Png);
 			themeScript = streamReader.ReadToEnd().Replace("BRANCHLINE_WORDMARK", Convert.ToBase64String(memoryStream.ToArray()));
 		}
+		using (Stream stream = executingAssembly.GetManifestResourceStream("StudioWorkspaceMenu.js"))
+		{
+			using StreamReader streamReader = new StreamReader(stream);
+			studioMenuScript = streamReader.ReadToEnd();
+		}
 		using (Stream stream = executingAssembly.GetManifestResourceStream("OpenSalesImport.js"))
 		{
 			using StreamReader streamReader = new StreamReader(stream);
@@ -411,20 +406,20 @@ internal sealed class BranchlineWorkspace : Form
 		shell.RowCount = 2;
 		shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0f));
 		shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-		shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 84f));
+		shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 94f));
 		shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 		base.Controls.Add(shell);
 		Panel panel = new Panel
 		{
 			Dock = DockStyle.Fill,
 			Margin = Padding.Empty,
-			Padding = new Padding(5, 4, 10, 4),
+			Padding = new Padding(6, 5, 9, 5),
 			BackColor = Navy
 		};
 		menu.Text = "";
 		menu.AccessibleName = "Toggle current application workspace menu";
-		menu.Size = new Size(77, 76);
-		menu.Width = 77;
+		menu.Size = new Size(86, 82);
+		menu.Width = 86;
 		menu.Dock = DockStyle.Left;
 		menu.ForeColor = Color.White;
 		menu.BackColor = Navy;
@@ -435,15 +430,13 @@ internal sealed class BranchlineWorkspace : Form
 			menuOpen = !menuOpen;
 			LayoutRail();
 		};
-		brandTitle.Text = "BRANCHLINE";
-		brandTitle.ForeColor = Color.White;
-		brandTitle.BackColor = Navy;
-		brandTitle.Font = new Font("Segoe UI", 12f, FontStyle.Bold);
-		brandTitle.TextAlign = ContentAlignment.MiddleLeft;
-		brandTitle.Dock = DockStyle.Left;
-		brandTitle.Width = 150;
-		brandTitle.Padding = new Padding(1, 0, 0, 0);
-		brandTitle.AccessibleName = "Branchline brand";
+		brandWordart.Image = brandWordartImage;
+		brandWordart.BackColor = Navy;
+		brandWordart.SizeMode = PictureBoxSizeMode.Zoom;
+		brandWordart.Dock = DockStyle.Left;
+		brandWordart.Width = 288;
+		brandWordart.Padding = new Padding(5, 6, 12, 3);
+		brandWordart.AccessibleName = "Branchline full wordmark, blue dot and cyan curved underline";
 		Panel headingHost = new Panel { Dock = DockStyle.Fill, BackColor = Navy };
 		megasaverHeader.Image = megasaverHeaderImage;
 		megasaverHeader.SizeMode = PictureBoxSizeMode.Zoom;
@@ -471,7 +464,7 @@ internal sealed class BranchlineWorkspace : Form
 		rail.BackColor = Navy;
 		rail.Margin = Padding.Empty;
 		rail.Padding = Padding.Empty;
-		rail.Width = 336;
+		rail.Width = 354;
 		rail.ColumnCount = 4;
 		rail.RowCount = 1;
 		rail.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -487,7 +480,7 @@ internal sealed class BranchlineWorkspace : Form
 		}
 		panel.Controls.Add(headingHost);
 		panel.Controls.Add(rail);
-		panel.Controls.Add(brandTitle);
+		panel.Controls.Add(brandWordart);
 		panel.Controls.Add(menu);
 		shell.Controls.Add(panel, 0, 0);
 		shell.SetColumnSpan(panel, 2);
@@ -527,6 +520,7 @@ internal sealed class BranchlineWorkspace : Form
 			sessionWatch.Dispose();
 			wordmark.Dispose();
 			megasaverHeaderImage.Dispose();
+			brandWordartImage.Dispose();
 		};
 		LayoutRail();
 	}
@@ -546,8 +540,9 @@ internal sealed class BranchlineWorkspace : Form
 		// only the CURRENT application's menu, never the application selector.
 		shell.ColumnStyles[0].Width = 0;
 		rail.Visible = true;
-		rail.Width = flag ? 232 : 336;
-		brandTitle.Visible = !flag && base.ClientSize.Width * 96 >= 960 * base.DeviceDpi;
+		rail.Width = flag ? 276 : 354;
+		brandWordart.Visible = base.ClientSize.Width * 96 >= 1040 * base.DeviceDpi;
+		brandWordart.Width = base.ClientSize.Width * 96 >= 1320 * base.DeviceDpi ? 300 : 245;
 		UpdateHeader();
 		for (int i = 0; i < tabs.Length; i++)
 		{
@@ -564,9 +559,10 @@ internal sealed class BranchlineWorkspace : Form
 
 	private void UpdateHeader()
 	{
-		bool ptgActive = selected == 1 || selected == 2;
-		megasaverHeader.Visible = ptgActive;
-		activeTitle.Visible = !ptgActive;
+		// 1st Megasaver is the shared organizational identity for ALL four apps.
+		// Transparent artwork sits directly on the opaque navy native header.
+		megasaverHeader.Visible = true;
+		activeTitle.Visible = false;
 		activeTitle.Text = selected switch
 		{
 			0 => "Sales Tracker",
@@ -575,7 +571,7 @@ internal sealed class BranchlineWorkspace : Form
 			_ => "Price Tag Generator"
 		};
 		// Shorter window widths never squeeze app icons onto the active heading.
-		megasaverHeader.Padding = new Padding(8, 4, 8, 4);
+		megasaverHeader.Padding = new Padding(5, 9, 5, 9);
 	}
 
 	private async Task ApplyFrameTheme(CoreWebView2Frame frame)
@@ -607,8 +603,16 @@ internal sealed class BranchlineWorkspace : Form
 		{
 			await view.CoreWebView2.ExecuteScriptAsync("(() => { const value = '" + state + "'; document.documentElement.dataset.branchlineMenu = value; try { const frame = document.getElementById('branchline-native-data-desk'); if (frame?.contentDocument?.documentElement) frame.contentDocument.documentElement.dataset.branchlineMenu = value; } catch {} })()");
 		}
-		catch (Exception)
+		catch (Exception) { }
+		if (studioFrames.TryGetValue(view, out var frames))
 		{
+			// Authorized sandboxed editors keep their own state and storage;
+			// the native shell only tells their existing menu whether to show.
+			foreach (CoreWebView2Frame frame in frames.ToArray())
+			{
+				try { await frame.ExecuteScriptAsync("document.documentElement.dataset.blNativeMenu='" + state + "';"); }
+				catch (Exception) { frames.Remove(frame); }
+			}
 		}
 	}
 
@@ -815,6 +819,22 @@ internal sealed class BranchlineWorkspace : Form
 		core.Settings.IsWebMessageEnabled = false;
 		core.Settings.IsPasswordAutosaveEnabled = true;
 		await core.AddScriptToExecuteOnDocumentCreatedAsync(themeScript);
+		await core.AddScriptToExecuteOnDocumentCreatedAsync(studioMenuScript);
+		studioFrames[view] = new List<CoreWebView2Frame>();
+		core.FrameCreated += delegate(object sender, CoreWebView2FrameCreatedEventArgs args)
+		{
+			CoreWebView2Frame frame = args.Frame;
+			studioFrames[view].Add(frame);
+			frame.DOMContentLoaded += async delegate
+			{
+				try
+				{
+					await frame.ExecuteScriptAsync(studioMenuScript);
+					await frame.ExecuteScriptAsync("document.documentElement.dataset.blNativeMenu='" + (menuOpen ? "open" : "closed") + "';");
+				}
+				catch (Exception) { /* frame can be destroyed during secure reauthorization */ }
+			};
+		};
 		string launchUrl = StudioPortal(view);
 		core.NavigationStarting += delegate(object sender, CoreWebView2NavigationStartingEventArgs args)
 		{
