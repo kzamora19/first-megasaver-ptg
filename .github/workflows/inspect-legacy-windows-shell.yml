@@ -79,3 +79,26 @@ jobs:
           name: portable-linux-exact-exe-decompiler
           path: /tmp/ilspy-standalone/
           retention-days: 2
+
+  legacy-windows-framework-references:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gather framework references used by installed production executable
+        shell: pwsh
+        run: |
+          $framework = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
+          if (!(Test-Path $framework)) { throw "Missing .NET Framework reference assemblies: $framework" }
+          $dest = Join-Path $env:RUNNER_TEMP 'legacy-framework-references'
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Get-ChildItem -Path $framework -Filter '*.dll' | Copy-Item -Destination $dest
+          Expand-Archive -LiteralPath 'public/branchline-workspace-windows.zip' -DestinationPath (Join-Path $env:RUNNER_TEMP 'published-original') -Force
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'published-original\Microsoft.Web.WebView2.WinForms.dll') $dest
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'published-original\Microsoft.Web.WebView2.Core.dll') $dest
+          Write-Host ('Copied {0} framework references' -f (Get-ChildItem $dest -Filter '*.dll').Count)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-framework-references
+          path: ${{ runner.temp }}/legacy-framework-references/
+          retention-days: 2
