@@ -27,6 +27,7 @@ try {
   // The synthetic screenshot test never accesses production Supabase, real
   // accounts, or third-party credentials.
   await context.route("**/*.supabase.co/**",async route=>{
+    if (route.request().url().includes("/functions/v1/ptg-auth")) return route.fallback();
     return route.fulfill({status:403,contentType:"application/json",
       headers:{"access-control-allow-origin":"*"},
       body:JSON.stringify({ok:false,message:"Staging screenshot only"})});
@@ -36,7 +37,11 @@ try {
   page.on("pageerror",error=>failures.push(error.message));
   await page.setViewportSize({width:1440,height:900});
   await page.goto(root,{waitUntil:"domcontentloaded"});
-  await page.locator(".ptg-universal-app-rail").waitFor({state:"visible"});
+  await page.locator(".ptg-universal-app-rail").waitFor({state:"visible"}).catch(async error=>{
+    console.log("SYNTHETIC_LOGIN_DIAG:",await page.locator("body").innerText().catch(()=>""),errors=failures);
+    await page.screenshot({path:join(out,"ptg-screenshot-diagnostic.png"),fullPage:true});
+    throw error;
+  });
   assert.equal(await page.locator(".ptg-universal-app-rail .ptg-official-app-choice").count(),4);
   const desktopNames=await page.locator(".ptg-universal-drawer-link").allTextContents();
   assert.deepEqual(desktopNames,["Price Tag Generator","Sales Tracker","MegaFrame Studio","MegaFlyer Studio"]);
