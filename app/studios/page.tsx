@@ -8,14 +8,18 @@ import {createClient} from "@/lib/supabase/client";
 import {getPtgAppSessionId, invokePtgAuth} from "@/lib/ptg/auth-client";
 
 type Studio = "megaframe"|"flyer";
+const isStudioStaging = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ===
+  "https://rlfdvmiqkbitetatxkju.supabase.co";
 // Build-time URLs only. No guessed protected host or public-editor fallback.
 function studioLaunchUrl(raw:string|undefined,studio:Studio){
   if(!raw)return "";
+  const path=studio==="megaframe"?"/megaframe-studio/studio/":"/flyer-studio/studio/";
+  // The isolated backend can only launch a Studio on the current browser origin.
+  if(isStudioStaging)return raw===path?path:"";
   try {
     const target=new URL(raw);
     // Fail closed if a release accidentally points at the still-public editor
     // root, an external host, a wrong Studio, or any unapproved preview URL.
-    const path=studio==="megaframe"?"/megaframe-studio/studio/":"/flyer-studio/studio/";
     if(target.protocol!=="https:"||target.origin!=="https://kzamora19.github.io"||
        target.pathname!==path||target.username||target.password||
        target.hash||target.search)return "";
@@ -56,6 +60,8 @@ export default function StudioLaunchPage(){
     setBusy(studio);setMessage("");
     try{
       if(!destinations[studio].url)throw Error("Secure Studio destination has not been configured.");
+      if(isStudioStaging&&(window.location.protocol!=="https:"||window.location.hostname==="kzamora19.github.io"))
+        throw Error("Studio staging requires its own HTTPS origin.");
       // Reverify the existing PTG account immediately before issuing the ticket.
       const check=await invokePtgAuth("session");
       if(!check.account||!allowedRole(check.account))

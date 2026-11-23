@@ -32,9 +32,10 @@ jobs:
       NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES: "false"
 
       NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES: "true"
-      # Controlled protected-access test routes; existing editors remain published.
-      NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: https://kzamora19.github.io/megaframe-studio/studio/
-      NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: https://kzamora19.github.io/flyer-studio/studio/
+      # Creative Studios are disabled in routine builds. Only the owner-authorized
+      # coordinated Pages dispatch embeds protected launch destinations.
+      NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/migration/github-pages' && vars.PTG_STUDIOS_CUTOVER_APPROVED == 'true' && 'https://kzamora19.github.io/megaframe-studio/studio/' || '' }}
+      NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/migration/github-pages' && vars.PTG_STUDIOS_CUTOVER_APPROVED == 'true' && 'https://kzamora19.github.io/flyer-studio/studio/' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +57,10 @@ jobs:
           path: ./out
 
   deploy:
+    # Do not auto-publish PTG Studio navigation simply because the staged PR is
+    # merged. Release requires a manual dispatch on the production Pages branch
+    # AND an explicit owner-controlled repository variable.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/migration/github-pages' && vars.PTG_STUDIOS_CUTOVER_APPROVED == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
