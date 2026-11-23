@@ -51,7 +51,7 @@ await runFixtureAcceptance({
     });
     const png = Buffer.from(dataUrl.split(',')[1], 'base64');
     await first.editor.locator('#photosInput').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:png});
-    await first.editor.getByText(/1 photo/i).first().waitFor();
+    await first.editor.locator('#photoCount').filter({hasText:/1 photo/i}).waitFor({state:'attached'});
     await first.editor.locator('#pinNav button[data-panel="0"]').click();
     await first.editor.locator('#saveProject').click();
     await first.editor.locator('#actionModalInput').fill(title);
@@ -77,7 +77,7 @@ await runFixtureAcceptance({
     await other.editor.locator('#retrieveStartupProject').click();
     const card = other.editor.locator('#projectList .savedProjectCard').filter({hasText:title});
     await card.getByRole('button',{name:'Open',exact:true}).click();
-    await other.editor.getByText(/1 photo/i).first().waitFor();
+    await other.editor.locator('#photoCount').filter({hasText:/1 photo/i}).waitFor({state:'attached'});
     console.log('PASS: restored the same named MegaFrame project and synthetic photo in a fresh browser context');
   } finally {
     await browser.close();
