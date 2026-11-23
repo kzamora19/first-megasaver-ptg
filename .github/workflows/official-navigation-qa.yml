@@ -1,0 +1,62 @@
+name: PTG official Branchline UI screenshots (NO DEPLOY)
+on:
+  push:
+    branches: [feature/official-navigation-ptg-20261123]
+    paths:
+      - 'components/workspace-layout.tsx'
+      - 'app/official-navigation.css'
+      - 'app/layout.tsx'
+      - 'public/icons/official/**'
+      - 'tests/official-navigation-browser.mjs'
+      - '.github/workflows/official-navigation-qa.yml'
+  pull_request:
+    paths:
+      - 'components/workspace-layout.tsx'
+      - 'app/official-navigation.css'
+      - 'app/layout.tsx'
+      - 'public/icons/official/**'
+      - 'tests/official-navigation-browser.mjs'
+      - '.github/workflows/official-navigation-qa.yml'
+permissions:
+  contents: read
+jobs:
+  synthetic-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      GITHUB_PAGES: "true"
+      NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+      NEXT_PUBLIC_SUPABASE_URL: https://rlfdvmiqkbitetatxkju.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_syntheticUiQa00000000000000
+      NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_ASSETS: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_ACCOUNTS: "true"
+      NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: ""
+      NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Build PTG static export without deployment
+        run: |
+          npm install --ignore-scripts --no-package-lock
+          npm run build
+          test -f out/studios/index.html
+          mkdir -p staging/.official-nav-preview/first-megasaver-ptg
+          cp -a out/. staging/.official-nav-preview/first-megasaver-ptg/
+      - name: Install isolated Chromium for UI mock screenshots
+        run: |
+          npm install --no-save --ignore-scripts --no-package-lock playwright@1.56.1
+          npx playwright install chromium --only-shell
+      - name: Test synthetic account, app rail, permission-neutral drawer and capture screenshots
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory staging/.official-nav-preview >/tmp/ptg-official-ui.log 2>&1 &
+          node tests/official-navigation-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ptg-official-navigation-screenshots
+          path: artifacts/official-navigation/*.png
+          retention-days: 14
+          if-no-files-found: warn
