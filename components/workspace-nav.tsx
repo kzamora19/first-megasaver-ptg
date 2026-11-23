@@ -59,12 +59,18 @@ export default function WorkspaceNav({ role, legacyRole = "", active, desk = fal
     ...(admin ? [["/admin/accounts", "Account Administration"]] : []),
   ];
   return <nav aria-label="Workspace">
-    {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate}
+    {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate} title={label} aria-label={label}
       className={"ptg-nav-item" + (active === path ? " active" : "")}
-      aria-current={active === path ? "page" : undefined}>{label}</Link>)}
-    {studiosAllowed&&<Link href="/studios/" onClick={onNavigate}
+      aria-current={active === path ? "page" : undefined}>
+        <span className="ptg-nav-icon" aria-hidden="true">{path === "/products" ? "⌕" : "⚙"}</span>
+        <span className="ptg-nav-text">{label}</span>
+      </Link>)}
+    {studiosAllowed&&<Link href="/studios/" onClick={onNavigate} title="Creative Studios" aria-label="Creative Studios"
       className={"ptg-nav-item"+(active==="/studios"?" active":"")}
-      aria-current={active==="/studios"?"page":undefined}>Creative Studios</Link>}
+      aria-current={active==="/studios"?"page":undefined}>
+        <span className="ptg-nav-icon" aria-hidden="true">✦</span>
+        <span className="ptg-nav-text">Creative Studios</span>
+      </Link>}
     {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }
