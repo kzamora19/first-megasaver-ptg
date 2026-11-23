@@ -9,7 +9,7 @@ const origin = 'https://branchline-staging.github.io';
 const backend = 'https://rlfdvmiqkbitetatxkju.supabase.co';
 const title = 'Browser staging frame ' + randomBytes(6).toString('hex');
 
-async function openFrame(browser, account) {
+async function openStudio(browser, account, studio = 'MegaFrame') {
   const context = await browser.newContext({serviceWorkers:'block'});
   // The disposable password is entered only on the exact isolated site.
   await context.route('**/*', route => {
@@ -18,18 +18,37 @@ async function openFrame(browser, account) {
       ['about:', 'blob:', 'data:'].includes(destination.protocol)
       ? route.continue() : route.abort();
   });
-  const page = await context.newPage();
-  await page.goto(origin + '/?acceptance=' + randomBytes(6).toString('hex'));
-  assert.equal(new URL(page.url()).origin, origin);
+  const sales = await context.newPage();
+  await sales.goto(origin + '/sales-tracker/?acceptance=' + randomBytes(6).toString('hex'));
+  await sales.getByRole('button',{name:'Open Sales Tracker demo'}).click();
+  await sales.getByText('BRANCHLINE · DEMO DATA',{exact:true}).waitFor();
+  await sales.locator('[data-live-page="apps"]').click();
+  const frameLink = sales.getByRole('link',{name:/^Open MegaFrame Studio/});
+  const flyerLink = sales.getByRole('link',{name:/^Open (?:Mega)?Flyer Studio/});
+  const ptgLink = sales.getByRole('link',{name:/^Open Price Tag Generator/});
+  for (const link of [frameLink, flyerLink, ptgLink]) {
+    assert.equal(new URL(await link.getAttribute('href')).origin, origin);
+  }
+  const [page] = await Promise.all([
+    sales.waitForEvent('popup'),
+    (studio === 'MegaFrame' ? frameLink : flyerLink).click()
+  ]);
+  await page.waitForURL(url => url.origin === origin && url.pathname === '/');
   await page.locator('[name=branchCode]').fill('STG001');
   await page.locator('[name=username]').fill(account.email.split('@')[0]);
   await page.locator('[name=password]').fill(account.password);
   await page.getByRole('button',{name:'Sign in to staging'}).click();
   await page.getByText('Signed in to staging. Choose a Studio.').waitFor();
-  await page.getByRole('button',{name:'Open MegaFrame'}).click();
-  await page.waitForURL(url => url.origin === origin && url.pathname === '/megaframe-studio/studio/');
+  await page.getByRole('button',{name:'Open '+studio}).click();
+  const route = studio === 'MegaFrame' ? '/megaframe-studio/studio/' : '/flyer-studio/studio/';
+  await page.waitForURL(url => url.origin === origin && url.pathname === route);
   const editor = page.frameLocator('#mount iframe');
-  await editor.locator('#startupChoiceDialog[open]').waitFor({timeout:45000});
+  if (studio === 'MegaFrame') {
+    await editor.locator('#startupChoiceDialog[open]').waitFor({timeout:45000});
+  } else {
+    await editor.getByText('Flyer Status: Draft',{exact:true}).waitFor({timeout:45000});
+  }
+  console.log('PASS: Sales Tracker sample workspace → staging PTG sign-in → ' + studio);
   return {context,page,editor};
 }
 
@@ -50,7 +69,9 @@ await runFixtureAcceptance({
 }, createClient, async account => {
   const browser = await chromium.launch();
   try {
-    const first = await openFrame(browser, account);
+    const flyer = await openStudio(browser, account, 'MegaFlyer');
+    await flyer.context.close();
+    const first = await openStudio(browser, account);
     await first.editor.getByRole('button',{name:/Create New Project/}).click();
     const dataUrl = await first.page.evaluate(() => {
       const canvas = document.createElement('canvas');
@@ -82,7 +103,7 @@ await runFixtureAcceptance({
     console.log('PASS: actual staging browser saved the encrypted MegaFrame backup');
     await first.context.close();
 
-    const other = await openFrame(browser, account);
+    const other = await openStudio(browser, account);
     await other.page.locator('#cloudRefresh').click();
     assert.equal(await other.page.locator('#cloudLocalProject option').count(), 0,
       'Fresh browser context must have no local projects before restore');
