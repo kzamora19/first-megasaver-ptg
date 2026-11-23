@@ -54,9 +54,12 @@ export default function WorkspaceNav({ role, active, desk = false, onNavigate }:
     ...(admin ? [["/admin/accounts", "Account Administration"]] : []),
   ];
   return <nav aria-label="Workspace">
-    {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate}
+    {items.map(([path, label]) => <Link key={path} href={path + "/"} onClick={onNavigate} title={label} aria-label={label}
       className={"ptg-nav-item" + (active === path ? " active" : "")}
-      aria-current={active === path ? "page" : undefined}>{label}</Link>)}
+      aria-current={active === path ? "page" : undefined}>
+        <span className="ptg-nav-icon" aria-hidden="true">{path === "/products" ? "⌕" : "⚙"}</span>
+        <span className="ptg-nav-text">{label}</span>
+      </Link>)}
     {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }
