@@ -366,10 +366,6 @@ footer {
   .ptg-sidebar{box-shadow:0 2px 8px #09264f1a;}
   .ptg-workspace-content{width:100%;min-width:0;}
 }
-@media print{
-  .ptg-sidebar,.ptg-menu-toggle{display:none!important;}
-  .ptg-app{display:block!important;background:#fff!important;}
-}
 
 /* Branchline desktop icon-first collapse: role and navigation targets unchanged. */
 .ptg-brand-mini-logo{display:none!important;}
