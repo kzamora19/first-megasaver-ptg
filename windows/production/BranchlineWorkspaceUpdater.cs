@@ -12,7 +12,8 @@ using System.Windows.Forms;
 internal static class BranchlineWorkspace
 {
     private const string OriginalSha256 = "DF991BBEDFFB31D59220CDD859772C09EE4C2ADF6A366597EE8E2786F6AA6E3F";
-    private const string UpdatedSha256 = "5F4F99CA151CB89FBA490AC252D9F85E02899481545E3766E600EA6C4DEFDD76";
+    private const string PreviousCandidateSha256 = "5F4F99CA151CB89FBA490AC252D9F85E02899481545E3766E600EA6C4DEFDD76";
+    private const string UpdatedSha256 = "8CE164CAE547F8BDA5C536C9E16766A95542D3C5D7F135FB6E2D13DFEDCB84E6";
     private const string ExeName = "Branchline Workspace.exe";
     private const string Resource = "Updated.Branchline Workspace.exe";
 
@@ -25,7 +26,7 @@ internal static class BranchlineWorkspace
         catch (Exception error)
         {
             MessageBox.Show("The existing Branchline Workspace was not updated.\n\n" + error.Message,
-                "Branchline Workspace update", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "Branchline Workspace — Round 2 update", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
     }
@@ -41,13 +42,19 @@ internal static class BranchlineWorkspace
         foreach (string directory in Directory.GetDirectories(root))
         {
             string candidate = Path.Combine(directory, ExeName);
-            if (File.Exists(candidate) && String.Equals(HashFile(candidate), OriginalSha256, StringComparison.OrdinalIgnoreCase))
-                existing.Add(candidate);
+            if (File.Exists(candidate))
+            {
+                string checksum = HashFile(candidate);
+                if (String.Equals(checksum, OriginalSha256, StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(checksum, PreviousCandidateSha256, StringComparison.OrdinalIgnoreCase))
+                    existing.Add(candidate);
+            }
         }
         if (existing.Count != 1)
-            throw new InvalidOperationException("Exactly one original November 23 installed executable was expected, but "
+            throw new InvalidOperationException("Exactly one compatible original Branchline Workspace installation was expected, but "
                 + existing.Count + " matching executables were found. No changes were made.\n\n"
-                + "To protect newer or different installations, this updater only accepts the uploaded original version.");
+                + "This updater accepts the owner\'s uploaded November 23 original and the prior navigation update only."
+                + " It does not touch any other installation.");
 
         string target = existing[0];
         if (Process.GetProcessesByName("Branchline Workspace").Any())
@@ -72,11 +79,11 @@ internal static class BranchlineWorkspace
             throw new InvalidOperationException("The embedded update failed its SHA-256 integrity check.");
 
         var choice = MessageBox.Show("Update the EXISTING Branchline Workspace installation?\n\n"
-            + "This update adjusts the application interface. It does not uninstall the app, delete projects,"
+            + "This fixes the app icons, complete Branchline branding, universal 1st Megasaver header and four app navigation. It does not uninstall the app, delete projects,"
             + " remove login sessions, or change the Supabase environments.\n\n"
             + "An original-executable backup will be retained in the installation folder.\n\n"
             + target,
-            "Branchline Workspace — Original Installation Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            "Branchline Workspace — Navigation Correction Round 2", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (choice != DialogResult.Yes) return 2;
 
         string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
@@ -100,7 +107,7 @@ internal static class BranchlineWorkspace
             MessageBox.Show("Branchline Workspace was updated at the original location.\n\n"
                 + "Your original executable is preserved as:\n" + backup + "\n\n"
                 + "Open Branchline Workspace using your existing desktop shortcut.",
-                "Branchline Workspace updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "Branchline Workspace updated — Round 2", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return 0;
         }
         catch
