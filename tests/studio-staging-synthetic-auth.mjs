@@ -22,7 +22,7 @@ export function validateFixtureConfig(env) {
   return {base,secret};
 }
 
-export async function runFixtureAcceptance(env,createClient) {
+export async function runFixtureAcceptance(env,createClient,checkBrowser) {
   const {base,secret}=validateFixtureConfig(env);
   const admin=createClient(base.url,secret,{
     auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
@@ -111,7 +111,8 @@ export async function runFixtureAcceptance(env,createClient) {
   try {
     const accounts={};
     for(const row of roles)accounts[row.label]=await provision(row);
-    await hostedAcceptance({
+    if(checkBrowser) await checkBrowser(accounts.allowed);
+    else await hostedAcceptance({
       ...env,
       STUDIO_HOSTED_STAGING_APPROVED:"1",STUDIO_HOSTED_TEST_MODE:"full",
       STUDIO_STAGING_ALLOWED_EMAIL:accounts.allowed.email,
