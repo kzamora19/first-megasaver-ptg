@@ -96,7 +96,9 @@ await runFixtureAcceptance({
     assert.equal(await downloadProject(other.page, card), sourcePhoto,
       'Restored project must contain the identical synthetic image');
     await card.getByRole('button',{name:'Open',exact:true}).click();
+    await other.editor.locator('#actionModalConfirm').click();
     await other.editor.locator('#savedProjectsDialog').waitFor({state:'hidden'});
+    assert.match(await other.editor.locator('#photoCount').textContent(), /1 photo/i);
     console.log('PASS: restored the same named MegaFrame project and synthetic photo in a fresh browser context');
   } finally {
     await browser.close();
