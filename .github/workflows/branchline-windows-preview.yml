@@ -1,0 +1,60 @@
+name: Build Branchline Windows Workspace Preview (NO RELEASE)
+on:
+  push:
+    branches:
+      - feature/workspace-installer-source-20261123
+    paths:
+      - 'windows/**'
+      - '.github/workflows/branchline-windows-preview.yml'
+  pull_request:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/branchline-windows-preview.yml'
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify trusted application destinations
+        shell: pwsh
+        run: dotnet run --project windows/Branchline.Workspace.PolicyTests/Branchline.Workspace.PolicyTests.csproj
+      - name: Publish x64 isolated preview app
+        shell: pwsh
+        run: |
+          dotnet restore windows/Branchline.Workspace/Branchline.Workspace.csproj
+          dotnet publish windows/Branchline.Workspace/Branchline.Workspace.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o "$env:RUNNER_TEMP\branchline-preview\app"
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+          if (!(Test-Path "$env:RUNNER_TEMP\branchline-preview\app\Branchline.Workspace.Preview.exe")) { throw "Preview executable is absent" }
+      - name: Compile user-level preview installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "windows\preview-out" | Out-Null
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw "Inno Setup compiler not found on windows-2022" }
+          $app = "$env:RUNNER_TEMP\branchline-preview\app"
+          $out = (Resolve-Path "windows\preview-out").Path
+          & $iscc "/DAppSource=$app" "/DOutputDir=$out" "windows\installer\Branchline.Workspace.Preview.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+      - name: Verify package, compute SHA-256 and ZIP
+        shell: pwsh
+        run: |
+          $app = "$env:RUNNER_TEMP\branchline-preview\app"
+          $output = (Resolve-Path "windows\preview-out").Path
+          Compress-Archive -Path "$app\*" -DestinationPath "$output\Branchline-Workspace-Preview-Portable-x64.zip" -CompressionLevel Optimal
+          $files = @(Get-ChildItem "$output\*.exe") + @(Get-ChildItem "$output\*.zip")
+          if ($files.Count -ne 2) { throw "Expected preview setup exe and portable zip" }
+          $lines = $files | ForEach-Object { $h = Get-FileHash $_.FullName -Algorithm SHA256; "$($h.Hash)  $($_.Name)" }
+          Set-Content -Path "$output\SHA256SUMS.txt" -Value $lines -Encoding ascii
+          Get-Content "$output\SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: branchline-workspace-preview-windows-x64
+          path: windows/preview-out/*
+          if-no-files-found: error
+          retention-days: 7
