@@ -41,3 +41,39 @@ jobs:
           name: original-branchline-windows-source-inspection
           path: ${{ runner.temp }}/branchline-recovered/
           retention-days: 3
+
+  linux-self-contained-decompiler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile a portable ILSpy decompiler for exact uploaded Windows launcher
+        shell: bash
+        run: |
+          mkdir -p /tmp/source-inspect
+          cd /tmp/source-inspect
+          dotnet new console -f net10.0
+          dotnet add package ICSharpCode.Decompiler --version 9.1.0.7988
+          cat > Program.cs <<'EOF'
+          using System;
+          using System.IO;
+          using ICSharpCode.Decompiler;
+          using ICSharpCode.Decompiler.CSharp;
+          if (args.Length < 2) { Console.Error.WriteLine("Usage: inspect <exe-path> <output-directory>"); return 2; }
+          var output = args[1];
+          Directory.CreateDirectory(output);
+          var decompiler = new CSharpDecompiler(args[0], new DecompilerSettings());
+          var syntaxTree = decompiler.DecompileWholeModuleAsString();
+          File.WriteAllText(Path.Combine(output, "AllSource.cs"), syntaxTree);
+          Console.WriteLine("Decompiled " + args[0] + " => " + Path.Combine(output, "AllSource.cs"));
+          return 0;
+          EOF
+          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o /tmp/ilspy-standalone
+          test -x /tmp/ilspy-standalone/source-inspect
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable-linux-exact-exe-decompiler
+          path: /tmp/ilspy-standalone/
+          retention-days: 2
