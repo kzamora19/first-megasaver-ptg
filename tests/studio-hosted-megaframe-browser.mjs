@@ -121,6 +121,23 @@ await runFixtureAcceptance({
     await other.editor.locator('#savedProjectsDialog').waitFor({state:'hidden'});
     assert.match(await other.editor.locator('#photoCount').textContent(), /1 photo/i);
     console.log('PASS: restored the same named MegaFrame project and synthetic photo in a fresh browser context');
+    await other.editor.locator('#pinNav button[data-panel="0"]').click();
+    await other.editor.locator('#openFrameLibrary').click();
+    await other.editor.locator('#frameLibGrid .frameLibCard').first()
+      .getByRole('button',{name:'Open frame'}).click();
+    await other.editor.locator('#frameLibrary').waitFor({state:'hidden'});
+    await other.editor.locator('#pinNav button[data-panel="5"]').click();
+    await other.editor.locator('#exportType').selectOption('image/png');
+    const [exported] = await Promise.all([
+      other.page.waitForEvent('download',{timeout:45000}),
+      other.editor.locator('#downloadOne').click()
+    ]);
+    const pngOutput = await readFile(await exported.path());
+    assert.equal(pngOutput.subarray(0,8).toString('hex'), '89504e470d0a1a0a');
+    const width = pngOutput.readUInt32BE(16);
+    const height = pngOutput.readUInt32BE(20);
+    assert.ok(width >= 200 && height >= 200, 'Expected a usable PNG export');
+    console.log(`PASS: actual staging MegaFrame exported the restored project as PNG (${width} × ${height})`);
   } finally {
     await browser.close();
   }
