@@ -5,6 +5,7 @@ import PwaRegister from "@/components/pwa-register";
 import AppConfirmProvider from "@/components/app-confirm";
 import WorkspaceLayout from "@/components/workspace-layout";
 import "./globals.css";
+import "./official-navigation.css";
 
 export const metadata: Metadata = {
   title: "Branchline · Price Tag Generator",
