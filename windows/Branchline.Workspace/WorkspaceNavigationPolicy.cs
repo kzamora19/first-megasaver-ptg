@@ -3,18 +3,18 @@ using System;
 namespace Branchline.Workspace;
 
 /// <summary>
-/// Only the official same-host Branchline and PTG/Studio application routes are
-/// folded into the existing WebView2 window. Authentication is enforced by
-/// the hosted apps and Edge Functions, never by this URL selection helper.
+/// Isolated HTTPS staging only. The hosted app/Edge Functions own authentication.
+/// The Windows preview must not open production Branchline/PTG links inside its
+/// staging WebView2 browser profile or capture unrelated staging routes.
 /// </summary>
 public static class WorkspaceNavigationPolicy
 {
-    public const string HomeUrl = "https://kzamora19.github.io/branchline/apps/";
-    private const string OfficialHost = "kzamora19.github.io";
+    public const string HomeUrl = "https://branchline-staging.github.io/";
+    private const string StagingHost = "branchline-staging.github.io";
 
     private static readonly string[] AllowedAppPaths =
     {
-        "/branchline/",
+        "/sales-tracker/",
         "/first-megasaver-ptg/",
         "/megaframe-studio/studio/",
         "/flyer-studio/studio/"
@@ -26,9 +26,11 @@ public static class WorkspaceNavigationPolicy
             return false;
         if (destination.Scheme != Uri.UriSchemeHttps ||
             destination.Port != 443 ||
-            !destination.Host.Equals(OfficialHost, StringComparison.OrdinalIgnoreCase) ||
+            !destination.Host.Equals(StagingHost, StringComparison.OrdinalIgnoreCase) ||
             destination.UserInfo.Length != 0)
             return false;
+
+        if (destination.AbsolutePath == "/") return true;
 
         foreach (var prefix in AllowedAppPaths)
             if (destination.AbsolutePath.StartsWith(prefix, StringComparison.Ordinal))
