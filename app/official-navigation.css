@@ -16,6 +16,10 @@
  background-image:url("/first-megasaver-ptg/icons/official/four-apps.png");
  background-repeat:no-repeat;background-size:84px 84px;background-position:0 0}
 .ptg-official-app-icon.sales-tracker{background-position:-42px 0}
+.ptg-official-app-icon.data-desk{
+ background-image:url("/first-megasaver-ptg/icons/official/data-desk.png");
+ background-size:42px 42px;background-position:center
+}
 .ptg-official-app-icon.megaframe-studio{background-position:0 -42px}
 .ptg-official-app-icon.flyer-studio{background-position:-42px -42px}
 .ptg-official-mobile-logo{display:none;align-items:center;justify-content:center;

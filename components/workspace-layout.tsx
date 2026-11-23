@@ -22,9 +22,11 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   const open = openOnPath === path;
   const home = session.role === "SYSTEM_ADMIN" ? "/admin/accounts/" : "/products/";
   const BrandLink = desk ? "a" : Link;
+  const activeApp = desk ? "data-desk" : "price-tag-generator";
   const apps = [
     {id:"price-tag-generator",name:"Price Tag Generator",label:"PTG",href:withBasePath("/products/")},
     {id:"sales-tracker",name:"Sales Tracker",label:"Sales",href:"/branchline/"},
+    ...(session.role === "SYSTEM_ADMIN" ? [{id:"data-desk",name:"Data Desk",label:"Data",href:withBasePath("/data-desk/")}] : []),
     {id:"megaframe-studio",name:"MegaFrame Studio",label:"Frame",href:withBasePath("/studios/?studio=megaframe")},
     {id:"flyer-studio",name:"MegaFlyer Studio",label:"Flyer",href:withBasePath("/studios/?studio=flyer")}
   ];
@@ -56,8 +58,8 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu} title="Branchline applications">
         <img src={withBasePath("/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
-      {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id==="price-tag-generator"?" is-active":"")}
-        aria-label={"Open "+app.name} aria-current={app.id==="price-tag-generator"?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
+      {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id===activeApp?" is-active":"")}
+        aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>
       </a>)}
     </nav>
@@ -106,8 +108,8 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
       <aside className="ptg-universal-drawer" aria-label="Branchline application list">
         <h2>Branchline applications</h2>
         <nav aria-label="Choose an application">
-          {apps.map(app=><a key={app.id} href={app.href} className={"ptg-universal-drawer-link "+(app.id==="price-tag-generator"?"is-active":"")}
-            aria-current={app.id==="price-tag-generator"?"page":undefined} onClick={()=>setAppMenuOpen(false)}>
+          {apps.map(app=><a key={app.id} href={app.href} className={"ptg-universal-drawer-link "+(app.id===activeApp?"is-active":"")}
+            aria-current={app.id===activeApp?"page":undefined} onClick={()=>setAppMenuOpen(false)}>
             <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/>{app.name}
           </a>)}
         </nav>

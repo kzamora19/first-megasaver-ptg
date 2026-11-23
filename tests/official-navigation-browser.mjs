@@ -42,11 +42,13 @@ try {
     await page.screenshot({path:join(out,"ptg-screenshot-diagnostic.png"),fullPage:true});
     throw error;
   });
-  assert.equal(await page.locator(".ptg-universal-app-rail .ptg-official-app-choice").count(),4);
+  assert.equal(await page.locator(".ptg-universal-app-rail .ptg-official-app-choice").count(),5);
   const desktopNames=await page.locator(".ptg-universal-drawer-link").allTextContents();
-  assert.deepEqual(desktopNames,["Price Tag Generator","Sales Tracker","MegaFrame Studio","MegaFlyer Studio"]);
+  assert.deepEqual(desktopNames,["Price Tag Generator","Sales Tracker","Data Desk","MegaFrame Studio","MegaFlyer Studio"]);
+  assert.equal(await page.locator(".ptg-universal-app-rail .ptg-official-app-choice.data-desk").count(),1);
+  assert.equal(await page.locator(".ptg-universal-drawer-link").nth(2).getAttribute("href"),"/first-megasaver-ptg/data-desk/");
   const studioLinks=await page.locator(".ptg-universal-drawer-link").evaluateAll(nodes=>
-    nodes.slice(2).map(x=>x.getAttribute("href")));
+    nodes.slice(3).map(x=>x.getAttribute("href")));
   assert.ok(studioLinks.every(href=>href?.startsWith("/first-megasaver-ptg/studios/?studio=")),
     "Studio choices must be PTG gated");
   assert.equal(await page.locator(".ptg-sidebar").isVisible(),true,
@@ -84,6 +86,7 @@ try {
   await teamLeader.goto(root,{waitUntil:"domcontentloaded"});
   await teamLeader.locator(".ptg-universal-app-rail").waitFor({state:"visible"});
   assert.equal(await teamLeader.locator(".ptg-universal-app-rail .ptg-official-app-choice").count(),4);
+  assert.equal(await teamLeader.locator(".ptg-official-app-choice.data-desk").count(),0);
   assert.equal(await teamLeader.locator('nav[aria-label="Workspace"] a[title="Creative Studios"]').count(),1);
   assert.equal(await teamLeader.locator('nav[aria-label="Workspace"] a[title="Account Administration"]').count(),0);
   await teamLeader.screenshot({path:join(out,"ptg-team-leader-desktop.png"),fullPage:true});
@@ -94,6 +97,7 @@ try {
   await branchUser.goto(root,{waitUntil:"domcontentloaded"});
   await branchUser.locator(".ptg-universal-app-rail").waitFor({state:"visible"});
   assert.equal(await branchUser.locator('nav[aria-label="Workspace"] a[title="Creative Studios"]').count(),0);
+  assert.equal(await branchUser.locator(".ptg-official-app-choice.data-desk").count(),0);
   await branchUser.close();
 
   assert.deepEqual(failures,[]);
