@@ -61,10 +61,12 @@ jobs:
           using System.IO;
           using ICSharpCode.Decompiler;
           using ICSharpCode.Decompiler.CSharp;
+          using ICSharpCode.Decompiler.Metadata;
           if (args.Length < 2) { Console.Error.WriteLine("Usage: inspect <exe-path> <output-directory>"); return 2; }
           var output = args[1];
           Directory.CreateDirectory(output);
-          var decompiler = new CSharpDecompiler(args[0], new DecompilerSettings());
+          var resolver = new UniversalAssemblyResolver(args[0], false, null);
+          var decompiler = new CSharpDecompiler(args[0], resolver, new DecompilerSettings());
           var syntaxTree = decompiler.DecompileWholeModuleAsString();
           File.WriteAllText(Path.Combine(output, "AllSource.cs"), syntaxTree);
           Console.WriteLine("Decompiled " + args[0] + " => " + Path.Combine(output, "AllSource.cs"));
