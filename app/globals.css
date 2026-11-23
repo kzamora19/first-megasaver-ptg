@@ -340,3 +340,56 @@ footer {
 .ptg-memo-history-pages span{font-size:12px;color:#5c6b80;margin-right:auto}
 .ptg-memo-history-pages button{padding:7px 11px;border-radius:6px;border:1px solid #c5d3e4;background:#fff;color:#1c4a82;cursor:pointer}
 .ptg-memo-history-pages button:disabled{opacity:.5;cursor:default}
+
+/* BRANCHLINE UNIFIED UI STAGE — 2026-11-23: visual-only, development branch. */
+:root{
+  --branchline-navy:#09264f;--branchline-royal:#075cf5;
+  --branchline-cyan:#0dd9eb;--branchline-teal:#00e4c1;
+  --accent:#0752cf;--accent-soft:#e9f2ff;
+}
+.ptg-app{background:#f3f7fd;}
+.ptg-sidebar{background:linear-gradient(180deg,#0d3565,var(--branchline-navy));border-right:1px solid #234d7e;}
+.ptg-nav-item{min-height:44px;border-radius:9px;color:#dbe9f9;}
+.ptg-nav-item:hover{background:#1a4d84;color:#fff;}
+.ptg-nav-item.active{background:#0759db;color:#fff;box-shadow:inset 3px 0 var(--branchline-cyan);}
+.ptg-nav-label{color:#b6cce7;}
+.ptg-user-chip{border-top-color:#335579;}
+.ptg-nav-item:focus-visible,.ptg-menu-toggle:focus-visible,
+.ptg-app button:focus-visible,.ptg-app a:focus-visible{
+  outline:3px solid var(--branchline-cyan);outline-offset:2px;
+}
+.ptg-app input:focus-visible,.ptg-app select:focus-visible,.ptg-app textarea:focus-visible{
+  outline:2px solid #075cf5;outline-offset:1px;
+}
+.ptg-workspace-content{min-width:0;}
+@media(max-width:720px){
+  .ptg-sidebar{box-shadow:0 2px 8px #09264f1a;}
+  .ptg-workspace-content{width:100%;min-width:0;}
+}
+
+/* Branchline desktop icon-first collapse: role and navigation targets unchanged. */
+.ptg-brand-mini-logo{display:none!important;}
+.ptg-nav-icon{display:inline-grid;place-items:center;width:20px;min-width:20px;font-size:20px;line-height:1;}
+.ptg-desktop-collapse{display:flex;align-items:center;justify-content:center;gap:9px;min-height:38px;margin:0 9px 12px;padding:7px 9px;
+  border:1px solid #4a709b;border-radius:9px;background:#123d70;color:#fff;font:700 12px/1.3 Arial,sans-serif;cursor:pointer;}
+.ptg-desktop-collapse:hover{background:#18528f;}
+.ptg-app:has(.ptg-sidebar-compact){grid-template-columns:76px minmax(0,1fr);}
+.ptg-sidebar-compact{padding:17px 6px;}
+.ptg-sidebar-compact .ptg-brand{padding:3px 3px 14px;}
+.ptg-sidebar-compact .ptg-brand-wide-logo,.ptg-sidebar-compact .ptg-brand small{display:none!important;}
+.ptg-sidebar-compact .ptg-brand-mini-logo{display:block!important;max-width:52px;max-height:52px;margin:auto;
+  object-fit:contain;filter:none!important;mix-blend-mode:normal!important;}
+.ptg-sidebar-compact .ptg-nav-label,.ptg-sidebar-compact .ptg-nav-text,.ptg-sidebar-compact .ptg-sidebar-bottom,
+.ptg-sidebar-compact .ptg-collapse-label{display:none!important;}
+.ptg-sidebar-compact .ptg-nav-item{justify-content:center;padding:10px 7px;margin:4px 0;}
+.ptg-sidebar-compact .ptg-nav-icon{width:25px;min-width:25px;font-size:23px;}
+.ptg-sidebar-compact .ptg-desktop-collapse{margin:0 3px 11px;}
+@media(max-width:720px){
+  .ptg-desktop-collapse{display:none!important;}
+  .ptg-app:has(.ptg-sidebar-compact){grid-template-columns:1fr;}
+  .ptg-sidebar-compact{padding:14px;}
+  .ptg-sidebar-compact .ptg-brand-wide-logo{display:block!important;}
+  .ptg-sidebar-compact .ptg-brand-mini-logo{display:none!important;}
+  .ptg-sidebar-compact .ptg-nav-label,.ptg-sidebar-compact .ptg-nav-text,.ptg-sidebar-compact .ptg-sidebar-bottom{display:initial!important;}
+  .ptg-sidebar-compact .ptg-nav-item{justify-content:flex-start;padding:12px 13px;}
+}
