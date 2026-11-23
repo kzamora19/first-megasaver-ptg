@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import {createClient} from '@supabase/supabase-js';
 import {chromium} from 'playwright';
@@ -32,6 +33,17 @@ async function openFrame(browser, account) {
   return {context,page,editor};
 }
 
+async function downloadProject(page, card) {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    card.getByRole('button',{name:'Backup',exact:true}).click()
+  ]);
+  const snapshot = JSON.parse(await readFile(await download.path(), 'utf8'));
+  assert.equal(snapshot.format, 'MegaFrameProjectV1');
+  assert.equal(snapshot.payload.photos.length, 1);
+  return snapshot.payload.photos[0].data;
+}
+
 await runFixtureAcceptance({
   ...process.env,
   STUDIO_STAGING_ISSUER_ORIGIN: origin
@@ -57,6 +69,11 @@ await runFixtureAcceptance({
     await first.editor.locator('#actionModalInput').fill(title);
     await first.editor.locator('#actionModalConfirm').click();
     await first.editor.locator('#projectSaveStatus').getByText(title,{exact:false}).waitFor();
+    await first.editor.locator('#openProjects').click();
+    const sourceCard = first.editor.locator('#projectList .savedProjectCard').filter({hasText:title});
+    const sourcePhoto = await downloadProject(first.page, sourceCard);
+    assert.match(sourcePhoto, /^data:image\/png;base64,/);
+    await first.editor.locator('#closeSavedProjects').click();
     await first.page.locator('#cloudRefresh').click();
     await first.page.locator('#cloudLocalProject option').filter({hasText:title}).waitFor({state:'attached'});
     await first.page.locator('#cloudLocalProject').selectOption({label:title});
@@ -76,8 +93,10 @@ await runFixtureAcceptance({
     await other.page.getByText(/Encrypted project retrieved/).waitFor();
     await other.editor.locator('#retrieveStartupProject').click();
     const card = other.editor.locator('#projectList .savedProjectCard').filter({hasText:title});
+    assert.equal(await downloadProject(other.page, card), sourcePhoto,
+      'Restored project must contain the identical synthetic image');
     await card.getByRole('button',{name:'Open',exact:true}).click();
-    await other.editor.locator('#photoCount').filter({hasText:/1 photo/i}).waitFor({state:'attached'});
+    await other.editor.locator('#savedProjectsDialog').waitFor({state:'hidden'});
     console.log('PASS: restored the same named MegaFrame project and synthetic photo in a fresh browser context');
   } finally {
     await browser.close();
