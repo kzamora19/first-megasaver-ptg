@@ -67,6 +67,8 @@ await runFixtureAcceptance({
 
     const other = await openFrame(browser, account);
     await other.page.locator('#cloudRefresh').click();
+    assert.equal(await other.page.locator('#cloudLocalProject option').count(), 0,
+      'Fresh browser context must have no local projects before restore');
     const remote = other.page.locator('#cloudRemoteProject');
     await remote.locator('option').filter({hasText:/./}).first().waitFor({state:'attached'});
     await remote.selectOption({index:0});
