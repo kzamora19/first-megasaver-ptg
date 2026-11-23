@@ -1,0 +1,38 @@
+name: Isolated staging MegaFrame browser backup
+on:
+  push:
+    branches: [test/hosted-frame-browser-20261123]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: |
+          node --check tests/studio-hosted-megaframe-browser.mjs
+          node --test tests/studio-staging-synthetic-auth.test.mjs
+  hosted:
+    needs: source
+    if: github.ref == 'refs/heads/test/hosted-frame-browser-20261123' && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: "1"
+      STUDIO_HOSTED_TEST_MODE: full
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0 playwright@1.65.1
+      - run: npx playwright install chromium --with-deps
+      - run: node tests/studio-hosted-megaframe-browser.mjs
