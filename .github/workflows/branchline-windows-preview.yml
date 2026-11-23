@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/workspace-installer-source-20261123
+      - feature/workspace-staging-pilot-20261123
     paths:
       - 'windows/**'
       - '.github/workflows/branchline-windows-preview.yml'
@@ -24,6 +25,14 @@ jobs:
       - name: Verify trusted application destinations
         shell: pwsh
         run: dotnet run --project windows/Branchline.Workspace.PolicyTests/Branchline.Workspace.PolicyTests.csproj
+      - name: Assert staging-only host and preserved preview installation identity
+        shell: pwsh
+        run: |
+          $policy = Get-Content windows/Branchline.Workspace/WorkspaceNavigationPolicy.cs -Raw
+          if (!$policy.Contains("https://branchline-staging.github.io/")) { throw "Missing staging home" }
+          if ($policy.Contains('public const string HomeUrl = "https://kzamora19.github.io')) { throw "Production launcher forbidden" }
+          $installer = Get-Content windows/installer/Branchline.Workspace.Preview.iss -Raw
+          if (!$installer.Contains("DD67574D-6DB8-4F31-AD3F-F519C17A2215")) { throw "Preview upgrade AppId drift" }
       - name: Publish x64 isolated preview app
         shell: pwsh
         run: |
@@ -46,7 +55,7 @@ jobs:
         run: |
           $app = "$env:RUNNER_TEMP\branchline-preview\app"
           $output = (Resolve-Path "windows\preview-out").Path
-          Compress-Archive -Path "$app\*" -DestinationPath "$output\Branchline-Workspace-Preview-Portable-x64.zip" -CompressionLevel Optimal
+          Compress-Archive -Path "$app\*" -DestinationPath "$output\Branchline-Unified-Staging-Preview-Portable-x64.zip" -CompressionLevel Optimal
           $files = @(Get-ChildItem "$output\*.exe") + @(Get-ChildItem "$output\*.zip")
           if ($files.Count -ne 2) { throw "Expected preview setup exe and portable zip" }
           $lines = $files | ForEach-Object { $h = Get-FileHash $_.FullName -Algorithm SHA256; "$($h.Hash)  $($_.Name)" }
@@ -54,7 +63,7 @@ jobs:
           Get-Content "$output\SHA256SUMS.txt"
       - uses: actions/upload-artifact@v4
         with:
-          name: branchline-workspace-preview-windows-x64
+          name: branchline-unified-staging-preview-windows-x64
           path: windows/preview-out/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14

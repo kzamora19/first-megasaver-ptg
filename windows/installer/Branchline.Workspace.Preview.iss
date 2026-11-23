@@ -1,5 +1,6 @@
 ; Branchline Workspace Preview — isolated user-level install.
-; Staging build only. NEVER overwrite the legacy Branchline Workspace install.
+; ONLY staging.github.io. Same preview AppId supports preview-to-preview upgrades.
+; NEVER overwrite or migrate the legacy production Branchline Workspace install.
 #ifndef AppSource
   #error AppSource is required (publish output)
 #endif
@@ -7,7 +8,7 @@
   #error OutputDir is required (CI artifacts)
 #endif
 
-#define AppVersion "0.2.0-preview.1"
+#define AppVersion "0.2.0-preview.2"
 
 [Setup]
 AppId={{DD67574D-6DB8-4F31-AD3F-F519C17A2215}
@@ -26,9 +27,9 @@ WizardStyle=modern
 Compression=lzma2
 SolidCompression=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=Branchline-Workspace-Preview-Setup-x64
+OutputBaseFilename=Branchline-Unified-Staging-Preview-Setup-x64
 VersionInfoProductName=Branchline Workspace Preview
-VersionInfoVersion=0.2.0.1
+VersionInfoVersion=0.2.0.2
 
 [Files]
 Source: "{#AppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

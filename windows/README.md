@@ -1,34 +1,29 @@
-# Branchline Workspace for Windows — reproducible preview
+# Branchline Unified STAGING Windows Preview — v0.2.0-preview.2
 
-**NONPRODUCTION / unsigned preview only.** This implementation is intentionally separate from the existing November 10 Windows installer. Do not silently replace old installed programs or promise an automatic upgrade.
+**Pilot only, unsigned, staging-exclusive.** This is a newer build of the existing separate Windows Preview AppId, not an automatic production upgrade.
 
-## Purpose
+## Verified configuration
 
-This source-buildable .NET 8 Windows Forms shell loads the official Branchline four-app launcher in a WebView2 browser:
+- Home / unified staging sign-in: https://branchline-staging.github.io/
+- Sales Tracker: https://branchline-staging.github.io/sales-tracker/
+- PTG (including System Admin-only Data Desk): https://branchline-staging.github.io/first-megasaver-ptg/login/
+- Protected Studios: https://branchline-staging.github.io/megaframe-studio/studio/ and https://branchline-staging.github.io/flyer-studio/studio/
 
-- Sales Tracker: `https://kzamora19.github.io/branchline/`
-- PTG: `https://kzamora19.github.io/first-megasaver-ptg/`
-- MegaFrame/MegaFlyer: links are resolved by Branchline's approved launcher to PTG protected `/studios/` routes. The shell does not bypass permissions, inject tokens, or keep a copy of any credentials.
+The preview **rejects production GitHub Pages URLs from the embedded WebView2 window** and treats unrelated destinations as external. It does not grant app/Studio permissions.
 
-The browser context remains in the user's own Windows profile in `%LOCALAPPDATA%\Branchline\WorkspacePreview\WebView2`. No credential sharing with the previous app or user's normal browser is assumed. External OAuth/Drive consent popups must still pass a real Windows acceptance test; the shell never pretends to solve those automatically. Unrelated URLs and the old public direct editors are deliberately not captured as native app destinations.
+## Installer compatibility
 
-## Build and CI
+The Inno Setup `AppId` stays `DD67574D-6DB8-4F31-AD3F-F519C17A2215` so this new pilot can upgrade the **previous PREVIEW installation only**. It preserves the original preview data directory at `%LOCALAPPDATA%\Branchline\WorkspacePreview\WebView2`. Neither the preview AppId nor profile is the identity of the production Windows app.
 
-The development-only GitHub Actions workflow `.github/workflows/branchline-windows-preview.yml` performs:
+The installer and portable ZIP are unsigned 64-bit test artifacts. Windows protection prompts must not be bypassed; a production rollout requires trusted signing and real-device upgrade/rollback tests.
 
-1. .NET 8 URL navigation policy tests.
-2. Pinned WebView2 NuGet restore (version 1.0.4370.26), Windows x64 self-contained publish.
-3. Preview-only Inno Setup installer compilation, separate AppId and install directory, SHA-256 checksums.
-4. Upload of a **workflow artifact only**, never to `public/`, GitHub Pages, or a release.
+## Build and test
 
-Local prerequisites: .NET 8 SDK, Inno Setup 6, and Windows 10/11. Run:
+The workflow `.github/workflows/branchline-windows-preview.yml` builds the Windows preview using .NET 8, tests the stage-only destination allowlist, compiles a user-level Inno Setup installer, calculates SHA256, and uploads artifacts for 14 days. It never publishes an installer to Pages, GitHub Releases, or the production app's download link.
 
-```powershell
-dotnet run --project windows/Branchline.Workspace.PolicyTests/Branchline.Workspace.PolicyTests.csproj
-dotnet publish windows/Branchline.Workspace/Branchline.Workspace.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/branchline-workspace
-```
+Existing MegaFrame local save/reopen, MegaFlyer editing, and PTG browser PDF tests are not re-run as installation blockers. The pilot still requires on-device WebView2 print and Google consent testing.
 
-An **unsigned** installer will likely show an operating-system reputation warning. Do not tell users to ignore these warnings; production needs trusted signing, upgrade compatibility, rollback evidence and Windows 10/11/Edge WebView2 test results.
+**Status:** Preview build only, not production deployment.
 
 ## Release blockers
 

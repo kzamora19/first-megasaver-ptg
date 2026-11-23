@@ -19,7 +19,7 @@ internal sealed class WorkspaceForm : Form
 
     public WorkspaceForm()
     {
-        Text = "Branchline Workspace Preview";
+        Text = "Branchline Unified Staging Preview";
         Width = 1280;
         Height = 820;
         MinimumSize = new System.Drawing.Size(380, 500);
@@ -51,7 +51,9 @@ internal sealed class WorkspaceForm : Form
     {
         try
         {
-            // Separate preview profile. Never migrate or clear a user's existing
+            // Keep the current PREVIEW profile to exercise preview-to-preview upgrades,
+            // while remaining isolated from the original production installation.
+            // Never migrate or clear a user's existing
             // production WebView2/browser profile during this release candidate.
             var profile = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -60,6 +62,18 @@ internal sealed class WorkspaceForm : Form
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             await browser.EnsureCoreWebView2Async(environment);
 
+            browser.CoreWebView2.NavigationStarting += (_, args) =>
+            {
+                // A staging installer must never open a production app URL in
+                // its preview WebView2 profile. Open those externally instead.
+                if (Uri.TryCreate(args.Uri, UriKind.Absolute, out var destination) &&
+                    destination.Scheme == Uri.UriSchemeHttps &&
+                    destination.Host.Equals("kzamora19.github.io", StringComparison.OrdinalIgnoreCase))
+                {
+                    args.Cancel = true;
+                    OpenExternal(args.Uri);
+                }
+            };
             browser.CoreWebView2.NewWindowRequested += (_, args) =>
             {
                 // Only real app routes remain in the unified window. Unrelated
@@ -75,8 +89,8 @@ internal sealed class WorkspaceForm : Form
             {
                 var title = browser.CoreWebView2.DocumentTitle;
                 Text = string.IsNullOrWhiteSpace(title)
-                    ? "Branchline Workspace Preview"
-                    : title + " — Branchline Workspace Preview";
+                    ? "Branchline Unified Staging Preview"
+                    : title + " — Branchline Unified Staging Preview";
             };
             browser.CoreWebView2.Navigate(WorkspaceNavigationPolicy.HomeUrl);
             RefreshButtons();
@@ -85,7 +99,7 @@ internal sealed class WorkspaceForm : Form
         {
             var choice = MessageBox.Show(
                 this,
-                "Branchline Workspace Preview could not start its embedded browser.\n\n" +
+                "Branchline Unified Staging Preview could not start its embedded browser.\n\n" +
                 "Install or repair Microsoft Edge WebView2 Runtime, then reopen this preview.\n\n" +
                 "Technical detail: " + ex.GetType().Name + "\n\nOpen Microsoft's WebView2 page?",
                 "Workspace browser unavailable",
