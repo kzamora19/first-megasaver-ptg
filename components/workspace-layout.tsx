@@ -14,6 +14,7 @@ const deskTools = new Set(["/price-memos/import", "/price-memos/subdealer", "/ad
 
 function WorkspaceFrame({ session, path, children }: { session: PtgClientSession; path: string; children: ReactNode }) {
   const [openOnPath, setOpenOnPath] = useState<string | null>(null);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const query = useSearchParams();
   const router = useRouter();
   const desk = path === "/data-desk" || (deskTools.has(path) && query.get("workspace") === "data-desk");
@@ -37,7 +38,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   }, [desk, router]);
 
   return <div className="ptg-app">
-    <aside className="ptg-sidebar ptg-print-hide" data-menu-open={open}>
+    <aside className={"ptg-sidebar ptg-print-hide" + (railCollapsed && !desk ? " ptg-sidebar-compact" : "")} data-menu-open={open}>
       <div className="ptg-sidebar-header">
         <BrandLink className="ptg-brand" href={desk ? withBasePath("/data-desk/") : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
           <span className="ptg-brand-lockup">
@@ -50,6 +51,11 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
           <span aria-hidden="true">☰</span>
         </button>
       </div>
+      {!desk && <button className="ptg-desktop-collapse" type="button"
+        aria-label={railCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
+        aria-expanded={!railCollapsed} aria-controls="ptg-workspace-links"
+        title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        onClick={() => setRailCollapsed(value => !value)}><span aria-hidden="true">{railCollapsed ? "»" : "«"}</span><span className="ptg-collapse-label">{railCollapsed ? "Expand" : "Collapse"}</span></button>}
       <div className="ptg-sidebar-content" id="ptg-workspace-links">
         <div className="ptg-sidebar-menu">
           <div className="ptg-nav-label">{desk ? "IMPORT TOOLS" : "WORKSPACE"}</div>
