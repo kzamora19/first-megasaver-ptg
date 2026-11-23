@@ -30,10 +30,10 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   ];
   const toggleAppMenu = () => {setOpenOnPath(null);setAppMenuOpen(value=>!value);};
   useEffect(()=>{
-    const key=(event:KeyboardEvent)=>{if(event.key==="Escape"&&appMenuOpen){event.preventDefault();setAppMenuOpen(false);}};
+    const key=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;if(appMenuOpen){event.preventDefault();setAppMenuOpen(false);}else if(openOnPath===path){event.preventDefault();setOpenOnPath(null);}};
     document.addEventListener("keydown",key);
     return ()=>document.removeEventListener("keydown",key);
-  },[appMenuOpen]);
+  },[appMenuOpen,openOnPath,path]);
 
   useEffect(() => {
     if (!desk || !usesEdgeAuth) return;
