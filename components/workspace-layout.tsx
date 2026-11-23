@@ -42,7 +42,8 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
       <div className="ptg-sidebar-header">
         <BrandLink className="ptg-brand" href={desk ? withBasePath("/data-desk/") : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
           <span className="ptg-brand-lockup">
-            <img src={withBasePath("/branchline-logo.png")} alt="" />
+            <img className="ptg-brand-wide-logo" src={withBasePath("/branchline-logo.png")} alt="" />
+            <img className="ptg-brand-mini-logo" src={withBasePath("/icons/ptg-icon.svg")} alt="" />
             <small>{desk ? "DATA DESK" : "PRICE TAG GENERATOR"}</small>
           </span>
         </BrandLink>
