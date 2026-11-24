@@ -19,6 +19,13 @@ test("existing installation identity and secure mobile launch routes",()=>{
  const mobile=read("app/workspace/mobile/workspace.tsx");
  assert.ok(mobile.includes("/studios/?studio=megaframe"));assert.ok(mobile.includes("/studios/?studio=flyer"));
  assert.ok(mobile.includes("<WebRelease />"));
+ assert.ok(!mobile.includes('<nav aria-label="Workspace apps">'));
+ assert.ok(mobile.includes("markEmbedded"));
+ assert.ok(mobile.includes("aria-expanded={listOpen}"));
+ assert.ok(mobile.includes('/icons/official/branchline.png'));
+ const css=read("app/official-navigation.css");
+ assert.ok(css.includes(".ptg-unified-host .ptg-brand-lockup img{display:none!important}"));
+ assert.ok(css.includes("html.bl-mobile-embedded .ptg-official-mobile-logo"));
  assert.ok(read("app/layout.tsx").includes('"branchline-web-release": String(release.sequence)'));
  assert.ok(read("components/workspace-layout.tsx").includes("<WebRelease />"));
  assert.ok(read("components/web-release.tsx").includes('release.sequence'));

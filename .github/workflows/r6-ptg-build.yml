@@ -50,6 +50,6 @@ jobs:
         run: npm run build
       - name: Verify generated release metadata
         run: |
-          grep -q 'name="branchline-web-release" content="2026112401"' out/products/index.html
-          grep -q 'name="branchline-web-release" content="2026112401"' out/workspace/mobile/index.html
+          grep -q 'name="branchline-web-release" content="2026112403"' out/products/index.html
+          grep -q 'name="branchline-web-release" content="2026112403"' out/workspace/mobile/index.html
           test -f out/updates/release.json

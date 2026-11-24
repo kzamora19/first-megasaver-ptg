@@ -29,3 +29,17 @@
 .mobile-workspace-header nav button{min-width:0;font-size:13px}
 .mobile-workspace-home{height:100%;box-sizing:border-box;overflow-y:auto;padding-bottom:85px}
 .mobile-workspace-choice-icon.megaframe,.mobile-workspace-choice-icon.flyer{background:transparent}
+
+/* One primary app switcher; active frames retain only their own app menu. */
+.mobile-workspace-header{display:flex;align-items:center;min-height:50px;padding:6px 10px}
+.mobile-workspace-brand{min-width:0;flex:1;text-align:left}
+.mobile-workspace-brand img{object-fit:contain;flex:0 0 34px}
+.mobile-workspace-brand span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mobile-workspace-content{position:relative}
+.mobile-app-overlay{position:absolute;inset:0;background:#051e439d;z-index:50;display:flex}
+.mobile-app-list{width:min(100%,340px);padding:12px;overflow:auto;background:#102b4d;color:white}
+.mobile-app-list h2{font-size:17px;margin:8px 0}
+.mobile-app-list .mobile-workspace-choices{margin:10px 0}
+.mobile-app-list .mobile-workspace-choice{padding:10px;min-height:60px}
+.mobile-workspace-choice-icon{background:transparent}
+.mobile-workspace-home{padding:20px 16px}

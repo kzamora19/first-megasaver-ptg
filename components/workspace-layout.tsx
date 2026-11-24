@@ -25,7 +25,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   const home = session.role === "SYSTEM_ADMIN" ? "/admin/accounts/" : "/products/";
   const BrandLink = desk ? "a" : Link;
   // Data Desk is a PTG workspace tool, not a fifth Branchline application.
-  const activeApp = "price-tag-generator";
+  const activeApp = path === "/studios" && query.get("studio")==="megaframe" ? "megaframe-studio" : path === "/studios" && query.get("studio")==="flyer" ? "flyer-studio" : "price-tag-generator";
   const apps = [
     {id:"price-tag-generator",name:"Price Tag Generator",label:"PTG",href:withBasePath("/products/")},
     {id:"sales-tracker",name:"Sales Tracker",label:"Sales",href:"/branchline/"},
@@ -84,7 +84,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
           <span className="ptg-brand-lockup">
             <img className="ptg-brand-wide-logo" src={withBasePath("/branchline-logo.png")} alt="" />
             <img className="ptg-brand-mini-logo" src={withBasePath("/icons/ptg-icon.svg")} alt="" />
-            <small>{desk ? "DATA DESK" : "PRICE TAG GENERATOR"}</small>
+            <small>{desk ? "DATA DESK" : activeApp==="megaframe-studio" ? "MEGAFRAME STUDIO" : activeApp==="flyer-studio" ? "MEGAFLYER STUDIO" : "PRICE TAG GENERATOR"}</small>
           </span>
         </BrandLink>
         <button className="ptg-menu-toggle" type="button"
