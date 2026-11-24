@@ -41,3 +41,17 @@ test("desktop and mobile device layout corrections preserve verified direct Stud
  assert.ok(portal.includes('if(!check.account||!allowedRole(check.account))'));
  assert.ok(portal.includes('JSON.stringify({action:"issue",studio})'));
 });
+
+ test("R6 status polls refresh verified identity without extending idle sessions",()=>{
+ const gate=read("components/client-session-gate.tsx"),auth=read("supabase/functions/ptg-auth/index.ts"),layout=read("components/workspace-layout.tsx");
+ assert.ok(auth.includes('activeSession(request, action !== "session-status")'));
+ assert.ok(auth.includes('if (action === "session-status" || action === "session")'));
+ assert.ok(auth.includes('role: session.role'));
+ assert.ok(gate.includes('const result = await invokePtgAuth("session-status")'));
+ assert.ok(gate.includes('if (stopped || !result.account) return'));
+ assert.ok(gate.includes('setSession(current => current && JSON.stringify(current) === JSON.stringify(account) ? current : account)'));
+ assert.ok(gate.includes('if (account.mustChangePassword)'));
+ assert.ok(gate.includes('!allowedRoles.split("|").includes(account.role)'));
+ assert.equal((layout.match(/session\.displayName\.trim\(\) \|\| session\.username/g)||[]).length,3);
+ assert.equal((layout.match(/session\.legacyRole\.trim\(\) \|\| session\.role/g)||[]).length,2);
+ });

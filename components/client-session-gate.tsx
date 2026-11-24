@@ -127,7 +127,7 @@ function VerifyPtgSessionGate({
 
   const role = session?.role;
   useEffect(() => {
-    if (!usesEdgeAuth || !watchAvailability || !role || role === "SYSTEM_ADMIN") return;
+    if (!usesEdgeAuth || !watchAvailability || !role) return;
     const client = createClient();
     const channel = client.channel("ptg-availability");
     let stopped = false;
@@ -142,7 +142,23 @@ function VerifyPtgSessionGate({
       }
       checking = true;
       try {
-        await invokePtgAuth("session-status");
+        const result = await invokePtgAuth("session-status");
+        if (stopped || !result.account) return; // Compatible with older status responses.
+        const account = result.account;
+        if (account.mustChangePassword) {
+          stopped = true;
+          setSession(null);
+          router.replace("/change-password");
+          return;
+        }
+        if (allowedRoles && !allowedRoles.split("|").includes(account.role)) {
+          stopped = true;
+          setSession(null);
+          router.replace(deniedTo);
+          return;
+        }
+        // Use only the freshly authenticated server response, never a cached or inferred role.
+        setSession(current => current && JSON.stringify(current) === JSON.stringify(account) ? current : account);
       } catch (error) {
         if (!stopped && typeof error === "object" && error !== null && "status" in error && error.status === 401) {
           stopped = true;
@@ -185,7 +201,7 @@ function VerifyPtgSessionGate({
       document.removeEventListener("visibilitychange", onVisibility);
       void client.removeChannel(channel);
     };
-  }, [role, router, watchAvailability]);
+  }, [role, router, watchAvailability, allowedRoles, deniedTo]);
 
   if (availabilityNotice) {
     return <AppDialog title={availabilityNotice.title} busy={false} closeIcon onClose={() => router.replace("/login")}>

@@ -390,8 +390,8 @@ Deno.serve(async request => {
     if (!session) return json(origin, { ok: false, message: "Please sign in again." }, 401);
 
     if ("unavailable" in session) return json(origin, { ok: false, availability: session.unavailable, message: "PTG is temporarily unavailable." }, 401);
-    if (action === "session-status") return json(origin, { ok: true });
-    if (action === "session") {
+    // Read-only status polls return the freshly verified account without touching idle activity.
+    if (action === "session-status" || action === "session") {
       return json(origin, { ok: true, account: {
         username: session.username,
         displayName: session.displayName,

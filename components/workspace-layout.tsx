@@ -82,7 +82,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>
       </a>)}
-      <details className="ptg-r6-account"><summary><strong>{session.username}</strong><small>{session.legacyRole || session.role.replaceAll("_"," ")}</small></summary><div className="ptg-r6-account-menu"><LogoutButton /></div></details>
+      <details className="ptg-r6-account"><summary><strong>{session.displayName.trim() || session.username}</strong><small>{session.legacyRole.trim() || session.role.replaceAll("_"," ")}</small></summary><div className="ptg-r6-account-menu"><LogoutButton /></div></details>
     </nav>
     <div className={"ptg-app" + (railCollapsed ? " ptg-workspace-collapsed" : "")}>
     <aside className={"ptg-sidebar ptg-print-hide" + (railCollapsed && !desk ? " ptg-sidebar-compact" : "")} data-menu-open={open}>
@@ -112,8 +112,8 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         </div>
         <div className="ptg-sidebar-bottom">
           <div className="ptg-user-chip">
-            <span className="ptg-avatar">{session.username.slice(0, 1).toUpperCase()}</span>
-            <span><strong>{session.username}</strong><small>{session.role.replaceAll("_", " ")}</small></span>
+            <span className="ptg-avatar">{(session.displayName.trim() || session.username).slice(0, 1).toUpperCase()}</span>
+            <span><strong>{session.displayName.trim() || session.username}</strong><small>{session.legacyRole.trim() || session.role.replaceAll("_", " ")}</small></span>
           </div>
           <LogoutButton />
         </div>
