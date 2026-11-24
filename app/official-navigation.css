@@ -154,3 +154,8 @@
  .ptg-web-r6 .ptg-r6-account{flex:0 1 220px;margin-left:auto}
  .ptg-web-r6 .ptg-r6-account summary::-webkit-details-marker{display:none}
 }
+.ptg-r6-branchline-wordart{display:none}
+@media(min-width:1010px){
+ .ptg-web-r6 .ptg-r6-branchline-wordart{display:block;flex:0 1 22%;width:22%;min-width:0;height:72px;object-fit:contain}
+ .ptg-web-r6 .ptg-r6-megasaver{flex:1 1 410px;max-width:none;height:76px;object-position:center}
+}

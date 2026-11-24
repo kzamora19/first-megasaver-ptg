@@ -71,6 +71,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu} title="Branchline applications">
         <img src={withBasePath(browserShell ? "/icons/r6/Approved.branchline.png" : "/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
+      <img className="ptg-r6-branchline-wordart" src={withBasePath("/icons/r6/BranchlineWordartFull.png")} alt="Branchline"/>
       <img className="ptg-r6-megasaver" src={withBasePath("/icons/r6/FirstMegasaverHeader.png")} alt="1st Megasaver"/>
       {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id===activeApp?" is-active":"")}
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
