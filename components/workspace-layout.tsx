@@ -33,6 +33,11 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
     {id:"megaframe-studio",name:"MegaFrame Studio",label:"Frame",href:withBasePath("/studios/?studio=megaframe")},
     {id:"flyer-studio",name:"MegaFlyer Studio",label:"Flyer",href:withBasePath("/studios/?studio=flyer")}
   ];
+  const toggleWorkspaceMenu = () => {
+    setAppMenuOpen(false);
+    if (desktopMode) setRailCollapsed(value => !value);
+    else setOpenOnPath(open ? null : path);
+  };
   const toggleAppMenu = () => {setOpenOnPath(null);setAppMenuOpen(value=>!value);};
   useEffect(() => {
     const native=!!(window as Window & {chrome?:{webview?:unknown}}).chrome?.webview;
@@ -67,8 +72,8 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   return <div className={"ptg-unified-host"+(browserShell?" ptg-web-r6":"")}>
     <WebRelease />
     <nav className="ptg-universal-app-rail ptg-print-hide" aria-label="Branchline applications">
-      <button type="button" className="ptg-official-brand-logo" aria-label={appMenuOpen?"Close application list":"Open application list"}
-        aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu} title="Branchline applications">
+      <button type="button" className="ptg-official-brand-logo" aria-label={browserShell ? (railCollapsed ? "Open workspace menu" : "Close workspace menu") : (appMenuOpen ? "Close application list" : "Open application list")}
+        aria-expanded={browserShell ? !railCollapsed : appMenuOpen} aria-controls={browserShell ? "ptg-workspace-links" : "ptg-universal-app-drawer"} onClick={browserShell ? toggleWorkspaceMenu : toggleAppMenu}>
         <img src={withBasePath(browserShell ? "/icons/r6/Approved.branchline.png" : "/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
       <img className="ptg-r6-branchline-wordart" src={withBasePath("/icons/r6/BranchlineWordartFull.png")} alt="Branchline"/>
@@ -96,11 +101,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         <button className="ptg-menu-toggle" type="button"
           aria-label={(desktopMode ? !railCollapsed : open) ? "Close workspace menu" : "Open workspace menu"}
           aria-expanded={desktopMode ? !railCollapsed : open} aria-controls="ptg-workspace-links"
-          onClick={() => {
-            setAppMenuOpen(false);
-            if (desktopMode) setRailCollapsed(value => !value);
-            else setOpenOnPath(open ? null : path);
-          }}>
+          onClick={toggleWorkspaceMenu}>
           <span aria-hidden="true">☰</span>
         </button>
       </div>

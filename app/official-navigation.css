@@ -165,3 +165,6 @@
  .ptg-web-r6 .ptg-nav-item{gap:8px;min-height:36px;margin:2px 0;padding:7px 8px}
  .ptg-web-r6 .ptg-nav-item.active{background:#1557a0;box-shadow:inset 3px 0 #12d3e4}
 }
+@media(min-width:721px){
+ .ptg-web-r6 .ptg-sidebar-header .ptg-menu-toggle{display:none}
+}
