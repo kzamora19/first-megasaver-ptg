@@ -1,4 +1,4 @@
-const CACHE_NAME = "first-megasaver-ptg-shell-v2";
+const CACHE_NAME = "first-megasaver-ptg-shell-v3-r6-isolation";
 const OFFLINE_URL = new URL("offline.html", self.registration.scope).pathname;
 
 self.addEventListener("install", (event) => {
@@ -11,10 +11,9 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    )
+      Promise.all(keys.filter((key) => key.startsWith("first-megasaver-ptg-shell-") && key !== CACHE_NAME).map((key) => caches.delete(key)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {

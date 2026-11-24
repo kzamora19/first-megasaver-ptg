@@ -48,6 +48,8 @@ jobs:
         run: node --test lib/ptg/subdealer-layout.test.mjs
       - name: Verify PTG responsive screen and print separation
         run: node --test lib/ptg/responsive-layout.test.mjs
+      - name: Verify PWA cache isolation and original installation identities
+        run: node --test lib/ptg/pwa-cache.test.cjs
       - name: Build static site
         run: npm run build
       - name: Upload Pages artifact
