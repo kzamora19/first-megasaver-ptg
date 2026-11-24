@@ -93,7 +93,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         </button>
         <BrandLink className="ptg-brand" href={desk ? withBasePath("/data-desk/") : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
           <span className="ptg-brand-lockup">
-            <img className="ptg-r6-sidebar-logo" src={withBasePath("/icons/r6/Approved.sales.png")} alt=""/>
+            <img className="ptg-r6-sidebar-logo" src={withBasePath(desk ? "/icons/official/data-desk.png" : "/icons/r6/Approved.ptg.png")} alt=""/>
             <img className="ptg-brand-wide-logo" src={withBasePath("/branchline-logo.png")} alt="" />
             <img className="ptg-brand-mini-logo" src={withBasePath("/icons/ptg-icon.svg")} alt="" />
             <small>{desk ? "DATA DESK" : activeApp==="megaframe-studio" ? "MEGAFRAME STUDIO" : activeApp==="flyer-studio" ? "MEGAFLYER STUDIO" : "PRICE TAG GENERATOR"}</small>
@@ -109,7 +109,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
       <div className="ptg-sidebar-content" id="ptg-workspace-links">
         <div className="ptg-sidebar-menu">
           <div className="ptg-nav-label">{desk ? "IMPORT TOOLS" : "WORKSPACE"}</div>
-          <WorkspaceNav role={session.role} legacyRole={session.legacyRole} active={path} desk={desk} onNavigate={() => setOpenOnPath(null)} />
+          <WorkspaceNav role={session.role} active={path} desk={desk} onNavigate={() => setOpenOnPath(null)} />
         </div>
         <div className="ptg-sidebar-bottom">
           <div className="ptg-user-chip">

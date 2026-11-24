@@ -8,12 +8,10 @@ const deskPtgTools = [
   ["/product-master", "Product Master"],
   ["/admin/logos", "Logo Manager"],
 ];
-export default function WorkspaceNav({ role, legacyRole = "", active, desk = false, onNavigate }: {
-  role: string; legacyRole?: string; active: string; desk?: boolean; onNavigate: () => void;
+export default function WorkspaceNav({ role, active, desk = false, onNavigate }: {
+  role: string; active: string; desk?: boolean; onNavigate: () => void;
 }) {
   const system = role === "SYSTEM_ADMIN";
-  const studiosAllowed=system||role==="BRANCH_ADMIN"||
-    (role==="BRANCH_USER"&&legacyRole.trim().toUpperCase()==="TEAM LEADER");
   const query = useSearchParams();
   const onDesk = active === "/data-desk";
   const catalog = onDesk && query.get("mode") === "catalog";
@@ -24,6 +22,7 @@ export default function WorkspaceNav({ role, legacyRole = "", active, desk = fal
   const salesTool = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !unifiedInvites ? deskSalesTools.find(tool => tool.id === query.get("tool")) : undefined;
   const unified = onDesk && !catalog && !srp && !promotionPdf && !subdealerPdf && !unifiedInvites && !salesTool;
   if (system && desk) return <nav aria-label="Data Desk import tools" data-branchline-import-menu>
+    <Link href="/admin/accounts/" onClick={onNavigate} className="ptg-nav-item">← Back to PTG</Link>
     <a href={withBasePath("/data-desk/")} onClick={onNavigate}
       className={"ptg-nav-item" + (unified ? " active" : "")}
       aria-current={unified ? "page" : undefined}>Unified Import</a>
@@ -45,9 +44,6 @@ export default function WorkspaceNav({ role, legacyRole = "", active, desk = fal
     <a href={withBasePath("/data-desk/?mode=srp")} onClick={onNavigate}
       className={"ptg-nav-item" + (srp ? " active" : "")}
       aria-current={srp ? "page" : undefined}>Product SRP Import</a>
-    {studiosAllowed&&<Link href="/studios/" onClick={onNavigate}
-      className={"ptg-nav-item"+(active==="/studios"?" active":"")}
-      aria-current={active==="/studios"?"page":undefined}>Creative Studios</Link>}
     <div className="ptg-nav-label">SALES TRACKER</div>
     {deskSalesTools.map(tool => <a key={tool.id} href={withBasePath("/data-desk/?tool=" + tool.id)}
       onClick={onNavigate} className={"ptg-nav-item" + (tool === salesTool ? " active" : "")}
@@ -66,12 +62,6 @@ export default function WorkspaceNav({ role, legacyRole = "", active, desk = fal
         <span className="ptg-nav-icon" aria-hidden="true">{path === "/products" ? "⌕" : "⚙"}</span>
         <span className="ptg-nav-text">{label}</span>
       </Link>)}
-    {studiosAllowed&&<Link href="/studios/" onClick={onNavigate} title="Creative Studios" aria-label="Creative Studios"
-      className={"ptg-nav-item"+(active==="/studios"?" active":"")}
-      aria-current={active==="/studios"?"page":undefined}>
-        <span className="ptg-nav-icon" aria-hidden="true">✦</span>
-        <span className="ptg-nav-text">Creative Studios</span>
-      </Link>}
     {system && <a hidden href={withBasePath("/data-desk/")} data-branchline-catalog-review>Data Desk</a>}
   </nav>;
 }
