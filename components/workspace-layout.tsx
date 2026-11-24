@@ -69,10 +69,9 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
     <nav className="ptg-universal-app-rail ptg-print-hide" aria-label="Branchline applications">
       <button type="button" className="ptg-official-brand-logo" aria-label={appMenuOpen?"Close application list":"Open application list"}
         aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu} title="Branchline applications">
-        <img src={withBasePath("/icons/official/branchline.png")} alt="" aria-hidden="true"/>
+        <img src={withBasePath(browserShell ? "/icons/r6/Approved.branchline.png" : "/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
-      <span className="ptg-r6-wordmark" aria-hidden="true">Branchline.</span>
-      <img className="ptg-r6-megasaver" src={withBasePath("/legacy-ptg/login-logo.png")} alt="1st Megasaver"/>
+      <img className="ptg-r6-megasaver" src={withBasePath("/icons/r6/FirstMegasaverHeader.png")} alt="1st Megasaver"/>
       {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id===activeApp?" is-active":"")}
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>
@@ -84,7 +83,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
       <div className="ptg-sidebar-header">
         <button type="button" className="ptg-official-mobile-logo" aria-label={appMenuOpen?"Close application list":"Open application list"}
           aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu}>
-          <img src={withBasePath("/icons/official/branchline.png")} alt="" aria-hidden="true"/>
+          <img src={withBasePath(browserShell ? "/icons/r6/Approved.branchline.png" : "/icons/official/branchline.png")} alt="" aria-hidden="true"/>
         </button>
         <BrandLink className="ptg-brand" href={desk ? withBasePath("/data-desk/") : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
           <span className="ptg-brand-lockup">
