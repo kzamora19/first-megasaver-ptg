@@ -2,7 +2,7 @@
 
 // Staged PTG launch portal. Access rights are checked by the PTG Edge Function,
 // not by the client-side buttons. No tokens or app secrets are persisted here.
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {createClient} from "@/lib/supabase/client";
 import {getPtgAppSessionId, invokePtgAuth} from "@/lib/ptg/auth-client";
@@ -36,9 +36,10 @@ export default function StudioLaunchPage(){
   const [busy,setBusy]=useState<Studio|null>(null);
   const [requestedStudio,setRequestedStudio]=useState<Studio|null>(null);
   const [message,setMessage]=useState("");
+  const attempted=useRef<Studio|null>(null);
   useEffect(()=>{
     // Source app cards identify which Studio the user requested.
-    // This is presentation context ONLY; it does not issue a ticket automatically.
+    // A named shortcut requests direct launch after the existing account is verified.
     const requested=new URLSearchParams(window.location.search).get("studio");
     if(requested==="megaframe"||requested==="flyer")setRequestedStudio(requested);
   },[]);
@@ -52,7 +53,7 @@ export default function StudioLaunchPage(){
       .finally(()=>{if(live)setChecking(false);});
     return()=>{live=false;};
   },[]);
-  async function launch(studio:Studio){
+  async function launch(studio:Studio,automatic=false){
     setBusy(studio);setMessage("");
     try{
       if(!destinations[studio].url)throw Error("Secure Studio destination has not been configured.");
@@ -79,17 +80,24 @@ export default function StudioLaunchPage(){
       // A location fragment is not sent in HTTP requests or Referer headers.
       // The Studio removes the fragment and exchanges this one-use bearer for a
       // P-256 browser-key-bound proof session; no reusable cookie is created.
-      window.location.assign(destinations[studio].url+"#ptg_studio_ticket="+encodeURIComponent(payload.ticket));
+      const target=destinations[studio].url+"#ptg_studio_ticket="+encodeURIComponent(payload.ticket);
+      if(automatic)window.location.replace(target);else window.location.assign(target);
     }catch(error){
       setMessage(error instanceof Error?error.message:"Could not open the studio.");
       setBusy(null);
     }
   }
   const eligible=allowedRole(account);
+  useEffect(()=>{
+    if(checking||!eligible||!requestedStudio||busy!==null||attempted.current===requestedStudio)return;
+    attempted.current=requestedStudio;
+    void launch(requestedStudio,true);
+  },[checking,eligible,requestedStudio,busy]);
+  if(requestedStudio&&(checking||(eligible&&!message)))return <main className="shell"><section className="panel"><p role="status">Opening {destinations[requestedStudio].name} securely…</p></section></main>;
   return <main className="shell"><section className="hero">
-    <h1>Creative Studios</h1>
+    <h1>{requestedStudio?destinations[requestedStudio].name:"Creative Studios"}</h1>
     <p className="intro">Access requires an active PTG Team Leader, Branch Admin or System Admin account.</p>
-    {requestedStudio&&<p role="status">Selected: <strong>{destinations[requestedStudio].name}</strong>. Use the button below to verify your PTG account and open the protected editor.</p>}
+    {requestedStudio&&<p role="status">Selected: <strong>{destinations[requestedStudio].name}</strong>. Your selected editor can be reopened below if the automatic launch was interrupted.</p>}
   </section>
   <section className="panel install-panel">
     {checking?<p role="status">Checking PTG authorization…</p>:
@@ -97,7 +105,7 @@ export default function StudioLaunchPage(){
       <>
         <p>Signed in as <strong>{account?.displayName||"PTG user"}</strong></p>
         <div style={{display:"grid",gap:16,gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))"}}>
-          {(Object.keys(destinations) as Studio[]).map(studio=><div key={studio} className="panel" style={{padding:16,outline:requestedStudio===studio?"2px solid #355ee8":undefined}}>
+          {(requestedStudio?[requestedStudio]:(Object.keys(destinations) as Studio[])).map(studio=><div key={studio} className="panel" style={{padding:16,outline:requestedStudio===studio?"2px solid #355ee8":undefined}}>
             <h2>{destinations[studio].name}</h2><p>{destinations[studio].summary}</p>
             <button type="button" className="admin-button" disabled={busy!==null||!destinations[studio].url} onClick={()=>void launch(studio)}>
               {!destinations[studio].url?"Launch unavailable until secure hosting is configured":busy===studio?"Checking access…":"Open "+destinations[studio].name}

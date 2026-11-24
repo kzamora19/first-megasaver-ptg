@@ -48,12 +48,16 @@
     function escape(e){if(e.key==="Escape"&&!panel.hidden){togglePanel(false);bell.focus();}}
     doc.addEventListener("click",outside);doc.addEventListener("keydown",escape);
     function mountBell(){
-      const selectors=[".mobile-workspace-header",".ptg-sidebar-header"];
+      const selectors=[".mobile-workspace-header",".ptg-web-r6 .ptg-universal-app-rail",".ptg-sidebar-header"];
       const header=selectors.map(s=>doc.querySelector(s)).find(e=>e&&e.getClientRects().length);
-      if(header){if(box.parentElement!==header)header.append(box);box.classList.remove("bl-bell-fallback");}
+      if(header){if(box.parentElement!==header){const account=header.querySelector(".ptg-r6-account");if(account)header.insertBefore(box,account);else header.append(box);}box.classList.remove("bl-bell-fallback");}
       else{if(box.parentElement!==doc.body)doc.body.append(box);box.classList.add("bl-bell-fallback");}
     }
     mountBell();
+    root.addEventListener("resize",mountBell);
+    const host=doc.querySelector(".ptg-unified-host");
+    const navObserver=new MutationObserver(mountBell);
+    if(host)navObserver.observe(host,{attributes:true,attributeFilter:["class"]});
     const observer=new MutationObserver(()=>mountBell());observer.observe(doc.body,{subtree:true,childList:true,attributes:true,attributeFilter:["hidden"]});
     async function publishedWorkspace(){
       try{
@@ -131,7 +135,7 @@
     const timer=root.setInterval(()=>refresh(false),15*60*1000);
     root.addEventListener("branchline-ptg-release-unmount",()=>{
       active=false;root.clearInterval(timer);root.removeEventListener("online",online);
-      doc.removeEventListener("visibilitychange",visible);observer.disconnect();doc.removeEventListener("click",outside);doc.removeEventListener("keydown",escape);box.remove();
+      doc.removeEventListener("visibilitychange",visible);observer.disconnect();navObserver.disconnect();root.removeEventListener("resize",mountBell);doc.removeEventListener("click",outside);doc.removeEventListener("keydown",escape);box.remove();
     },{once:true});
     refresh(false);
   }

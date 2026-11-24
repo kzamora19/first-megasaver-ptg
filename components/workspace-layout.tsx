@@ -18,6 +18,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [desktopMode, setDesktopMode] = useState(false);
+  const [browserShell,setBrowserShell]=useState(false);
   const query = useSearchParams();
   const router = useRouter();
   const desk = path === "/data-desk" || (deskTools.has(path) && query.get("workspace") === "data-desk");
@@ -34,6 +35,8 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   ];
   const toggleAppMenu = () => {setOpenOnPath(null);setAppMenuOpen(value=>!value);};
   useEffect(() => {
+    const native=!!(window as Window & {chrome?:{webview?:unknown}}).chrome?.webview;
+    setBrowserShell(!native);
     const query = window.matchMedia("(min-width: 721px)");
     const update = () => setDesktopMode(query.matches);
     update();
@@ -61,17 +64,20 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
     return () => { active = false; window.clearInterval(timer); };
   }, [desk, router]);
 
-  return <div className="ptg-unified-host">
+  return <div className={"ptg-unified-host"+(browserShell?" ptg-web-r6":"")}>
     <WebRelease />
     <nav className="ptg-universal-app-rail ptg-print-hide" aria-label="Branchline applications">
       <button type="button" className="ptg-official-brand-logo" aria-label={appMenuOpen?"Close application list":"Open application list"}
         aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu} title="Branchline applications">
         <img src={withBasePath("/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
+      <span className="ptg-r6-wordmark" aria-hidden="true">Branchline.</span>
+      <img className="ptg-r6-megasaver" src={withBasePath("/legacy-ptg/app-header-original.png")} alt="1st Megasaver"/>
       {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id===activeApp?" is-active":"")}
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>
       </a>)}
+      <details className="ptg-r6-account"><summary><strong>{session.username}</strong><small>{session.legacyRole || session.role.replaceAll("_"," ")}</small></summary><div className="ptg-r6-account-menu"><LogoutButton /></div></details>
     </nav>
     <div className={"ptg-app" + (railCollapsed ? " ptg-workspace-collapsed" : "")}>
     <aside className={"ptg-sidebar ptg-print-hide" + (railCollapsed && !desk ? " ptg-sidebar-compact" : "")} data-menu-open={open}>

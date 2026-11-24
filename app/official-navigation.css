@@ -88,3 +88,46 @@
  .ptg-unified-host .ptg-sidebar{z-index:43}
  html.bl-mobile-embedded .ptg-official-mobile-logo,html.bl-mobile-embedded .ptg-universal-drawer-backdrop{display:none!important}
 }
+
+/* R6 browser-installed desktop shell; leave native WebView2 chrome intact. */
+.ptg-r6-wordmark,.ptg-r6-megasaver,.ptg-r6-account{display:none}
+.ptg-unified-host .ptg-nav-item{width:100%;box-sizing:border-box}
+.ptg-unified-host .ptg-nav-item .ptg-nav-text{width:auto;flex:1 1 auto;min-width:0;text-align:left;font-size:inherit;overflow-wrap:normal;word-break:normal}
+.ptg-unified-host .ptg-nav-item .ptg-nav-icon{flex:0 0 18px;width:18px}
+@media(min-width:721px){
+ .ptg-web-r6{--ptg-web-header:84px;--ptg-outer-rail:0px;padding:var(--ptg-web-header) 0 0}
+ .ptg-web-r6 .ptg-universal-app-rail{inset:0 0 auto;width:100%;height:var(--ptg-web-header);box-sizing:border-box;display:flex;flex-direction:row;align-items:center;padding:8px 16px;gap:8px;overflow:visible;background:#102847;z-index:60}
+ .ptg-web-r6 .ptg-official-brand-logo{flex:0 0 56px;margin:0;border:0}
+ .ptg-web-r6 .ptg-official-brand-logo img{width:48px;height:48px;object-fit:contain}
+ .ptg-web-r6 .ptg-r6-wordmark{display:block;font-size:clamp(18px,2.5vw,34px);color:white;font-weight:800;white-space:nowrap}
+ .ptg-web-r6 .ptg-r6-megasaver{display:block;min-width:0;width:30%;height:62px;object-fit:contain;margin-right:auto}
+ .ptg-web-r6 .ptg-official-app-choice{flex:0 0 52px;min-height:58px;border-color:transparent;box-shadow:none}
+ .ptg-web-r6 .ptg-official-app-choice.is-active{background:#1a426f;border-color:transparent;box-shadow:none}
+ .ptg-web-r6 .ptg-r6-account{display:block;position:relative;min-width:0;max-width:180px;color:white;text-align:right}
+ .ptg-web-r6 .ptg-r6-account summary{cursor:pointer;list-style:none;padding:8px 4px}
+ .ptg-web-r6 .ptg-r6-account summary:after{content:" ▾"}
+ .ptg-web-r6 .ptg-r6-account summary strong,.ptg-web-r6 .ptg-r6-account summary small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .ptg-web-r6 .ptg-r6-account summary small{font-size:11px;color:#d5e4ef}
+ .ptg-web-r6 .ptg-r6-account-menu{position:absolute;right:0;top:100%;min-width:150px;padding:12px;border-radius:8px;background:#102847;box-shadow:0 4px 14px #0004}
+ .ptg-web-r6 .ptg-sidebar{top:var(--ptg-web-header);height:calc(100dvh - var(--ptg-web-header));box-sizing:border-box}
+ .ptg-web-r6 .ptg-sidebar-header{flex-direction:row;justify-content:space-between}
+ .ptg-web-r6 .ptg-sidebar-header .ptg-brand{padding:0}
+ .ptg-web-r6 .ptg-brand-lockup img{display:none!important}
+ .ptg-web-r6 .ptg-brand-lockup small{margin:0}
+ .ptg-web-r6 .ptg-universal-drawer-backdrop{inset:var(--ptg-web-header) 0 0;z-index:59}
+ .ptg-web-r6 .ptg-sidebar-bottom{display:none}
+}
+@media(min-width:721px) and (max-width:1000px){
+ .ptg-web-r6 .ptg-r6-megasaver{width:17%;height:48px}
+ .ptg-web-r6 .ptg-universal-app-rail{gap:4px;padding:6px}
+ .ptg-web-r6 .ptg-r6-account{max-width:105px}
+}
+@media(max-width:720px){
+ .ptg-unified-host .ptg-sidebar-menu,.ptg-unified-host .ptg-sidebar-menu nav,.ptg-unified-host .ptg-sidebar-content{width:100%;min-width:0}
+ .ptg-unified-host .ptg-nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;min-height:42px}
+ .ptg-unified-host .ptg-sidebar-header .ptg-menu-toggle{margin-left:auto}
+ .ptg-unified-host .ptg-sidebar-header #bl-release-check{margin-left:0}
+}
+@media print{.ptg-web-r6{padding:0!important}}
+
+@media(min-width:721px){.ptg-web-r6 .legacy-products-banner-pin{display:none!important}.ptg-web-r6 .legacy-tools-account{display:none!important}}

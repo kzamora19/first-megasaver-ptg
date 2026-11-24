@@ -31,3 +31,13 @@ test("existing installation identity and secure mobile launch routes",()=>{
  assert.ok(read("components/web-release.tsx").includes('release.sequence'));
  assert.equal(restartPath("/first-megasaver-ptg/login/"),null);
 });
+
+test("desktop and mobile device layout corrections preserve verified direct Studio launch",()=>{
+ const css=read("app/official-navigation.css"),portal=read("app/studios/page.tsx");
+ assert.ok(css.includes(".ptg-nav-item .ptg-nav-text{width:auto;flex:1 1 auto"));
+ assert.ok(css.includes(".ptg-web-r6 .ptg-universal-app-rail"));
+ assert.ok(portal.includes("attempted.current=requestedStudio"));
+ assert.ok(portal.includes('const check=await invokePtgAuth("session")'));
+ assert.ok(portal.includes('if(!check.account||!allowedRole(check.account))'));
+ assert.ok(portal.includes('JSON.stringify({action:"issue",studio})'));
+});
