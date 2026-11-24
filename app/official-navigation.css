@@ -159,3 +159,9 @@
  .ptg-web-r6 .ptg-r6-branchline-wordart{display:block;flex:0 1 22%;width:22%;min-width:0;height:72px;object-fit:contain}
  .ptg-web-r6 .ptg-r6-megasaver{flex:1 1 410px;max-width:none;height:76px;object-position:center}
 }
+@media(min-width:721px){
+ .ptg-web-r6 .ptg-app:not(.ptg-workspace-collapsed){grid-template-columns:242px minmax(0,1fr)}
+ .ptg-web-r6 .ptg-sidebar{padding:16px 10px}
+ .ptg-web-r6 .ptg-nav-item{gap:8px;min-height:36px;margin:2px 0;padding:7px 8px}
+ .ptg-web-r6 .ptg-nav-item.active{background:#1557a0;box-shadow:inset 3px 0 #12d3e4}
+}
