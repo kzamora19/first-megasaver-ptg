@@ -50,6 +50,8 @@ jobs:
         run: node --test lib/ptg/responsive-layout.test.mjs
       - name: Verify PWA cache isolation and original installation identities
         run: node --test lib/ptg/pwa-cache.test.cjs
+      - name: Verify web update scope and mobile compatibility
+        run: node --test tests/r6-web-updates.test.cjs
       - name: Build static site
         run: npm run build
       - name: Upload Pages artifact

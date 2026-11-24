@@ -1,0 +1,55 @@
+name: R6 PTG production build preflight
+on:
+  pull_request:
+    branches: [migration/github-pages]
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'public/updates/**'
+      - '.github/workflows/r6-ptg-build.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAGES: "true"
+      NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
+      NEXT_PUBLIC_SUPABASE_URL: https://agknxlowackphvwyvxge.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_kv2q3dnNQt4ij0mgkOLbQQ_S2MO9FvG
+      NEXT_PUBLIC_PTG_USE_EDGE_AUTH: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_DATA: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_ASSETS: "true"
+      NEXT_PUBLIC_PTG_USE_EDGE_ACCOUNTS: "true"
+      NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL: https://psoopubvdpwztzkdyifa.supabase.co
+      NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY: sb_publishable_e_6K64Wul2fJEq2KiuvnTA_NmuaKqNm
+      NEXT_PUBLIC_PTG_ENABLE_CATALOG_PILOT_WRITES: "false"
+
+      NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES: "true"
+      # Controlled protected-access test routes; existing editors remain published.
+      NEXT_PUBLIC_STUDIO_MEGAFRAME_LAUNCH_URL: https://kzamora19.github.io/megaframe-studio/studio/
+      NEXT_PUBLIC_STUDIO_FLYER_LAUNCH_URL: https://kzamora19.github.io/flyer-studio/studio/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Verify Subdealer PDF field extraction
+        run: node --test lib/ptg/subdealer-layout.test.mjs
+      - name: Verify PTG responsive screen and print separation
+        run: node --test lib/ptg/responsive-layout.test.mjs
+      - name: Verify PWA cache isolation and original installation identities
+        run: node --test lib/ptg/pwa-cache.test.cjs
+      - name: Verify web update scope and mobile compatibility
+        run: node --test tests/r6-web-updates.test.cjs
+      - name: Build static site
+        run: npm run build
+      - name: Verify generated release metadata
+        run: |
+          grep -q 'name="branchline-web-release" content="2026112401"' out/products/index.html
+          grep -q 'name="branchline-web-release" content="2026112401"' out/workspace/mobile/index.html
+          test -f out/updates/release.json
