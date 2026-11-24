@@ -142,3 +142,6 @@
 @media(max-width:720px){
  .ptg-unified-host .ptg-sidebar-header{position:sticky;top:0;background:#102847;z-index:45}
 }
+
+@media(min-width:1001px){.ptg-web-r6 .ptg-r6-megasaver{height:78px;max-width:580px;object-fit:cover;object-position:center;filter:grayscale(1) contrast(5);mix-blend-mode:screen}}
+@media(min-width:721px) and (max-width:1000px){.ptg-web-r6 .ptg-r6-megasaver{object-fit:contain;filter:grayscale(1) contrast(5);mix-blend-mode:screen}}
