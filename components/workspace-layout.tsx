@@ -28,7 +28,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   // Data Desk is a PTG workspace tool, not a fifth Branchline application.
   const activeApp = path === "/studios" && query.get("studio")==="megaframe" ? "megaframe-studio" : path === "/studios" && query.get("studio")==="flyer" ? "flyer-studio" : "price-tag-generator";
   const apps = [
-    {id:"price-tag-generator",name:"Price Tag Generator",label:"PTG",href:withBasePath("/products/")},
+    {id:"price-tag-generator",name:"Price Tag Generator",label:"PTG",href:withBasePath("/")},
     {id:"sales-tracker",name:"Sales Tracker",label:"Sales",href:"/branchline/"},
     {id:"megaframe-studio",name:"MegaFrame Studio",label:"Frame",href:withBasePath("/studios/?studio=megaframe")},
     {id:"flyer-studio",name:"MegaFlyer Studio",label:"Flyer",href:withBasePath("/studios/?studio=flyer")}

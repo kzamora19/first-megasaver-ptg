@@ -6,7 +6,7 @@
 .ptg-official-brand-logo{min-height:62px;display:grid;place-items:center;cursor:pointer;background:transparent;
  border:1px solid transparent;border-bottom-color:#315786;border-radius:10px;margin-bottom:9px}
 .ptg-official-brand-logo img{width:43px;height:43px;object-fit:contain}
-.ptg-official-brand-logo:hover,.ptg-official-brand-logo[aria-expanded="true"]{border-color:#0dd9eb;background:#123e73}
+.ptg-official-brand-logo:hover{border-color:#0dd9eb;background:#123e73}
 .ptg-official-app-choice{min-height:62px;display:flex;align-items:center;justify-content:center;
  flex-direction:column;gap:4px;padding:5px 3px;color:#e7f5ff;text-decoration:none;background:transparent;
  border:1px solid transparent;border-radius:10px;font:600 10px/1.2 "Segoe UI",Arial,sans-serif}
@@ -167,4 +167,17 @@
 }
 @media(min-width:721px){
  .ptg-web-r6 .ptg-sidebar-header .ptg-menu-toggle{display:none}
+}
+
+/* Same-origin navigation uses a short browser-managed transition. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .ptg-web-r6 .ptg-universal-app-rail { view-transition-name: branchline-header; }
+  ::view-transition-group(root) { animation-duration: 120ms; }
+  ::view-transition-old(branchline-header) { display: none; }
+  ::view-transition-group(branchline-header),
+  ::view-transition-new(branchline-header) { animation-duration: 0s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) { animation-duration: 0s; }
 }

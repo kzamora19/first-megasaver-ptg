@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import {
   clearPtgAuthSession,
   getAvailabilityNotice,
+  getPtgAppSessionId,
   invokePtgAuth,
   usesEdgeAuth,
   type EdgeAuthResponse,
@@ -67,6 +68,10 @@ function VerifyPtgSessionGate({
         setProgress(10);
         let account: PtgClientSession | undefined;
         if (usesEdgeAuth) {
+          if (!getPtgAppSessionId()) {
+            router.replace("/login");
+            return;
+          }
           const result = await invokePtgAuth("session");
           account = result.account;
         } else {
@@ -84,7 +89,7 @@ function VerifyPtgSessionGate({
         }
         if (cancelled) return;
         if (!account) {
-          if (usesEdgeAuth) await clearPtgAuthSession();
+          if (usesEdgeAuth) await clearPtgAuthSession().catch(() => {});
           router.replace("/login");
           return;
         }
@@ -110,8 +115,8 @@ function VerifyPtgSessionGate({
             setSession(null);
             void clearPtgAuthSession().catch(() => {});
           } else {
-            await clearPtgAuthSession();
-            router.replace("/login");
+            await clearPtgAuthSession().catch(() => {});
+            if (!cancelled) router.replace("/login");
           }
           return;
         }
