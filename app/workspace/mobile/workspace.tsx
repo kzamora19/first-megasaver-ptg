@@ -24,7 +24,7 @@ export default function MobileWorkspace() {
   }
 
   return <main className="mobile-workspace">
-    <WebRelease />
+    {current === null && <WebRelease />}
     <header className="mobile-workspace-header">
       <button type="button" className="mobile-workspace-brand" onClick={() => setCurrent(null)} aria-label="Branchline Workspace home">
         <img src="/branchline/icons/icon-192.png" width="28" height="28" alt="" />

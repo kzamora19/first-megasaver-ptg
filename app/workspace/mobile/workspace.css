@@ -23,3 +23,9 @@
 .mobile-workspace-choice-icon svg { width: 34px; height: 34px; }
 .mobile-workspace-choice:focus-visible { outline: 3px solid #2b66dc; outline-offset: 3px; }
 
+
+/* Keep all four integrated choices accessible on the legacy mobile install. */
+.mobile-workspace-header nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.mobile-workspace-header nav button{min-width:0;font-size:13px}
+.mobile-workspace-home{height:100%;box-sizing:border-box;overflow-y:auto;padding-bottom:85px}
+.mobile-workspace-choice-icon.megaframe,.mobile-workspace-choice-icon.flyer{background:transparent}
