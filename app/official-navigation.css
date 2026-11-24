@@ -188,7 +188,7 @@
 .ptg-brand-lockup .ptg-r6-sidebar-logo{display:none}
 @media(min-width:721px){
  .ptg-web-r6 .ptg-brand-lockup{display:flex;align-items:center;gap:8px}
- .ptg-web-r6 .ptg-brand-lockup .ptg-r6-sidebar-logo{display:block!important;width:32px;height:32px;object-fit:contain}
+ .ptg-web-r6 .ptg-brand-lockup .ptg-r6-sidebar-logo{display:block!important;width:32px;height:32px;object-fit:contain;filter:none;mix-blend-mode:normal}
 }
 
 .bl-startup-host{padding-top:96px}
