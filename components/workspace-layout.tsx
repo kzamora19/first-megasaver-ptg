@@ -72,7 +72,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         <img src={withBasePath("/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
       <span className="ptg-r6-wordmark" aria-hidden="true">Branchline.</span>
-      <img className="ptg-r6-megasaver" src={withBasePath("/legacy-ptg/app-header-original.png")} alt="1st Megasaver"/>
+      <img className="ptg-r6-megasaver" src={withBasePath("/legacy-ptg/price-tag-header.png")} alt="1st Megasaver"/>
       {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id===activeApp?" is-active":"")}
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>

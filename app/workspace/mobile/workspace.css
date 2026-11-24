@@ -43,3 +43,12 @@
 .mobile-app-list .mobile-workspace-choice{padding:10px;min-height:60px}
 .mobile-workspace-choice-icon{background:transparent}
 .mobile-workspace-home{padding:20px 16px}
+
+/* The outer mobile header owns the viewport, not the scrolling iframe. */
+html:has(.mobile-workspace),body:has(.mobile-workspace){margin:0;overflow:hidden;overscroll-behavior:none}
+.mobile-workspace{position:fixed;inset:0;height:auto;max-height:100dvh;overflow:hidden}
+.mobile-workspace-header{position:relative;z-index:100;flex:0 0 auto;min-height:54px;box-sizing:border-box;padding:max(6px,env(safe-area-inset-top)) 10px 6px;box-shadow:0 1px 5px #051e4333}
+.mobile-workspace-content{min-height:0;overflow:hidden}
+.mobile-workspace-content iframe{display:block;min-height:0}
+.mobile-workspace-content iframe[hidden]{display:none!important}
+.mobile-workspace-header #bl-release-check{margin-left:auto}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import InstallApp from "@/components/install-app";
 import WebRelease from "@/components/web-release";
 import { withBasePath } from "@/lib/base-path";
@@ -36,13 +36,55 @@ export default function MobileWorkspace() {
     setCurrent(app);
     setListOpen(false);
   }
+  // Relay only the existing public update button on the active same-origin
+  // application document. The protected editor iframe stays opaque.
+  useEffect(()=>{
+    const root=document.querySelector(".mobile-workspace");
+    if(!root)return;
+    let previous:Document|null=null;
+    function activeDocument(){
+      const frame=root!.querySelector<HTMLIFrameElement>("iframe:not([hidden])");
+      try{
+        if(!frame?.contentDocument||frame.contentWindow?.location.origin!==window.location.origin)return null;
+        const path=frame.contentWindow.location.pathname;
+        if(!["/branchline/","/first-megasaver-ptg/","/megaframe-studio/studio/","/flyer-studio/studio/"].some(p=>path.startsWith(p)))return null;
+        return frame.contentDocument;
+      }catch{return null;}
+    }
+    function sync(){
+      const parentBell=root!.querySelector<HTMLButtonElement>(".mobile-workspace-header .bl-update-bell");
+      const child=activeDocument(),childBell=child?.querySelector<HTMLButtonElement>("#bl-release-check>.bl-update-bell");
+      if(previous&&previous!==child){previous.documentElement.classList.remove("bl-parent-bell");previous=null;}
+      if(parentBell&&child&&childBell){
+        child.documentElement.classList.add("bl-parent-bell");
+        previous=child;
+        parentBell.classList.toggle("has-update",childBell.classList.contains("has-update"));
+        parentBell.setAttribute("aria-expanded",childBell.getAttribute("aria-expanded")||"false");
+      }
+    }
+    function forward(event:Event){
+      const target=event.target as Element|null;
+      if(!target?.closest(".mobile-workspace-header .bl-update-bell"))return;
+      const child=activeDocument();
+      const button=child?.querySelector<HTMLButtonElement>("#bl-release-check>.bl-update-bell");
+      if(!button)return; // home/older release uses the parent checker normally
+      event.preventDefault();event.stopImmediatePropagation();
+      const own=root!.querySelector<HTMLElement>(".mobile-workspace-header #bl-update-dropdown");
+      if(own)own.hidden=true;
+      button.click();sync();
+    }
+    const timer=window.setInterval(sync,350);
+    root.addEventListener("click",forward,true);
+    sync();
+    return ()=>{window.clearInterval(timer);root.removeEventListener("click",forward,true);previous?.documentElement.classList.remove("bl-parent-bell");};
+  },[current]);
   const choices = apps.map(app => <button key={app.key} type="button" className="mobile-workspace-choice" onClick={() => open(app.key)} aria-current={current===app.key?"page":undefined}>
     <span className="mobile-workspace-choice-icon" aria-hidden="true"><span className={"ptg-official-app-icon "+app.icon}/></span>
     <span><strong>{app.name}</strong><small>{app.summary}</small></span><span aria-hidden="true">→</span>
   </button>);
 
   return <main className="mobile-workspace">
-    {current === null && <WebRelease />}
+    <WebRelease />
     <header className="mobile-workspace-header">
       <button type="button" className="mobile-workspace-brand" onClick={() => setListOpen(value=>!value)} aria-label={listOpen?"Close application list":"Open application list"} aria-expanded={listOpen} aria-controls="mobile-app-list">
         <img src={withBasePath("/icons/official/branchline.png")} width="34" height="34" alt="" />
