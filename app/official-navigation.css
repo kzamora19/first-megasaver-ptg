@@ -131,3 +131,17 @@
 @media print{.ptg-web-r6{padding:0!important}}
 
 @media(min-width:721px){.ptg-web-r6 .legacy-products-banner-pin{display:none!important}.ptg-web-r6 .legacy-tools-account{display:none!important}}
+
+/* Shared readable R6 desktop header; use the existing compact official mark. */
+@media(min-width:721px){
+ .ptg-web-r6 .ptg-r6-megasaver{display:block;flex:1 1 340px;min-width:0;width:100%;max-width:640px;height:66px;object-fit:contain;object-position:center;margin:0 auto}
+ .ptg-web-r6 .ptg-r6-wordmark{flex:0 1 auto;margin-right:0}
+ .ptg-web-r6 .ptg-brand-lockup small,.ptg-web-r6 .ptg-sidebar-menu,.ptg-web-r6 .ptg-nav-item{color:#fff}
+ .ptg-web-r6 .ptg-nav-item.active{background:#1858a0;color:white}
+}
+@media(max-width:720px){
+ .ptg-unified-host .ptg-sidebar-header{position:sticky;top:0;background:#102847;z-index:45}
+}
+
+@media(min-width:1001px){.ptg-web-r6 .ptg-r6-megasaver{height:78px;max-width:580px;object-fit:cover;object-position:center;filter:grayscale(1) contrast(5);mix-blend-mode:screen}}
+@media(min-width:721px) and (max-width:1000px){.ptg-web-r6 .ptg-r6-megasaver{object-fit:contain;filter:grayscale(1) contrast(5);mix-blend-mode:screen}}

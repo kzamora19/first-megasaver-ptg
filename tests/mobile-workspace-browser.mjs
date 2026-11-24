@@ -44,6 +44,8 @@ try{
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   const header=await page.locator(".mobile-workspace-header").boundingBox();
   assert.ok(header.height<=64,"Compact primary header");
+  assert.equal(await page.locator(".mobile-workspace").evaluate(e=>getComputedStyle(e).position),"fixed");
+  assert.equal(await page.locator(".mobile-workspace-header").evaluate(e=>Math.round(e.getBoundingClientRect().top)),0);
   console.log("PASS actual exported mobile workspace",viewport.width,"four app choices, single switcher, no shortcuts, frame draft retained");
   await ctx.close();
  }
