@@ -1,0 +1,21 @@
+name: PTG PWA cache isolation and identity
+on:
+  pull_request:
+    branches: [migration/github-pages]
+    paths:
+      - 'public/sw.js'
+      - 'public/*.webmanifest'
+      - 'lib/ptg/pwa-cache.test.cjs'
+      - '.github/workflows/ptg-pwa-cache.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check public/sw.js
+      - run: node --test lib/ptg/pwa-cache.test.cjs
