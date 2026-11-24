@@ -53,7 +53,7 @@ export default function StudioLaunchPage(){
       .finally(()=>{if(live)setChecking(false);});
     return()=>{live=false;};
   },[]);
-  async function launch(studio:Studio){
+  async function launch(studio:Studio,automatic=false){
     setBusy(studio);setMessage("");
     try{
       if(!destinations[studio].url)throw Error("Secure Studio destination has not been configured.");
@@ -80,7 +80,8 @@ export default function StudioLaunchPage(){
       // A location fragment is not sent in HTTP requests or Referer headers.
       // The Studio removes the fragment and exchanges this one-use bearer for a
       // P-256 browser-key-bound proof session; no reusable cookie is created.
-      window.location.assign(destinations[studio].url+"#ptg_studio_ticket="+encodeURIComponent(payload.ticket));
+      const target=destinations[studio].url+"#ptg_studio_ticket="+encodeURIComponent(payload.ticket);
+      if(automatic)window.location.replace(target);else window.location.assign(target);
     }catch(error){
       setMessage(error instanceof Error?error.message:"Could not open the studio.");
       setBusy(null);
@@ -90,7 +91,7 @@ export default function StudioLaunchPage(){
   useEffect(()=>{
     if(checking||!eligible||!requestedStudio||busy!==null||attempted.current===requestedStudio)return;
     attempted.current=requestedStudio;
-    void launch(requestedStudio);
+    void launch(requestedStudio,true);
   },[checking,eligible,requestedStudio,busy]);
   if(requestedStudio&&(checking||(eligible&&!message)))return <main className="shell"><section className="panel"><p role="status">Opening {destinations[requestedStudio].name} securely…</p></section></main>;
   return <main className="shell"><section className="hero">
