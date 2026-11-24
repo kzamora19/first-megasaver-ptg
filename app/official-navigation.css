@@ -129,3 +129,5 @@
  .ptg-unified-host .ptg-sidebar-header #bl-release-check{margin-left:0}
 }
 @media print{.ptg-web-r6{padding:0!important}}
+
+@media(min-width:721px){.ptg-web-r6 .legacy-products-banner-pin{display:none!important}.ptg-web-r6 .legacy-tools-account{display:none!important}}

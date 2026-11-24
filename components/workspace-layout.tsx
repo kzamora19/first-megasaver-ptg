@@ -77,7 +77,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
         <span className={"ptg-official-app-icon "+app.id} aria-hidden="true"/><span>{app.label}</span>
       </a>)}
-      <details className="ptg-r6-account"><summary><strong>{session.username}</strong><small>{session.role.replaceAll("_"," ")}</small></summary><div className="ptg-r6-account-menu"><LogoutButton /></div></details>
+      <details className="ptg-r6-account"><summary><strong>{session.username}</strong><small>{session.legacyRole || session.role.replaceAll("_"," ")}</small></summary><div className="ptg-r6-account-menu"><LogoutButton /></div></details>
     </nav>
     <div className={"ptg-app" + (railCollapsed ? " ptg-workspace-collapsed" : "")}>
     <aside className={"ptg-sidebar ptg-print-hide" + (railCollapsed && !desk ? " ptg-sidebar-compact" : "")} data-menu-open={open}>

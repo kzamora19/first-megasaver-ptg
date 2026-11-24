@@ -92,10 +92,11 @@ export default function StudioLaunchPage(){
     attempted.current=requestedStudio;
     void launch(requestedStudio);
   },[checking,eligible,requestedStudio,busy]);
+  if(requestedStudio&&(checking||(eligible&&!message)))return <main className="shell"><section className="panel"><p role="status">Opening {destinations[requestedStudio].name} securely…</p></section></main>;
   return <main className="shell"><section className="hero">
     <h1>{requestedStudio?destinations[requestedStudio].name:"Creative Studios"}</h1>
     <p className="intro">Access requires an active PTG Team Leader, Branch Admin or System Admin account.</p>
-    {requestedStudio&&<p role="status">Selected: <strong>{destinations[requestedStudio].name}</strong>. Opening your authorized editor…</p>}
+    {requestedStudio&&<p role="status">Selected: <strong>{destinations[requestedStudio].name}</strong>. Your selected editor can be reopened below if the automatic launch was interrupted.</p>}
   </section>
   <section className="panel install-panel">
     {checking?<p role="status">Checking PTG authorization…</p>:
