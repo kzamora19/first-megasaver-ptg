@@ -76,7 +76,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         aria-expanded={browserShell ? !railCollapsed : appMenuOpen} aria-controls={browserShell ? "ptg-workspace-links" : "ptg-universal-app-drawer"} onClick={browserShell ? toggleWorkspaceMenu : toggleAppMenu}>
         <img src={withBasePath(browserShell ? "/icons/r6/Approved.branchline.png" : "/icons/official/branchline.png")} alt="" aria-hidden="true"/>
       </button>
-      <img className="ptg-r6-branchline-wordart" src={withBasePath("/icons/r6/BranchlineWordartFull.png")} alt="Branchline"/>
+      <a className="ptg-r6-branchline-wordart" href="/branchline/apps/" aria-label="Branchline Workspace Home"><img src={withBasePath("/icons/r6/BranchlineWordartFull.png")} alt="Branchline"/></a>
       <img className="ptg-r6-megasaver" src={withBasePath("/icons/r6/FirstMegasaverHeader.png")} alt="1st Megasaver"/>
       {apps.map(app=><a key={app.id} href={app.href} className={"ptg-official-app-choice "+app.id+(app.id===activeApp?" is-active":"")}
         aria-label={"Open "+app.name} aria-current={app.id===activeApp?"page":undefined} title={app.name} onClick={()=>setAppMenuOpen(false)}>
@@ -93,6 +93,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
         </button>
         <BrandLink className="ptg-brand" href={desk ? withBasePath("/data-desk/") : home} onClick={() => setOpenOnPath(null)} aria-label={desk ? "Data Desk home" : "Branchline Price Tag Generator home"}>
           <span className="ptg-brand-lockup">
+            <img className="ptg-r6-sidebar-logo" src={withBasePath("/icons/r6/Approved.sales.png")} alt=""/>
             <img className="ptg-brand-wide-logo" src={withBasePath("/branchline-logo.png")} alt="" />
             <img className="ptg-brand-mini-logo" src={withBasePath("/icons/ptg-icon.svg")} alt="" />
             <small>{desk ? "DATA DESK" : activeApp==="megaframe-studio" ? "MEGAFRAME STUDIO" : activeApp==="flyer-studio" ? "MEGAFLYER STUDIO" : "PRICE TAG GENERATOR"}</small>
