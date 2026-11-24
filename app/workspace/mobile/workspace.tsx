@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import InstallApp from "@/components/install-app";
+import WebRelease from "@/components/web-release";
 import { withBasePath } from "@/lib/base-path";
 import "./workspace.css";
 
 const apps = [
   { key: "sales", name: "Sales Tracker", src: "/branchline/" },
   { key: "ptg", name: "Price Tag Generator", src: withBasePath("/login/") },
+  { key: "megaframe", name: "MegaFrame Studio", src: withBasePath("/studios/?studio=megaframe") },
+  { key: "flyer", name: "MegaFlyer Studio", src: withBasePath("/studios/?studio=flyer") },
 ] as const;
 type App = (typeof apps)[number]["key"];
 
@@ -21,6 +24,7 @@ export default function MobileWorkspace() {
   }
 
   return <main className="mobile-workspace">
+    <WebRelease />
     <header className="mobile-workspace-header">
       <button type="button" className="mobile-workspace-brand" onClick={() => setCurrent(null)} aria-label="Branchline Workspace home">
         <img src="/branchline/icons/icon-192.png" width="28" height="28" alt="" />
@@ -38,10 +42,10 @@ export default function MobileWorkspace() {
         <div className="mobile-workspace-choices">
           {apps.map(app => <button key={app.key} type="button" className="mobile-workspace-choice" onClick={() => open(app.key)}>
             <span className={`mobile-workspace-choice-icon ${app.key}`} aria-hidden="true">
-              {app.key === "sales" ? <img src="/branchline/icons/icon-192.png" alt="" /> :
+              {app.key === "sales" ? <img src="/branchline/icons/icon-192.png" alt="" /> : app.key === "megaframe" || app.key === "flyer" ? <span className={"ptg-official-app-icon "+(app.key==="megaframe"?"megaframe-studio":"flyer-studio")} aria-hidden="true" /> :
                 <svg viewBox="0 0 48 48" fill="none"><path d="M8 10h17l15 15-15 15L8 23V10Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round"/><circle cx="17" cy="18" r="2.7" fill="currentColor"/><path d="M22 24l7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>}
             </span>
-            <span><strong>{app.name}</strong><small>{app.key === "sales" ? "Track sales and review performance" : "Find products and prepare price tags"}</small></span>
+            <span><strong>{app.name}</strong><small>{app.key === "sales" ? "Track sales and review performance" : app.key === "megaframe" ? "Photo frames and collages" : app.key === "flyer" ? "Promotional artwork and flyers" : "Find products and prepare price tags"}</small></span>
             <span aria-hidden="true">→</span>
           </button>)}
         </div>

@@ -1,0 +1,3 @@
+# Branchline web updates — ptg
+
+Production origin only. Release sequence is per module under a common production schema; each release must increase sequence (including rollback). Change the module's release.json, versioned update asset references and entry stamp together. No native payload. Existing app installation manifest is unchanged. PTG's authenticated workspace and original mobile workspace mount the checker; login and auth callbacks do not. Mobile Studio entries use the established PTG authorization portal. Save confirmation is explicit, not automatic save. Production device acceptance and complete asset-coherence validation remain required.

@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState, type ReactNode } from "react";
 import LogoutButton from "@/app/dashboard/logout-button";
 import ClientSessionGate, { type PtgClientSession } from "@/components/client-session-gate";
 import WorkspaceNav from "@/components/workspace-nav";
+import WebRelease from "@/components/web-release";
 import { withBasePath } from "@/lib/base-path";
 import { invokePtgAuth, usesEdgeAuth } from "@/lib/ptg/auth-client";
 
@@ -61,6 +62,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   }, [desk, router]);
 
   return <div className="ptg-unified-host">
+    <WebRelease />
     <nav className="ptg-universal-app-rail ptg-print-hide" aria-label="Branchline applications">
       <button type="button" className="ptg-official-brand-logo" aria-label={appMenuOpen?"Close application list":"Open application list"}
         aria-expanded={appMenuOpen} aria-controls="ptg-universal-app-drawer" onClick={toggleAppMenu} title="Branchline applications">
