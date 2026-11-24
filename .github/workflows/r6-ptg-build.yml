@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       GITHUB_PAGES: "true"
       NEXT_PUBLIC_BASE_PATH: /first-megasaver-ptg
