@@ -50,9 +50,12 @@ jobs:
         run: npm run build
       - name: Verify generated release metadata
         run: |
-          grep -q 'name="branchline-web-release" content="2026112410"' out/products/index.html
-          grep -q 'name="branchline-web-release" content="2026112410"' out/workspace/mobile/index.html
-          test -f out/updates/release.json
+          revision=$(node -p "require('./public/updates/release.json').sequence")
+          grep -q "name=\"branchline-web-release\" content=\"$revision\"" out/products/index.html
+          grep -q "name=\"branchline-web-release\" content=\"$revision\"" out/workspace/mobile/index.html
+          cmp public/updates/release.json out/updates/release.json
+          test -s out/widgets/assets/assistant.webp
+          test -s out/widgets/widget-loader.js
       - name: Install browser for mobile device regression
         run: |
           npm install --no-save --ignore-scripts playwright@1.56.1
