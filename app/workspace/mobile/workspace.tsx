@@ -52,7 +52,7 @@ export default function MobileWorkspace() {
       }catch{return null;}
     }
     function sync(){
-      const parentBell=root!.querySelector<HTMLButtonElement>(".mobile-workspace-header .bl-update-bell");
+      const parentBell=root!.querySelector<HTMLButtonElement>("#bl-release-check > .bl-update-bell");
       const child=activeDocument(),childBell=child?.querySelector<HTMLButtonElement>("#bl-release-check>.bl-update-bell");
       if(previous&&previous!==child){previous.documentElement.classList.remove("bl-parent-bell");previous=null;}
       if(parentBell&&child&&childBell){
@@ -64,12 +64,12 @@ export default function MobileWorkspace() {
     }
     function forward(event:Event){
       const target=event.target as Element|null;
-      if(!target?.closest(".mobile-workspace-header .bl-update-bell"))return;
+      if(!target?.closest("#bl-release-check > .bl-update-bell"))return;
       const child=activeDocument();
       const button=child?.querySelector<HTMLButtonElement>("#bl-release-check>.bl-update-bell");
       if(!button)return; // home/older release uses the parent checker normally
       event.preventDefault();event.stopImmediatePropagation();
-      const own=root!.querySelector<HTMLElement>(".mobile-workspace-header #bl-update-dropdown");
+      const own=root!.querySelector<HTMLElement>("#bl-update-dropdown");
       if(own)own.hidden=true;
       button.click();sync();
     }
