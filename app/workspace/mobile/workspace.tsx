@@ -70,6 +70,8 @@ export default function MobileWorkspace() {
         parentBell.classList.toggle("has-update",childBell.classList.contains("has-update"));
         parentBell.classList.toggle("has-notices",childBell.classList.contains("has-notices"));
         parentBell.dataset.unreadCount=childBell.dataset.unreadCount||"";
+        if(parentBell.dataset.noticeRevision!==childBell.dataset.noticeRevision)parentBell.dataset.noticeRevision=childBell.dataset.noticeRevision||"";
+        if(parentBell.dataset.releaseSequence!==childBell.dataset.releaseSequence)parentBell.dataset.releaseSequence=childBell.dataset.releaseSequence||"";
         parentBell.setAttribute("aria-expanded",childBell.getAttribute("aria-expanded")||"false");
         parentBell.setAttribute("aria-description",childBell.getAttribute("aria-description")||"Software update notifications");
       }else restoreParent();

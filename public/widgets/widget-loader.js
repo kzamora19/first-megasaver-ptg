@@ -3,7 +3,8 @@
 "use strict";
 const paths=["floating-widgets","guide-content","help-panel","widget-shell","widget-bootstrap"];
 let loaded=null;
-function load(base){
+function load(base,sequence){
+ const version=Number.isSafeInteger(sequence)?"?v="+sequence:"";
  if(!/^\/(?:branchline|first-megasaver-ptg|megaframe-studio\/studio|flyer-studio\/studio)\/widgets\/$/.test(base))return Promise.reject(Error("Unknown widget bundle"));
  if(loaded)return loaded;
  const doc=root.document,created=[];
@@ -14,7 +15,7 @@ function load(base){
   el.onload=()=>{root.clearTimeout(timer);resolve();};el.onerror=()=>{root.clearTimeout(timer);reject(Error("Widget resource missing"));};
   doc.head.append(el);
  });}
- loaded=(async()=>{await Promise.all(["floating-widgets.css","help-panel.css"].map(n=>add("link",base+n)));for(const name of paths)await add("script",base+name+".js");return root.BranchlineWidgetBootstrap;})().catch(error=>{for(const el of created)el.remove();loaded=null;throw error;});
+ loaded=(async()=>{await Promise.all(["floating-widgets.css","help-panel.css"].map(n=>add("link",base+n+version)));for(const name of paths)await add("script",base+name+".js"+version);return root.BranchlineWidgetBootstrap;})().catch(error=>{for(const el of created)el.remove();loaded=null;throw error;});
  return loaded;
 }
 root.BranchlineWidgetLoader=Object.freeze({load});
