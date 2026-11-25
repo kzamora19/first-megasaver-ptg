@@ -27,7 +27,7 @@ test("existing installation identity and secure mobile launch routes",()=>{
  assert.ok(css.includes(".ptg-unified-host .ptg-brand-lockup img{display:none!important}"));
  assert.ok(css.includes("html.bl-mobile-embedded .ptg-official-mobile-logo"));
  assert.ok(read("app/layout.tsx").includes('"branchline-web-release": String(release.sequence)'));
- assert.ok(read("components/workspace-layout.tsx").includes("<WebRelease />"));
+ assert.ok(read("components/workspace-layout.tsx").includes("<WebRelease memoAnnouncementsKey={session.username} />"));
  assert.ok(read("components/web-release.tsx").includes('release.sequence'));
  assert.equal(restartPath("/first-megasaver-ptg/login/"),null);
 });

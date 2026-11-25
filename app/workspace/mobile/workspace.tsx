@@ -42,6 +42,14 @@ export default function MobileWorkspace() {
     const root=document.querySelector(".mobile-workspace");
     if(!root)return;
     let previous:Document|null=null;
+    const restoreParent=()=>{
+      const bell=root!.querySelector<HTMLButtonElement>("#bl-release-check > .bl-update-bell");
+      if(!bell||bell.dataset.relayActive!=="true")return;
+      delete bell.dataset.relayActive;
+      bell.classList.toggle("has-update",!!bell.closest(".bl-update-available"));
+      bell.setAttribute("aria-expanded","false");
+      (window as Window & {BranchlineReleaseUpdates?:{refreshBadge?:()=>void}}).BranchlineReleaseUpdates?.refreshBadge?.();
+    };
     function activeDocument(){
       const frame=root!.querySelector<HTMLIFrameElement>("iframe:not([hidden])");
       try{
@@ -52,31 +60,35 @@ export default function MobileWorkspace() {
       }catch{return null;}
     }
     function sync(){
-      const parentBell=root!.querySelector<HTMLButtonElement>(".mobile-workspace-header .bl-update-bell");
+      const parentBell=root!.querySelector<HTMLButtonElement>("#bl-release-check > .bl-update-bell");
       const child=activeDocument(),childBell=child?.querySelector<HTMLButtonElement>("#bl-release-check>.bl-update-bell");
       if(previous&&previous!==child){previous.documentElement.classList.remove("bl-parent-bell");previous=null;}
       if(parentBell&&child&&childBell){
         child.documentElement.classList.add("bl-parent-bell");
         previous=child;
+        parentBell.dataset.relayActive="true";
         parentBell.classList.toggle("has-update",childBell.classList.contains("has-update"));
+        parentBell.classList.toggle("has-notices",childBell.classList.contains("has-notices"));
+        parentBell.dataset.unreadCount=childBell.dataset.unreadCount||"";
         parentBell.setAttribute("aria-expanded",childBell.getAttribute("aria-expanded")||"false");
-      }
+        parentBell.setAttribute("aria-description",childBell.getAttribute("aria-description")||"Software update notifications");
+      }else restoreParent();
     }
     function forward(event:Event){
       const target=event.target as Element|null;
-      if(!target?.closest(".mobile-workspace-header .bl-update-bell"))return;
+      if(!target?.closest("#bl-release-check > .bl-update-bell"))return;
       const child=activeDocument();
       const button=child?.querySelector<HTMLButtonElement>("#bl-release-check>.bl-update-bell");
       if(!button)return; // home/older release uses the parent checker normally
       event.preventDefault();event.stopImmediatePropagation();
-      const own=root!.querySelector<HTMLElement>(".mobile-workspace-header #bl-update-dropdown");
+      const own=root!.querySelector<HTMLElement>("#bl-update-dropdown");
       if(own)own.hidden=true;
       button.click();sync();
     }
     const timer=window.setInterval(sync,350);
     root.addEventListener("click",forward,true);
     sync();
-    return ()=>{window.clearInterval(timer);root.removeEventListener("click",forward,true);previous?.documentElement.classList.remove("bl-parent-bell");};
+    return ()=>{window.clearInterval(timer);root.removeEventListener("click",forward,true);previous?.documentElement.classList.remove("bl-parent-bell");restoreParent();};
   },[current]);
   const choices = apps.map(app => <button key={app.key} type="button" className="mobile-workspace-choice" onClick={() => open(app.key)} aria-current={current===app.key?"page":undefined}>
     <span className="mobile-workspace-choice-icon" aria-hidden="true"><span className={"ptg-official-app-icon "+app.icon}/></span>
