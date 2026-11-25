@@ -58,6 +58,7 @@
     noticeSection.append(noticeHeading,noticeList,markRead);panel.append(noticeSection);
     let noticeScope=null,notices=[],seen=new Set();
     function badgeCount(){
+      if(bell.dataset.relayActive==="true")return;
       const count=notices.filter(item=>!seen.has(item.id)).length+(bell.classList.contains("has-update")?1:0);
       const label=count>99?"99+":String(count);
       bell.dataset.unreadCount=count?label:"";
@@ -124,6 +125,7 @@
       detachFloating(){togglePanel(false);floatingHost=null;restoreArtwork();floatingImage=null;mountBell();},
       close(){togglePanel(false);},
       setAnnouncements,
+      refreshBadge:badgeCount,
       clearAnnouncements(){setAnnouncements(null,[]);},
       isFloating(){return box.classList.contains("bl-release-floating");}
     });
