@@ -225,13 +225,13 @@
     let widgetBoot=null,widgetLoader=null,widgetLive=true;
     function startWidgets(){
       if(!widgetLive||!box.isConnected)return;
-      root.BranchlineWidgetLoader.load("/first-megasaver-ptg/widgets/").then(bootstrap=>{
+      root.BranchlineWidgetLoader.load("/first-megasaver-ptg/widgets/",running).then(bootstrap=>{
         if(!widgetLive||!box.isConnected||!bootstrap)return;
         widgetBoot=bootstrap.create(root);root.BranchlineWidgetRuntime=widgetBoot;widgetBoot.watch();
       }).catch(()=>{});
     }
     if(root.BranchlineWidgetLoader)startWidgets();else{
-      widgetLoader=doc.createElement("script");widgetLoader.src="/first-megasaver-ptg/widgets/widget-loader.js";widgetLoader.onload=startWidgets;doc.head.append(widgetLoader);
+      widgetLoader=doc.createElement("script");widgetLoader.src="/first-megasaver-ptg/widgets/widget-loader.js"+"?v="+running;widgetLoader.onload=startWidgets;doc.head.append(widgetLoader);
     }
     refresh(false);
   }
