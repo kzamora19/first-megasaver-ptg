@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 
 const projectUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -22,8 +22,6 @@ const respond = (origin: string, body: unknown, status = 200) => new Response(JS
   },
 });
 const fail = (message: string) => ({ ok: false, message });
-const clean = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
-const MAX_ROWS = 10_000;
 
 type ActiveSession = { id: string; userId: string; role: string; branchId: string | null; username: string; mustChangePassword: boolean };
 
@@ -34,7 +32,7 @@ async function getSession(request: Request): Promise<ActiveSession | null> {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
     global: { headers: { Authorization: authorization } },
   });
-  const { data: authData, error: authError } = await client.auth.getUser();
+  const { data: authData, error: authError } = await client.auth.getUser(authorization.slice(7));
   if (authError || !authData.user) return null;
   const appSessionId = request.headers.get("x-ptg-session-id");
   if (!appSessionId || appSessionId.length > 100) return null;
@@ -44,8 +42,9 @@ async function getSession(request: Request): Promise<ActiveSession | null> {
   if (rowError || !row) return null;
   const now = Date.now();
   const idleLimitMs = row.remember_device === true ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
-  const idleExpired = now - new Date(row.last_activity_at).getTime() > idleLimitMs;
-  const absoluteExpired = new Date(row.expires_at).getTime() <= now;
+  const activity = Date.parse(row.last_activity_at), expiry = Date.parse(row.expires_at);
+  const idleExpired = !Number.isFinite(activity) || activity > now + 60000 || now - activity > idleLimitMs;
+  const absoluteExpired = !Number.isFinite(expiry) || expiry <= now;
   const { data: profile, error: profileError } = await admin.from("user_profiles")
     .select("role_key,is_active,session_version,must_change_password")
     .eq("id", authData.user.id).maybeSingle();
