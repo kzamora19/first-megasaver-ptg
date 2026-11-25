@@ -52,3 +52,6 @@ html:has(.mobile-workspace),body:has(.mobile-workspace){margin:0;overflow:hidden
 .mobile-workspace-content iframe{display:block;min-height:0}
 .mobile-workspace-content iframe[hidden]{display:none!important}
 .mobile-workspace-header #bl-release-check{margin-left:auto}
+
+/* The mobile workspace supplies its own application menu and header. */
+body:has(.mobile-workspace) .bl-startup-host { display: none !important; }
