@@ -34,6 +34,7 @@ try{
   assert.equal(await page.locator(".bl-update-bell").count(),1);
   assert.equal(await page.evaluate(()=>originalBell===document.querySelector(".bl-update-bell")),true);
   const toggle=page.locator(".bl-widget-collapse");assert.equal(await toggle.locator("svg").count(),1);assert.equal(await toggle.innerText(),"");const header=page.locator(studio?"body > header":".ptg-sidebar-header");const hb=await header.boundingBox(),tb=await toggle.boundingBox();assert.ok(tb.y>=hb.y+hb.height&&tb.y<hb.y+hb.height+20);
+  await page.locator(".bl-widget-settings summary").click();const settings=page.locator(".bl-widget-settings-panel");await settings.getByLabel("Position").selectOption("left");await page.waitForFunction(()=>document.querySelector(".bl-widget-collapse").getBoundingClientRect().left<30);await settings.getByRole("button",{name:"Reset to upper right"}).click();await page.locator(".bl-widget-settings summary").click();await page.waitForFunction(()=>document.querySelector(".bl-widget-collapse").getBoundingClientRect().right>innerWidth-30);
   await page.getByRole("button",{name:"Branchline Guide"}).click();
   const panel=page.locator(".bl-help-panel");await panel.waitFor();
   assert.equal(await panel.getByRole("combobox").inputValue(),{ptg:"price-tag-generator",megaframe:"megaframe-studio",flyer:"flyer-studio"}[module]);
