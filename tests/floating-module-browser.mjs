@@ -41,7 +41,7 @@ try{
   await panel.getByRole("button",{name:"Close"}).click();
   await page.getByRole("button",{name:"Software update notifications"}).click();
   sequence=running+1;const before=checks;await page.getByRole("button",{name:"Check for updates"}).click();
-  await page.locator(".bl-update-bell.has-update").waitFor();assert.equal(checks,before+1);
+  await page.locator(".bl-update-bell.has-update").waitFor();await page.waitForFunction(()=>document.querySelector(".bl-update-bell").classList.contains("bl-widget-ringing"));assert.equal(await page.locator(".bl-update-bell").evaluate(b=>getComputedStyle(b,":after").content),'""');assert.equal(await page.locator(".bl-update-bell").evaluate(b=>getComputedStyle(b,":after").width),"13px");assert.equal(checks,before+1);
   await page.getByRole("button",{name:"Later"}).click();
   await page.evaluate(()=>document.documentElement.classList.add("bl-parent-bell"));
   await page.locator("#bl-floating-widgets").waitFor({state:"detached"});
