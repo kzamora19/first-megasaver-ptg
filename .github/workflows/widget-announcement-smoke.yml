@@ -1,0 +1,29 @@
+name: Memo announcement deployed endpoint security smoke
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/ptg-widget-announcements/**'
+      - '.github/workflows/widget-announcement-smoke.yml'
+  push:
+    branches: [feature/floating-widgets]
+    paths:
+      - 'supabase/functions/ptg-widget-announcements/**'
+      - '.github/workflows/widget-announcement-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  unauthenticated:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reject missing and invalid bearer tokens on the new read-only endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint='https://agknxlowackphvwyvxge.supabase.co/functions/v1/ptg-widget-announcements'
+          code=$(curl -sS --max-time 20 --retry 2 -o /tmp/response.json -w '%{http_code}' -X POST "$endpoint" -H 'Origin: https://kzamora19.github.io' -H 'Content-Type: application/json' --data '{}')
+          test "$code" = 401 || test "$code" = 403
+          node -e 'const v=JSON.parse(require("fs").readFileSync("/tmp/response.json","utf8"));if(v.notices||v.ok===true)process.exit(1)'
+          code=$(curl -sS --max-time 20 --retry 2 -o /tmp/response.json -w '%{http_code}' -X POST "$endpoint" -H 'Authorization: Bearer invalid-test-token' -H 'Origin: https://kzamora19.github.io' -H 'Content-Type: application/json' --data '{}')
+          test "$code" = 401 || test "$code" = 403
+          node -e 'const v=JSON.parse(require("fs").readFileSync("/tmp/response.json","utf8"));if(v.notices||v.ok===true)process.exit(1)'
+          echo 'PASS missing and invalid bearer token denial'
