@@ -12,7 +12,7 @@ try{
   await context.route("**/*",route=>{
    const u=new URL(route.request().url()),p=u.pathname;
    assert.equal(u.origin,origin);
-   if(p===prefix+entry)return route.fulfill({contentType:"text/html",body:'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="'+prefix+'/updates/check.css">'+(studio?'<main><div id="mount"></div></main>':'<main class="ptg-unified-host"><div class="ptg-sidebar-header">PTG</div></main>')+'<textarea aria-label="Draft"></textarea><script defer src="'+prefix+'/updates/check.js" data-sequence="'+running+'"></script>'});
+   if(p===prefix+entry)return route.fulfill({contentType:"text/html",body:'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="'+prefix+'/updates/check.css">'+(studio?'<header style="height:64px">Studio header</header><main><div id="mount"></div></main>':'<main class="ptg-unified-host"><div class="ptg-sidebar-header" style="height:64px">PTG</div></main>')+'<textarea aria-label="Draft"></textarea><script defer src="'+prefix+'/updates/check.js" data-sequence="'+running+'"></script>'});
    if(p.endsWith("/updates/release.json")){checks++;return route.fulfill({json:{schema:1,channel:"production",app:module,sequence}});}
    if(p.endsWith("/updates/index.json"))return route.fulfill({json:{schema:1,channel:"production",workspaceVersion:"fixture",modules:[{app:module,sequence}]}});
    if(p.startsWith(prefix+"/")&&/\.(js|css|svg|webp)$/.test(p)){
@@ -33,6 +33,7 @@ try{
   await page.waitForFunction(()=>[...document.querySelectorAll("#bl-floating-widgets img")].length===3&&[...document.querySelectorAll("#bl-floating-widgets img")].every(i=>i.complete&&i.naturalWidth>0));
   assert.equal(await page.locator(".bl-update-bell").count(),1);
   assert.equal(await page.evaluate(()=>originalBell===document.querySelector(".bl-update-bell")),true);
+  const toggle=page.locator(".bl-widget-collapse");assert.equal(await toggle.locator("svg").count(),1);assert.equal(await toggle.innerText(),"");const header=page.locator(studio?"body > header":".ptg-sidebar-header");const hb=await header.boundingBox(),tb=await toggle.boundingBox();assert.ok(tb.y>=hb.y+hb.height&&tb.y<hb.y+hb.height+20);
   await page.getByRole("button",{name:"Branchline Guide"}).click();
   const panel=page.locator(".bl-help-panel");await panel.waitFor();
   assert.equal(await panel.getByRole("combobox").inputValue(),{ptg:"price-tag-generator",megaframe:"megaframe-studio",flyer:"flyer-studio"}[module]);
