@@ -63,7 +63,7 @@ export default function PriceMemoImporter() {
         if(!result.ok)throw new Error(result.message||"Import failed.");
         const summary=result.summary as Summary;
         setEntries(current=>current.map(item=>item.id===entry.id?{...item,summary,status:summary.skipped?"SKIPPED":"IMPORTED"}:item));
-        if(summary.skipped)skipped++;else imported++;
+        if(summary.skipped)skipped++;else {imported++;window.dispatchEvent(new Event("branchline-memo-import-complete"));}
       } catch(e) {
         failed++;
         setEntries(current=>current.map(item=>item.id===entry.id?{...item,error:e instanceof Error?e.message:"Import failed.",status:"FAILED"}:item));

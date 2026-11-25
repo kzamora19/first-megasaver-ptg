@@ -59,6 +59,8 @@ export default function MobileWorkspace() {
         child.documentElement.classList.add("bl-parent-bell");
         previous=child;
         parentBell.classList.toggle("has-update",childBell.classList.contains("has-update"));
+        parentBell.classList.toggle("has-notices",childBell.classList.contains("has-notices"));
+        parentBell.dataset.unreadCount=childBell.dataset.unreadCount||"";
         parentBell.setAttribute("aria-expanded",childBell.getAttribute("aria-expanded")||"false");
       }
     }

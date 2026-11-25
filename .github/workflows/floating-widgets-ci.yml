@@ -15,7 +15,7 @@ jobs:
           node-version: '22'
       - name: Verify existing updater and shared source syntax
         run: |
-          node --test tests/r6-web-updates.test.cjs
+          node --test tests/r6-web-updates.test.cjs tests/widget-memo-projection.test.mjs
           for file in public/widgets/*.js public/updates/check.js; do node --check "$file"; done
       - name: Install Chromium test dependency
         run: |

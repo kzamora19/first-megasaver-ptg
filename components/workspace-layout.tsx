@@ -70,7 +70,7 @@ function WorkspaceFrame({ session, path, children }: { session: PtgClientSession
   }, [desk, router]);
 
   return <div className={"ptg-unified-host"+(browserShell?" ptg-web-r6":"")}>
-    <WebRelease />
+    <WebRelease memoAnnouncementsKey={session.username} />
     <nav className="ptg-universal-app-rail ptg-print-hide" aria-label="Branchline applications">
       <button type="button" className="ptg-official-brand-logo" aria-label={browserShell ? (railCollapsed ? "Open workspace menu" : "Close workspace menu") : (appMenuOpen ? "Close application list" : "Open application list")}
         aria-expanded={browserShell ? !railCollapsed : appMenuOpen} aria-controls={browserShell ? "ptg-workspace-links" : "ptg-universal-app-drawer"} onClick={browserShell ? toggleWorkspaceMenu : toggleAppMenu}>
