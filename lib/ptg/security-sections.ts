@@ -4,6 +4,7 @@ export const securitySections = [
   ["admins", "System Admin"],
   ["permissions", "Permissions"],
   ["srp", "Product SRP Import"],
+  ["storage", "Storage Management"],
   ["audit", "Audit Log"],
 ] as const;
 

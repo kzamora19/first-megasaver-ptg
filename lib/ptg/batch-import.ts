@@ -29,6 +29,7 @@ export type Sheet = {
 };
 export type Source = { file: File; sheets: Sheet[]; error?: string };
 export type CatalogItem = { barcode: string; brand: string; description: string; category: string; sub_category: string; srp?: number };
+export type DatedCatalogSource = { sourceFile: string; sourceDate: string; rows: CatalogItem[] };
 export type Issue = { severity: string; message: string; source_file?: string };
 export type SalesPreview = {
   valid: boolean; catalog: CatalogItem[]; issues: Issue[];
@@ -99,6 +100,7 @@ export function sourceDivisions(sheets: Sheet[]) {
 export function buildBatchPlan(
   engine: Engine, preview: SalesPreview | undefined, operations: Operation[],
   memos: { name: string; parsed: ParsedMemo }[], branches: Branch[], uuid: () => string,
+  catalogSources: DatedCatalogSource[] = [],
 ) {
   const jobs: BatchJob[] = [];
   const issues = [...(preview?.issues ?? [])];
@@ -130,17 +132,13 @@ export function buildBatchPlan(
     }
   }
   if (operations.includes("ptg-catalog")) {
-    const rows = preview?.catalog ?? [];
-    if (!rows.length || rows.some(row => !row.barcode || !row.description || !row.brand || !row.category || !row.sub_category)) {
-      issues.push({ severity: "ERROR", message: "PTG Product Master needs a barcode, description, brand, category and subcategory on every included product." });
-    } else {
-      for (let index = 0; index < rows.length; index += 1000) {
-        const catalog = rows.slice(index, index + 1000).map(({ barcode, description, brand, category, sub_category }) =>
-          ({ barcode, description, brand, category, sub_category }));
-        jobs.push({ key: "ptg-catalog-" + index, label: catalog.length + " Product Master rows", scope: "Global catalog",
-          target: "ptg", state: "pending", ptg: { functionName: "ptg-products",
-            body: { action: "master-import", sourceFile: "Data Desk unified import", rows: catalog } } });
+    if (!catalogSources.length) issues.push({severity:"ERROR",message:"Confirm each Product Master source file and effective date."});
+    for (const {sourceFile,sourceDate,rows} of catalogSources) {
+      if (!sourceFile || !/^\d{4}-\d{2}-\d{2}$/.test(sourceDate) || !rows.length || rows.length > 10000 || rows.some(r=>typeof r.barcode!=="string"||!r.barcode||!r.description) || new Set(rows.map(r=>r.barcode)).size!==rows.length) {
+        issues.push({severity:"ERROR",source_file:sourceFile,message:"Confirm source date and unique valid catalog rows (maximum 10,000 per source)."});continue;
       }
+      const catalog=rows.map(({barcode,description,brand,category,sub_category})=>({barcode,description,brand,category,sub_category}));
+      jobs.push({key:"ptg-catalog-"+jobs.filter(j=>j.key.startsWith("ptg-catalog-")).length,label:sourceFile+" · "+catalog.length+" Product Master rows",scope:"Global catalog · "+sourceDate,target:"ptg",state:"pending",ptg:{functionName:"ptg-products",body:{action:"master-import",sourceFile,sourceDate,rows:catalog}}});
     }
   }
   if (operations.includes("ptg-memos")) {

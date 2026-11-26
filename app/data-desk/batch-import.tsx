@@ -7,7 +7,7 @@ import { withBasePath } from "@/lib/base-path";
 import { invokePtgData } from "@/lib/ptg/edge-api";
 import { parsePriceMemo } from "@/lib/price-memos/parse-price-memo";
 import { buildBatchPlan, isPromotionPdfWorkbook, loadBatchEngine, runBatch, salesOperations, sourceDivisions,
-  type BatchJob, type Branch, type DeskSalesTool, type Issue, type Operation, type SalesOperation, type Sheet, type Source } from "@/lib/ptg/batch-import";
+  type BatchJob, type Branch, type DatedCatalogSource, type DeskSalesTool, type Issue, type Operation, type SalesOperation, type Sheet, type Source } from "@/lib/ptg/batch-import";
 
 const writes = process.env.NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES === "true";
 const labels: Record<Operation, string> = {
@@ -38,6 +38,7 @@ async function readScope(client: SupabaseClient, table: string, columns: string,
 export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   const [sessionId] = useState(getPtgAppSessionId);
   const [sources, setSources] = useState<Source[]>([]);
+  const [catalogDates, setCatalogDates] = useState<Record<string,string>>({});
   const [disabledSources, setDisabledSources] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [selectedOperations, setOperations] = useState<Operation[]>([]);
@@ -83,7 +84,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
   async function inspect(files: File[]) {
     if (!files.length || busy.current) return;
     invalidate();
-    setSources([]); setExcluded([]); setDisabledSources([]); setLocationMap({}); setDivisionMap({});
+    setSources([]); setCatalogDates({}); setExcluded([]); setDisabledSources([]); setLocationMap({}); setDivisionMap({});
     if (files.length > 80 || files.reduce((total, file) => total + file.size, 0) > 160 * 1024 * 1024 ||
       new Set(files.map(file => file.name)).size !== files.length) {
       setError("Choose up to 80 uniquely named source files, 160 MB combined.");
@@ -159,7 +160,7 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
           return;
         }
       }
-      const needed = [...new Set([...selectedSales, ...(operations.includes("ptg-catalog") ? ["catalog" as const] : [])])];
+      const needed = [...new Set(selectedSales)];
       const [knownProducts, knownStock] = await Promise.all([
         access && selectedSales.includes("catalog")
           ? readScope(access.client, "products", "branch_id,barcode,brand,model_description", branchList) : [],
@@ -180,7 +181,19 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
           catch (failure) { throw new Error(source.file.name + ": " + message(failure)); }
         }
       }
-      const plan = buildBatchPlan(engine, preview, operations, memos, branchList, () => crypto.randomUUID());
+      const catalogSources: DatedCatalogSource[] = [];
+      if (operations.includes("ptg-catalog")) {
+        for (const source of included) {
+          const sourceSheets = sheets.filter(sheet => sheet.file === source.file.name);
+          if (!sourceSheets.length) continue;
+          const date = catalogDates[source.file.name];
+          if (!date || date > today) throw new Error("Confirm the effective date for " + source.file.name);
+          const parsed = engine.prepareImport(sourceSheets,{branches: branchList, operations:["catalog"], asOf:date,today,locationMap,divisionMap,knownProducts:[],knownStock:[]},apis);
+          if (!parsed.valid || parsed.issues.some(issue => issue.severity === "ERROR") || !parsed.catalog.length) throw new Error(source.file.name + ": no independently validated catalog rows. Exclude non-catalog files or import separately.");
+          catalogSources.push({sourceFile:source.file.name,sourceDate:date,rows:parsed.catalog});
+        }
+      }
+      const plan = buildBatchPlan(engine, preview, operations, memos, branchList, () => crypto.randomUUID(), catalogSources);
       setReview({ ...plan, scope: access?.scope, inventory: operations.includes("inventory") });
     } catch (failure) { setError(message(failure)); }
     finally { busy.current = false; setProgress(""); }
@@ -255,7 +268,8 @@ export default function BatchImport({ tool, verifyPtg, verifySales }: Props) {
             <p><label><input type="checkbox" checked={!disabledSources.includes(source.file.name)} onChange={event => {
               setDisabledSources(current => event.target.checked ? current.filter(name => name !== source.file.name) : [...current, source.file.name]); invalidate();
             }} /> {source.file.name}</label>{source.error && <span> · {source.error}</span>}</p>
-            {!disabledSources.includes(source.file.name) && source.sheets.map(sheet => <details key={sheet.id}>
+            {operations.includes("ptg-catalog") && !disabledSources.includes(source.file.name) && <label>Catalog source effective date <input type="date" max={today} value={catalogDates[source.file.name] ?? ""} onChange={event => {setCatalogDates(current=>({...current,[source.file.name]:event.target.value}));invalidate();}} /></label>}
+             {!disabledSources.includes(source.file.name) && source.sheets.map(sheet => <details key={sheet.id}>
               <summary>{sheet.name} · {parsers?.engine.TYPES[sheet.config.role] ?? sheet.config.role} · {sheet.rows.length} source rows</summary>
               <label><input type="checkbox" checked={!excluded.includes(sheet.id)} onChange={event => {
                 setExcluded(current => event.target.checked ? current.filter(id => id !== sheet.id) : [...current, sheet.id]); invalidate();

@@ -43,6 +43,7 @@ function parseSheet(rows: unknown[][]): Product[] {
 
 export default function ProductMasterImporter() {
   const [fileName, setFileName] = useState("");
+  const [sourceDate, setSourceDate] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,7 +52,7 @@ export default function ProductMasterImporter() {
   const preview = useMemo(() => products.slice(0, 8), [products]);
 
   async function handleFile(file?: File) {
-    setMessage(""); setError(false); setSummary(null); setProducts([]); setFileName("");
+    setMessage(""); setError(false); setSummary(null); setProducts([]); setFileName(""); setSourceDate("");
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) { setError(true); setMessage("File is larger than 15 MB. Please split it into smaller files."); return; }
     try {
@@ -78,6 +79,7 @@ export default function ProductMasterImporter() {
 
   async function importProducts() {
     if (!products.length || !fileName || busy) return;
+    if (!sourceDate) { setError(true); setMessage("Confirm the effective date of the source file."); return; }
     setBusy(true); setMessage(""); setError(false); setSummary(null);
     try {
       let result: { ok: boolean; summary?: ImportSummary; message?: string };
@@ -85,12 +87,13 @@ export default function ProductMasterImporter() {
         result = await invokePtgData("ptg-products", {
           action: "master-import",
           sourceFile: fileName,
+          sourceDate,
           rows: products,
         }) as typeof result;
       } else {
         const response = await fetch("/api/products/master", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceFile: fileName, rows: products }),
+          body: JSON.stringify({ sourceFile: fileName, sourceDate, rows: products }),
         });
         result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.message || "Import failed.");
@@ -117,16 +120,17 @@ export default function ProductMasterImporter() {
         {fileName && <p className="admin-muted">Selected: <strong>{fileName}</strong> · {products.length.toLocaleString()} rows</p>}
         {message && <p className={error ? "admin-alert error" : "admin-alert success"} role="status">{message}</p>}
         {products.length > 0 && <>
+          <label>Source effective date <input type="date" required value={sourceDate} onChange={e => setSourceDate(e.target.value)} disabled={busy} /></label>
           <div className="admin-list-heading"><div><h3>Import preview</h3><p className="admin-muted">Showing {preview.length} of {products.length.toLocaleString()} rows. Barcode values are kept as text.</p></div></div>
           <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Barcode</th><th>Description</th><th>Brand</th><th>Category</th><th>Sub-category</th></tr></thead><tbody>
             {preview.map((row, index) => <tr key={index}><td>{row.barcode}</td><td>{row.description}</td><td>{row.brand || "—"}</td><td>{row.category || "—"}</td><td>{row.sub_category || "—"}</td></tr>)}
           </tbody></table></div>
-          <button className="admin-button" onClick={() => void importProducts()} disabled={busy}>{busy ? "IMPORTING…" : `IMPORT ${products.length.toLocaleString()} ROWS`}</button>
+          <button className="admin-button" onClick={() => void importProducts()} disabled={busy || !sourceDate}>{busy ? "IMPORTING…" : `IMPORT ${products.length.toLocaleString()} ROWS`}</button>
         </>}
         {summary && <div className="import-summary"><strong>Import summary</strong><div className="import-summary-grid">
           <span>Received <b>{summary.received.toLocaleString()}</b></span><span>Inserted <b>{summary.inserted.toLocaleString()}</b></span><span>Updated <b>{summary.updated.toLocaleString()}</b></span><span>Invalid <b>{summary.invalidRows.toLocaleString()}</b></span><span>Duplicates <b>{summary.duplicateRows.toLocaleString()}</b></span>
         </div></div>}
-        <p className="admin-footnote">Import matches records by barcode. Existing barcodes are updated; new barcodes are inserted. The original source file is not modified.</p>
+        <p className="admin-footnote">Missing barcodes remain in the catalog. Only newer valid fields replace existing values; blank fields do not erase information. Existing source chronology may require System Admin review.</p>
       </div>
     </section>
   );

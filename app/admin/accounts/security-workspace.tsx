@@ -8,6 +8,7 @@ import { getSecuritySection, securitySections, type SecuritySection } from "@/li
 import AppDialog from "@/components/app-dialog";
 import { useAppConfirm } from "@/components/app-confirm";
 import AccountAdministration from "./account-administration";
+import StorageManagement from "./storage-management";
 import { withBasePath } from "@/lib/base-path";
 import "./security.css";
 
@@ -26,6 +27,7 @@ const descriptions: Record<SecuritySection, string> = {
   admins: "Manage System Admin accounts, invitations, and passwords.",
   permissions: "Review role permissions and test authorization for your current session.",
   srp: "Update the product SRP register manually or from a verified Head Office workbook.",
+  storage: "Review storage retention and legacy catalog source dates.",
   audit: "Review recent authentication, authorization, and administrative activity.",
 };
 
@@ -50,7 +52,7 @@ export default function SecurityWorkspace({ desk = false }: { desk?: boolean }) 
         <Link key={key} href={"/admin/accounts/?section=" + key} aria-current={key === section ? "page" : undefined}>{label}</Link>)}
       <a href={withBasePath("/data-desk/")}>Open Data Desk →</a>
     </nav>}
-    <SecurityPanel key={section} section={section} desk={desk} />
+    {section === "storage" ? <StorageManagement /> : <SecurityPanel key={section} section={section} desk={desk} />}
   </main>;
 }
 
@@ -110,6 +112,7 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
   const [manualRows, setManualRows] = useState([0]);
   const [nextRowId, setNextRowId] = useState(1);
   const [file, setFile] = useState<File | null>(null);
+  const [sourceDate,setSourceDate]=useState("");
   const [verified, setVerified] = useState(false);
   const [accountRefresh, setAccountRefresh] = useState(0);
   const [auditRefresh, setAuditRefresh] = useState(0);
@@ -156,6 +159,7 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
   }
 
   async function importSrp(selected: File) {
+    if (!sourceDate) throw new Error("Confirm the source effective date.");
     if (selected.size > 15 * 1024 * 1024) throw new Error("The workbook exceeds 15 MB.");
     const { read, utils } = await import("xlsx");
     const workbook = read(await selected.arrayBuffer());
@@ -188,12 +192,12 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
       seen.add(key);
       const value = rawPrice.replace(/[₱,\s]/g, "");
       const srp = Number(value);
-      return [{ barcode, description, srp: /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(srp) ? srp : null }];
+      if(value && (!/^\d+(?:\.\d+)?$/.test(value)||!Number.isFinite(srp)))throw new Error("Invalid SRP in worksheet row "+rowNumber+".");return [{barcode,description,srp:value?srp:null}];
     });
     if (!rows.length || rows.length > 10000) throw new Error("Use a workbook containing 1 to 10,000 product rows.");
-    const result = await request("securityImportSrp", { source: selected.name, verified, rows });
+    const result = await request("securityImportSrp", { source: selected.name, sourceDate, verified, rows });
     setVerified(false);
-    return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records with no valid incoming price.";
+    return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records without a newer valid change.";
   }
 
   function submitManualSrp(event: FormEvent<HTMLFormElement>) {
@@ -210,14 +214,13 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
         if (!barcode || !description || !amount || !Number.isFinite(srp) || srp < 0) {
           throw new Error("Enter a barcode, description, and valid SRP for product " + (index + 1) + ".");
         }
-        if (barcodes.has(barcode)) throw new Error("Enter each barcode only once.");
-        barcodes.add(barcode);
+        const key = /^\d+$/.test(barcode) ? barcode.replace(/^0+(?=\d)/, "") : barcode.toUpperCase();if(barcodes.has(key))throw new Error("Enter each barcode only once.");barcodes.add(key);
         return { barcode, description, srp };
       });
-      const result = await request("securityImportSrp", { source: "Manual entry", verified: fields.has("verified"), rows });
+      const result = await request("securityImportSrp", { source: "Manual entry", sourceDate: String(fields.get("sourceDate") ?? ""), verified: fields.has("verified"), rows });
       form.reset();
       setManualRows([0]);
-      return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records with no valid incoming price.";
+      return "Saved " + result.count + " SRP records. Preserved " + (result.preserved ?? 0) + " existing records without a newer valid change.";
     });
   }
 
@@ -398,6 +401,7 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
         <p>Enter one or more products. A positive SRP updates an existing barcode. A zero SRP preserves an existing record or adds a zero placeholder for a new barcode.</p>
         <form className="admin-form" onSubmit={submitManualSrp}>
           <fieldset disabled={busy} className="srp-manual-form">
+          <label>Price effective date<input name="sourceDate" type="date" required /></label>
             {manualRows.map((id, index) => <div className="srp-manual-fields" key={id} role="group" aria-label={"Product " + (index + 1)}>
               <label>Barcode<input name={"barcode-" + id} maxLength={100} required /></label>
               <label>Model / description<input name={"description-" + id} maxLength={1000} required /></label>
@@ -420,16 +424,17 @@ function SecurityPanel({ section, desk }: { section: SecuritySection; desk: bool
       <h3>Verify the source workbook</h3>
       <p>Use the current Head Office workbook or Product Data Extractor export. Import time records when PTG received the workbook. It cannot establish when the prices took effect.</p>
       <p>For product names, barcodes, and categories, open <Link className="admin-link" href={desk ? "/product-master/?workspace=data-desk" : "/product-master/"}>Product Master</Link>.</p>
-      <form className="security-form" onReset={() => { setFile(null); setVerified(false); }} onSubmit={event => {
+      <form className="security-form" onReset={() => { setFile(null); setVerified(false); setSourceDate(""); }} onSubmit={event => {
         event.preventDefault();
-        if (file && verified) void run(() => importSrp(file));
+        if (file && verified && sourceDate) void run(() => importSrp(file));
       }}>
         <label>SRP workbook (.xlsx or .xls)<input type="file" accept=".xlsx,.xls" required onChange={event => {
-          setFile(event.target.files?.[0] ?? null);
+          setFile(event.target.files?.[0] ?? null);setSourceDate("");
           setVerified(false);
         }} /></label>
+        <label>Source effective date<input type="date" required value={sourceDate} onChange={event=>{setSourceDate(event.target.value);setVerified(false);}} /></label>
         <label className="security-check"><input type="checkbox" checked={verified} onChange={event => setVerified(event.target.checked)} required /> I verified the source and its prices.</label>
-        <button className="admin-button" disabled={busy || !file || !verified}>Import Product SRP</button>
+        <button className="admin-button" disabled={busy || !file || !verified || !sourceDate}>Import Product SRP</button>
         <button className="admin-button secondary" type="reset" disabled={busy}>Clear selection</button>
       </form>
     </section>

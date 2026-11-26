@@ -251,56 +251,18 @@ async function searchProductMaster(origin: string, session: ActiveSession, body:
 }
 
 async function importProductMaster(origin: string, session: ActiveSession, body: Record<string, unknown>) {
-  if (session.mustChangePassword) return respond(origin, fail("Password change required."), 403);
-  if (session.role !== "SYSTEM_ADMIN") return respond(origin, fail("Only the System Admin can import the product master."), 403);
-  const maxRows = 10000;
-  const sourceFile = clean(body.sourceFile, 240);
-  const input = body.rows;
-  if (!sourceFile || !Array.isArray(input) || input.length === 0 || input.length > maxRows) {
-    return respond(origin, fail("Provide a source file name and 1–" + maxRows + " product rows."), 400);
+  if (session.mustChangePassword || session.role !== "SYSTEM_ADMIN") return respond(origin, fail("Only an active System Admin can import the catalog."),403);
+  const sourceFile = typeof body.sourceFile === "string" ? body.sourceFile.trim() : "";
+  const sourceDate = typeof body.sourceDate === "string" ? body.sourceDate : "";
+  if (!sourceFile || sourceFile.length>240 || !/^\d{4}-\d{2}-\d{2}$/.test(sourceDate) || !Array.isArray(body.rows) || !body.rows.length || body.rows.length>10000) return respond(origin,fail("Provide a verified source date and 1–10,000 rows."),400);
+  const result=await admin.rpc("ptg_import_catalog_dated",{p_dataset:"master",p_source_file:sourceFile,p_effective_date:sourceDate,p_rows:body.rows,p_actor_id:session.userId});
+  if(result.error){
+    if(result.error.code==="42501")return respond(origin,fail("Forbidden."),403);
+    if(["P0001","22007","22008"].includes(result.error.code))return respond(origin,fail(result.error.message),400);
+    return respond(origin,fail("Catalog import not confirmed. Verify the destination before retrying."),503);
   }
-  const importedAt = new Date().toISOString();
-  const deduped = new Map<string, { barcode: string; description: string; brand: string; category: string; sub_category: string; source_file: string; imported_at: string; updated_at: string }>();
-  let invalidRows = 0;
-  for (const value of input) {
-    const row = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
-    const barcode = clean(row.barcode, 100);
-    const description = clean(row.description, 500);
-    if (!barcode || !description) { invalidRows++; continue; }
-    deduped.set(barcode, {
-      barcode, description, brand: clean(row.brand, 100), category: clean(row.category, 160),
-      sub_category: clean(row.sub_category, 160), source_file: sourceFile, imported_at: importedAt, updated_at: importedAt,
-    });
-  }
-  if (!deduped.size) return respond(origin, fail("No valid rows found. Barcode and description are required."), 400);
-  const rows = [...deduped.values()];
-  // Keep lookup URLs short and each result below the Data API row limit.
-  const barcodes = rows.map(row => row.barcode);
-  const lookupSize = 100;
-  const batches = Array.from({ length: Math.ceil(barcodes.length / lookupSize) }, (_, index) =>
-    barcodes.slice(index * lookupSize, (index + 1) * lookupSize),
-  );
-  const existing = new Set<string>();
-  for (let index = 0; index < batches.length; index += 8) {
-    const results = await Promise.all(batches.slice(index, index + 8).map(batch =>
-      admin.from("product_master").select("barcode").in("barcode", batch),
-    ));
-    for (const result of results) {
-      if (result.error) return respond(origin, fail("Could not validate existing product records."), 500);
-      for (const row of result.data ?? []) existing.add(row.barcode);
-    }
-  }
-  const { error } = await admin.from("product_master").upsert(rows, { onConflict: "barcode" });
-  if (error) return respond(origin, fail("Product import failed; no success was recorded."), 500);
-  const inserted = rows.filter(row => !existing.has(row.barcode)).length;
-  const updated = rows.length - inserted;
-  const duplicateRows = input.length - invalidRows - rows.length;
-  await admin.from("security_audit_logs").insert({
-    actor_user_id: session.userId, branch_id: null, event_category: "PRODUCT_MASTER", action: "IMPORT",
-    target_identifier: sourceFile, outcome: "SUCCESS", message: "Product master import completed.",
-    metadata: { received: input.length, unique_valid: rows.length, inserted, updated, invalid_rows: invalidRows, duplicate_rows: duplicateRows },
-  });
-  return respond(origin, { ok: true, summary: { received: input.length, uniqueValid: rows.length, inserted, updated, invalidRows, duplicateRows } });
+  if(!result.data||typeof result.data!=="object")return respond(origin,fail("Import result not confirmed."),503);
+  return respond(origin,{ok:true,summary:result.data});
 }
 
 Deno.serve(async request => {

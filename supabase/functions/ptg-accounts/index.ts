@@ -489,24 +489,26 @@ async function securityAction(session: Session, origin: string, body: Record<str
     return json(origin, { ok: true });
   }
   if (action === "securityImportSrp") {
-    await require("IMPORT_SRP", "EXECUTE");
-    const { rows, verified } = body;
-    const source = clean(body.source, 250);
-    if (!source || verified !== true || !Array.isArray(rows) || !rows.length || rows.length > 10000) throw new Error("SECURITY_INPUT");
-    const records = new Map<string, { barcode: string; description: string; srp: number | null }>();
-    for (const row of rows) {
-      const barcode = clean(row?.barcode, 100);
-      const description = clean(row?.description, 1000);
-      const key = /^\d+$/.test(barcode) ? barcode.replace(/^0+(?=\d)/, "") : barcode.toUpperCase();
-      const srp = row?.srp;
-      if (!barcode || !description || records.has(key)) throw new Error("SECURITY_INPUT");
-      records.set(key, { barcode, description, srp: typeof srp === "number" && Number.isFinite(srp) && srp > 0 ? srp : null });
-    }
-    const { data: saved, error } = await admin.rpc("ptg_import_srp", { p_rows: [...records.values()], p_source: source });
-    if (error) throw new Error("SECURITY_WRITE_FAILED");
-    const preserved = records.size - Number(saved);
-    await audit(session, null, "IMPORT_SRP", source, "Saved " + saved + " SRP records and preserved " + preserved + " existing records.");
-    return json(origin, { ok: true, count: saved, preserved });
+    await require("IMPORT_SRP","EXECUTE");
+    const {rows,verified,sourceDate}=body;
+    const source=typeof body.source==="string"?body.source.trim():"";
+    if(!source||source.length>240||typeof sourceDate!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(sourceDate)||verified!==true||!Array.isArray(rows)||!rows.length||rows.length>10000)throw new Error("SECURITY_INPUT");
+    const records=rows.map(row=>({barcode:row?.barcode,model_description:row?.description,srp:row?.srp}));
+    const {data:saved,error}=await admin.rpc("ptg_import_catalog_dated",{p_dataset:"srp",p_source_file:source,p_effective_date:sourceDate,p_rows:records,p_actor_id:session.userId});
+    if(error){if(error.code==="42501")throw new Error("PERMISSION_DENIED");if(["P0001","22007","22008"].includes(error.code))return json(origin,{ok:false,message:error.message},400);throw new Error("SECURITY_WRITE_FAILED");}
+    if(!saved||!Number.isInteger(saved.inserted)||!Number.isInteger(saved.updated)||!Number.isInteger(saved.unchanged))throw new Error("SECURITY_WRITE_FAILED");
+    return json(origin,{ok:true,count:saved.inserted+saved.updated,preserved:saved.unchanged});
+  }
+  if(action==="securityStorageOverview"){
+    const {data,error}=await admin.rpc("ptg_storage_review",{p_actor_id:session.userId});
+    if(error)throw new Error(error.code==="42501"?"PERMISSION_DENIED":"SECURITY_READ_FAILED");
+    return json(origin,{ok:true,storage:data});
+  }
+  if(action==="securityApproveLegacyCatalog"){
+    if(body.confirmed!==true||typeof body.source!=="string"||typeof body.sourceDate!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(body.sourceDate)||!["master","srp"].includes(String(body.dataset)))throw new Error("SECURITY_INPUT");
+    const {error}=await admin.rpc("ptg_approve_legacy_source",{p_actor_id:session.userId,p_dataset:body.dataset,p_source:body.source,p_upper_date:body.sourceDate});
+    if(error){if(error.code==="42501")throw new Error("PERMISSION_DENIED");if(error.code==="P0001")return json(origin,{ok:false,message:error.message},400);throw new Error("SECURITY_WRITE_FAILED");}
+    return json(origin,{ok:true});
   }
   return json(origin, { ok: false, message: "Unsupported security action." }, 400);
 }
