@@ -81,8 +81,13 @@ jobs:
           supabase init
           supabase start
           supabase status -o env > "$RUNNER_TEMP/retention-local.env"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - name: Test actual Storage API with synthetic files only
         run: node review/smart-retention/real-storage-tests.mjs "$RUNNER_TEMP/retention-local.env"
+      - name: Test authenticated System Admin HTTP handlers on local stack
+        run: node review/smart-retention/authenticated-http-tests.mjs "$RUNNER_TEMP/retention-local.env"
       - name: Remove disposable local test stack
         if: always()
         run: |
