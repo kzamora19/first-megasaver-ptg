@@ -3,6 +3,8 @@ on:
   push:
     branches: [feature/studio-review-role-contract-20261126]
     paths: ['.github/workflows/megaflyer-hosted-review-acceptance.yml']
+  pull_request:
+    branches: [feature/studio-gateway-pages-refresh-20261121]
   workflow_dispatch:
     inputs:
       confirm:
@@ -28,7 +30,7 @@ jobs:
           node --test tests/studio-staging-synthetic-auth.test.mjs
   acceptance:
     needs: source
-    if: ${{ github.ref == 'refs/heads/feature/studio-review-role-contract-20261126' && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true' && (github.event_name == 'push' || inputs.confirm == 'staging-only') }}
+    if: ${{ vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true' && ((github.event_name == 'pull_request' && github.head_ref == 'feature/studio-review-role-contract-20261126' && github.event.pull_request.head.repo.full_name == github.repository) || (github.ref == 'refs/heads/feature/studio-review-role-contract-20261126' && (github.event_name == 'push' || inputs.confirm == 'staging-only'))) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: studio-integration-staging
