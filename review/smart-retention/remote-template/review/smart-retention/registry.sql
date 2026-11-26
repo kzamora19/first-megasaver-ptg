@@ -5,8 +5,8 @@ GRANT USAGE ON SCHEMA private TO service_role;
 -- The remote gateway authenticates a signed request from the central PTG System Admin gateway.
 -- This service-only helper requires its verified actor ID; it is not a user-facing role check.
 CREATE FUNCTION private.branchline_retention_require_actor(p_actor uuid)
-RETURNS void LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $
-BEGIN IF p_actor IS NULL THEN RAISE EXCEPTION 'Authenticated System Admin actor required' USING ERRCODE='42501';END IF;END $;
+RETURNS void LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path='' AS $$
+BEGIN IF p_actor IS NULL THEN RAISE EXCEPTION 'Authenticated System Admin actor required' USING ERRCODE='42501';END IF;END $$;
 REVOKE ALL ON FUNCTION private.branchline_retention_require_actor(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION private.branchline_retention_require_actor(uuid) TO service_role;
 CREATE TABLE private.branchline_retention_policy(
