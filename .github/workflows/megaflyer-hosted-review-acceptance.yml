@@ -1,0 +1,48 @@
+name: MegaFlyer isolated hosted review acceptance
+on:
+  push:
+    branches: [feature/studio-review-role-contract-20261126]
+    paths: ['.github/workflows/megaflyer-hosted-review-acceptance.yml']
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type staging-only to run disposable staging identities'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: branchline-isolated-studio-acceptance
+  cancel-in-progress: false
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: |
+          node --check tests/studio-staging-synthetic-auth.mjs
+          node --check tests/studio-hosted-staging-acceptance.mjs
+          node --test tests/studio-staging-synthetic-auth.test.mjs
+  acceptance:
+    needs: source
+    if: ${{ github.ref == 'refs/heads/feature/studio-review-role-contract-20261126' && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true' && (github.event_name == 'push' || inputs.confirm == 'staging-only') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: studio-integration-staging
+    env:
+      STUDIO_HOSTED_STAGING_APPROVED: '1'
+      STUDIO_HOSTED_TEST_MODE: full
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
+      - name: Test exact isolated staging project and clean disposable users
+        run: node tests/studio-staging-synthetic-auth.mjs
