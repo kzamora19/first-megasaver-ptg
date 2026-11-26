@@ -106,7 +106,7 @@ BEGIN
    ELSE
     IF jsonb_typeof(v_incoming)<>'string' THEN RAISE EXCEPTION 'Invalid field %',v_field;END IF;
     IF btrim(v_incoming#>>'{}')='' THEN CONTINUE;END IF;
-    IF length(btrim(v_incoming#>>'{}')) > CASE v_field WHEN 'brand' THEN 100 WHEN 'category' THEN 160 WHEN 'sub_category' THEN 160 WHEN 'model_description' THEN 1000 ELSE 500 END THEN RAISE EXCEPTION 'Field too long';END IF;
+    IF length(btrim(v_incoming#>>'{}')) > (CASE v_field WHEN 'brand' THEN 100 WHEN 'category' THEN 160 WHEN 'sub_category' THEN 160 WHEN 'model_description' THEN 1000 ELSE 500 END) THEN RAISE EXCEPTION 'Field too long';END IF;
     v_incoming:=to_jsonb(btrim(v_incoming#>>'{}'));
    END IF;
    SELECT max(effective_date) INTO v_latest FROM private.ptg_catalog_field_versions WHERE dataset=p_dataset AND record_id=v_id AND field_name=v_field;
