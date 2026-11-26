@@ -79,16 +79,21 @@ Deno.serve(async request => {
     if(!session)return respond(origin,fail("Please sign in again."),401);
     if(session.mustChangePassword||!["SYSTEM_ADMIN","BRANCH_ADMIN","BRANCH_USER"].includes(session.role)||(!session.branchId&&session.role!=="SYSTEM_ADMIN"))
       return respond(origin,fail("PTG access is not enabled for this account."),403);
+    let retentionNotices:{id:string;title:string;body:string}[]=[];
+    if(session.role==="SYSTEM_ADMIN"){
+      const {data,error}=await admin.rpc("ptg_retention_notices",{p_actor_id:session.userId});
+      if(!error&&Array.isArray(data))retentionNotices=data.filter(n=>n&&typeof n.id==="string"&&n.id.startsWith("retention:")&&typeof n.title==="string"&&typeof n.body==="string");
+    }
     const since=new Date(Date.now()-14*86400000).toISOString();
     const {data:memos,error:memoError}=await admin.from("price_memos").select("id,memo_id,period,imported_at,memo_type,branch_id,product_count")
       .is("branch_id",null).in("memo_type",["MEMO_LIST","KIOSK_MEMO_LIST"]).gte("imported_at",since).order("imported_at",{ascending:false}).order("id",{ascending:false}).limit(15);
     if(memoError)throw Error("Memo metadata unavailable");
-    if(!memos?.length)return respond(origin,{ok:true,notices:[]});
+    if(!memos?.length)return respond(origin,{ok:true,notices:retentionNotices});
     const {data:campaigns,error:campaignError}=await admin.from("ptg_memo_campaigns").select("memo_number,campaign").in("memo_number",memos.map(m=>m.memo_id));
     if(campaignError)throw Error("Campaign scope unavailable");
     const blocked=new Set((campaigns||[]).filter(c=>String(c.campaign).trim().toUpperCase()==="SUBDEALER").map(c=>c.memo_number));
     const eligible=memos.filter(m=>!blocked.has(m.memo_id)&&!/^SUB(?:CON-|D?20\d{2}-)/i.test(m.memo_id)&&m.product_count>0&&m.product_count<=10000);
-    if(!eligible.length)return respond(origin,{ok:true,notices:[]});
+    if(!eligible.length)return respond(origin,{ok:true,notices:retentionNotices});
     const products=[];
     let complete=false;
     // Only brand and memo ID are read; never price, customer, or audit details.
@@ -100,6 +105,6 @@ Deno.serve(async request => {
       if((data||[]).length<1000){complete=true;break;}
     }
     if(!complete)throw Error("Memo brand result exceeds safe bound");
-    return respond(origin,{ok:true,notices:safeMemoNotices(eligible,campaigns||[],products)});
+    return respond(origin,{ok:true,notices:[...retentionNotices,...safeMemoNotices(eligible,campaigns||[],products)]});
   }catch{return respond(origin,fail("Memo announcements temporarily unavailable."),503);}
 });

@@ -2,7 +2,7 @@
 BEGIN;
 CREATE FUNCTION public.ptg_storage_review(p_actor_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
-DECLARE v_buckets jsonb;v_sources jsonb;
+DECLARE v_buckets jsonb;v_sources jsonb;v_files jsonb;v_policy jsonb;v_eligible bigint;v_expiring bigint;v_total bigint;v_reclaimed bigint;
 BEGIN
  PERFORM private.ptg_catalog_require_admin(p_actor_id);
  SELECT coalesce(jsonb_agg(to_jsonb(q) ORDER BY q.id),'[]'::jsonb) INTO v_buckets FROM (
@@ -19,7 +19,14 @@ BEGIN
    SELECT 'srp',m.source_file,count(*),max(m.import_date)::date FROM public.product_srp m WHERE NOT EXISTS(SELECT 1 FROM private.ptg_catalog_field_versions v WHERE v.dataset='srp' AND v.record_id=m.id) GROUP BY m.source_file
   ) s LEFT JOIN private.ptg_catalog_legacy_sources b ON b.dataset=s.dataset AND b.source_file=s.source
  ) q;
- RETURN jsonb_build_object('scope','PTG','policy',jsonb_build_object('retentionDays',60,'enabled',false),'buckets',v_buckets,'legacySources',v_sources,'eligible',null,'expiring',null,'registryReady',false);
+ SELECT jsonb_build_object('retentionDays',retention_days,'enabled',enabled,'releaseAuthorized',release_authorized) INTO v_policy FROM private.ptg_retention_policy WHERE singleton;
+ SELECT count(*) FILTER(WHERE f.state='registered' AND d.reason='eligible'),count(*) FILTER(WHERE f.state='registered' AND d.reason='expiring'),count(*),coalesce(sum(f.removed_bytes),0)
+ INTO v_eligible,v_expiring,v_total,v_reclaimed FROM private.ptg_retained_sources f JOIN private.ptg_retention_decisions(now()) d ON d.file_id=f.id;
+ SELECT coalesce(jsonb_agg(to_jsonb(q) ORDER BY q.imported_at DESC,q.id),'[]'::jsonb) INTO v_files FROM (
+ SELECT f.id,f.source_name AS name,f.kind,f.scope,f.imported_at,f.source_date,f.byte_size AS bytes,f.hold,f.state,d.reason,d.expires_at AS "expiresAt"
+ FROM private.ptg_retained_sources f JOIN private.ptg_retention_decisions(now()) d ON d.file_id=f.id ORDER BY f.imported_at DESC,f.id LIMIT 250
+ ) q;
+ RETURN jsonb_build_object('scope','PTG','policy',v_policy,'buckets',v_buckets,'legacySources',v_sources,'eligible',v_eligible,'expiring',v_expiring,'total',v_total,'reclaimedBytes',v_reclaimed,'files',v_files,'registryReady',true);
 END $$;
 REVOKE ALL ON FUNCTION public.ptg_storage_review(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.ptg_storage_review(uuid) TO service_role;

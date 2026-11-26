@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@10.3.1";
+import {runCleanup} from "../_shared/retention-cleanup.mjs";
 
 const projectUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -503,6 +504,26 @@ async function securityAction(session: Session, origin: string, body: Record<str
     const {data,error}=await admin.rpc("ptg_storage_review",{p_actor_id:session.userId});
     if(error)throw new Error(error.code==="42501"?"PERMISSION_DENIED":"SECURITY_READ_FAILED");
     return json(origin,{ok:true,storage:data});
+  }
+  if(action==="securityRetentionConfigure"){
+    if(typeof body.days!=="number"||!Number.isInteger(body.days)||typeof body.enabled!=="boolean"||body.confirmed!==true)throw new Error("SECURITY_INPUT");
+    const {error}=await admin.rpc("ptg_retention_configure",{p_actor_id:session.userId,p_days:body.days,p_enabled:body.enabled});
+    if(error){if(error.code==="42501")throw new Error("PERMISSION_DENIED");if(error.code==="P0001")return json(origin,{ok:false,message:error.message},400);throw new Error("SECURITY_WRITE_FAILED");}
+    return json(origin,{ok:true});
+  }
+  if(action==="securityRetentionHold"){
+    if(typeof body.id!=="string"||!/^[0-9a-f-]{36}$/i.test(body.id)||typeof body.hold!=="boolean")throw new Error("SECURITY_INPUT");
+    const {error}=await admin.rpc("ptg_retention_hold",{p_actor_id:session.userId,p_id:body.id,p_hold:body.hold});
+    if(error){if(error.code==="42501")throw new Error("PERMISSION_DENIED");if(error.code==="P0001")return json(origin,{ok:false,message:error.message},400);throw new Error("SECURITY_WRITE_FAILED");}
+    return json(origin,{ok:true});
+  }
+  if(action==="securityRetentionCleanup"){
+    const dryRun=body.dryRun!==false;
+    if(!dryRun&&(body.confirmed!==true||Deno.env.get("RETENTION_RUNTIME_ENABLED")!=="true"))throw new Error("PERMISSION_DENIED");
+    const fileId=body.id===undefined?null:body.id;
+    if(fileId!==null&&(typeof fileId!=="string"||!/^[0-9a-f-]{36}$/i.test(fileId)))throw new Error("SECURITY_INPUT");
+    const result=await runCleanup({admin,actorId:session.userId,dryRun,fileId});
+    return json(origin,{ok:true,cleanup:result});
   }
   if(action==="securityApproveLegacyCatalog"){
     if(body.confirmed!==true||typeof body.source!=="string"||typeof body.sourceDate!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(body.sourceDate)||!["master","srp"].includes(String(body.dataset)))throw new Error("SECURITY_INPUT");
