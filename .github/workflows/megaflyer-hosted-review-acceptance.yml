@@ -40,7 +40,7 @@ jobs:
       STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
       STUDIO_STAGING_PUBLISHABLE_KEY: ${{ secrets.STUDIO_STAGING_PUBLISHABLE_KEY }}
       STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
-      STUDIO_STAGING_ISSUER_ORIGIN: ${{ vars.STUDIO_STAGING_ISSUER_ORIGIN }}
+      STUDIO_STAGING_ISSUER_ORIGIN: https://branchline-staging.github.io
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
