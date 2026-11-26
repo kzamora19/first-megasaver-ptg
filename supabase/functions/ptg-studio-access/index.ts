@@ -7,14 +7,13 @@ import {
 } from "../_shared/studio-access-policy.mjs";
 import {validPublicKey,validProofRequest,proofMessage,STUDIO_PROOF_LIFETIME_SECONDS,STUDIO_CHALLENGE_LIFETIME_SECONDS} from "../_shared/studio-continuation-policy.mjs";
 import {studioIssuerOrigin} from "../_shared/studio-issuer-origin.mjs";
-import {studioSupabaseKey} from "../_shared/studio-supabase-keys.mjs";
 import {studioDraftMaterial} from "../_shared/studio-draft-scope.mjs";
 import {cloudActionValid,cloudKeyAllowed,validateCloudMutation} from "../_shared/studio-cloud-policy.mjs";
 import {centralDriveOperation} from "../_shared/studio-central-drive.mjs";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
-const secret = studioSupabaseKey((name: string)=>Deno.env.get(name),"secret");
-const pub = studioSupabaseKey((name: string)=>Deno.env.get(name),"publishable");
+const secret = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const pub = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const gatewaySecret = Deno.env.get("PTG_STUDIO_GATEWAY_SECRET") ?? "";
 // Exact HTTPS origin set at deployment time. No implicit Vercel host or wildcard.
 const issuerOrigin = studioIssuerOrigin(Deno.env.get("PTG_STUDIO_ISSUER_ORIGIN"));
@@ -51,7 +50,7 @@ async function validSourceSession(userId:string,sessionId:string){
   const [sessionResult,profileResult]=await Promise.all([
     admin.from("app_sessions").select("id,user_id,branch_id,session_version,remember_device,expires_at,last_activity_at,revoked_at")
       .eq("id",sessionId).eq("user_id",userId).maybeSingle(),
-    admin.from("user_profiles").select("id,role_key,legacy_role,is_active,must_change_password,session_version")
+    admin.from("user_profiles").select("id,role_key,legacy_role,display_name,is_active,must_change_password,session_version")
       .eq("id",userId).maybeSingle(),
   ]);
   const row=sessionResult.data,profile=profileResult.data;
@@ -63,6 +62,12 @@ async function validSourceSession(userId:string,sessionId:string){
     if(error || !branch || branch.status!=="ACTIVE" || branch.operational_status!=="ON")return null;
   }
   return {row,profile};
+}
+function workspaceIdentity(profile: { display_name?: string | null; role_key: string; legacy_role?: string | null }) {
+  return {
+    name: String(profile.display_name ?? "").trim(),
+    role: String(profile.legacy_role ?? "").trim() || profile.role_key.replaceAll("_", " "),
+  };
 }
 async function issue(request:Request,body:Record<string,unknown>){
   const origin=request.headers.get("origin");
@@ -159,7 +164,7 @@ async function exchange(request:Request,body:Record<string,unknown>){
  if(sessionError||!session)return json({ok:false},503);
  const recovery=(studio==="megaframe"||studio==="flyer")
   ? await studioDraftMaterial(draftRoot,studio,grant.user_id) : {};
- return json({ok:true,sessionId:session.id,challenge,expiresAt:new Date(expiry).toISOString(),...recovery});
+ return json({ok:true,sessionId:session.id,challenge,expiresAt:new Date(expiry).toISOString(),...recovery,workspaceIdentity:workspaceIdentity(active.profile)});
 }
 // Each signed challenge is consumed exactly once; server rechecks PTG role,
 // branch, forced logout and live session version before issuing the next challenge.
@@ -200,7 +205,9 @@ async function prove(request:Request,body:Record<string,unknown>){
  // Service-only identity is returned AFTER a fresh one-use P-256 proof and live PTG role check.
  // Studio backends must strip actor details from browser-facing delivery replies.
  return json({ok:true,sessionId:record.id,challenge:nextChallenge,expiresAt:new Date(expiry).toISOString(),
+   workspaceIdentity:workspaceIdentity(active.profile),
    actorId:record.user_id,
+   roleKey:active.profile.role_key,
    canManage:active.profile.role_key==="SYSTEM_ADMIN"||active.profile.role_key==="BRANCH_ADMIN"});
 }
 
