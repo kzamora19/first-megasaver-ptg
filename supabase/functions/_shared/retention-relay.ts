@@ -16,7 +16,7 @@ export async function remoteRetentionRequest(session:Actor,project:unknown,actio
  if(session.role!=="SYSTEM_ADMIN"||session.mustChangePassword||!isRemoteRetentionProject(project))throw Error("Forbidden");
  const config=REMOTE_RETENTION_PROJECTS[project],secret=Deno.env.get(config.secret)??"";
  if(secret.length<32)throw Error("Remote storage relay not configured");
- const time=String(Date.now()),body=JSON.stringify({...params,actorId:session.userId,action});
+ const time=String(Date.now()),body=JSON.stringify({...params,actorId:session.userId,action,requestId:crypto.randomUUID()});
  const signature=await signRetention(secret,config.ref,time,body);
  const response=await fetch("https://"+config.ref+".supabase.co/functions/v1/branchline-retention",{method:"POST",headers:{"Content-Type":"application/json","x-branchline-retention-time":time,"x-branchline-retention-signature":signature},body,redirect:"error",signal:AbortSignal.timeout(action==="cleanup"?120000:5000)});
  const result=await response.json();

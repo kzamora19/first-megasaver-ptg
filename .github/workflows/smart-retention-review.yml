@@ -51,6 +51,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test signed cross-project HTTP relay against three isolated receivers
+        run: deno test --allow-env=RETENTION_RELAY_SALES_SECRET,RETENTION_RELAY_MEGAFRAME_SECRET,RETENTION_RELAY_FLYER_SECRET --allow-net=127.0.0.1 review/smart-retention/relay-integration-tests.ts
       - name: Type-check updated server endpoints
         run: deno check --node-modules-dir=auto supabase/functions/ptg-products/index.ts supabase/functions/ptg-accounts/index.ts supabase/functions/ptg-widget-announcements/index.ts supabase/functions/ptg-retention-worker/index.ts
 
