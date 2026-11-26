@@ -95,7 +95,8 @@ export async function hostedAcceptance(env,send=fetch){
   const recordKey=studio.name==="megaframe"?"project_staging-ci-synthetic":"p:current";
   const plaintext=Buffer.from(JSON.stringify({
     source:"isolated-staging-only",studio:studio.name,kind:"synthetic-project",
-    revision:1,nonce:randomBytes(12).toString("base64url")
+    revision:1,nonce:randomBytes(12).toString("base64url"),
+    ...(studio.name==="flyer"?{reviewScope:"front",campaign:{sectionLayout:{front:{backgroundMode:"watermark",backgroundOpacity:25,backgroundRotation:15,cardOpacity:0}},footerDesign:{front:{mode:"imageText",left:"Synthetic terms",right:"Synthetic contact",height:42},back:{mode:"none"}},headerDesign:{front:{extraHeight:12}}},offers:[{sku:"STAGING-ONLY",section:"front",freebieAppearance:{size:65,scale:120,x:80,y:20,fit:"fill",aspect:true,font:12}}]}:{})
   }),"utf8");
   const aesKey=await webcrypto.subtle.generateKey({name:"AES-GCM",length:256},
     false,["encrypt","decrypt"]);
