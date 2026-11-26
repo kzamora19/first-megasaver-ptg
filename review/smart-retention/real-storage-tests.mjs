@@ -42,6 +42,9 @@ assert.ok(Array.isArray(gone)&&gone.length<100&&!gone.some(o=>o.name===leaf),"Ex
 for(const p of paths.slice(1))assert.equal(ok(await bucket.exists(p.path),"Verify protected version"),true);
 const final=ok(await admin.rpc("ptg_storage_review",{p_actor_id:actor}),"Final overview");
 assert.equal(final.eligible,0);assert.equal(final.reclaimedBytes,paths[0].bytes);
+assert.ok(final.auditCount>=5);
+const deletion=final.auditEvents.find(e=>e.action==="deleted");
+assert.equal(deletion.actor_id,actor);assert.equal(deletion.source,"fixture-1.xlsx");assert.equal(deletion.details.verifiedBytes,paths[0].bytes);
 const record=ok(await admin.from("product_master").select("barcode").eq("barcode","00000528").single(),"Permanent business record");
 assert.equal(record.barcode,"00000528");
 assert.equal(ok(await admin.rpc("ptg_retention_notices",{p_actor_id:actor}),"Admin notice").length,1);

@@ -5,7 +5,7 @@ import {chromium} from "playwright";
 const host="https://kzamora19.github.io",base="/first-megasaver-ptg/",dir=path.resolve("out"),fakeApi="https://example.supabase.co";
 const browser=await chromium.launch({headless:true});
 const calls=[];
-const response=(project)=>({policy:{retentionDays:60,enabled:false,releaseAuthorized:false},buckets:[{id:project+"-protected-assets",objects:1,bytes:1048576,unknownSizes:0}],legacySources:project==="ptg"?[{dataset:"srp",source:"Fixture workbook.xlsx",records:13,lastImport:"2026-11-23",approvedDate:null}]:[],eligible:0,expiring:0,registryReady:true,total:0,reclaimedBytes:0,files:[]});
+const response=(project)=>({policy:{retentionDays:60,enabled:false,releaseAuthorized:false},buckets:[{id:project+"-protected-assets",objects:1,bytes:1048576,unknownSizes:0}],legacySources:project==="ptg"?[{dataset:"srp",source:"Fixture workbook.xlsx",records:13,lastImport:"2026-11-23",approvedDate:null}]:[],eligible:0,expiring:0,registryReady:true,total:0,reclaimedBytes:0,files:[],auditCount:1,auditEvents:[{id:project+"-audit",created_at:"2026-11-26T01:00:00Z",actor_id:"00000000-0000-0000-0000-000000000001",action:"policy",source:null,details:{days:60,enabled:false}}]});
 async function open(role,viewport){
  const ctx=await browser.newContext({viewport,serviceWorkers:"block"});
  await ctx.addInitScript(()=>sessionStorage.setItem("ptg_app_session_id","synthetic-browser-session"));
@@ -59,6 +59,8 @@ try{
   const section=page.locator("section.admin-card").filter({has:page.getByRole("heading",{name:"Storage Management",exact:true})}).first();
   const picker=section.getByLabel("Project",{exact:true});
   assert.equal(await picker.inputValue(),"ptg");
+  await page.getByRole("heading",{name:"Retention audit log"}).waitFor();
+  await page.getByText("60 days · disabled",{exact:true}).waitFor();
   assert.equal(await section.getByLabel("Enable automatic cleanup").isDisabled(),true);
   assert.equal(await section.getByRole("button",{name:"Run eligible cleanup"}).isDisabled(),true);
   assert.equal(await section.getByRole("button",{name:"Confirm date",exact:true}).isDisabled(),true);
