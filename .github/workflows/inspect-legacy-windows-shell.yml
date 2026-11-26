@@ -1,0 +1,104 @@
+name: Inspect existing Windows shell (source recovery)
+on:
+  push:
+    branches:
+      - fix/windows-installed-navigation-20261123
+    paths:
+      - .github/workflows/inspect-legacy-windows-shell.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-existing-launcher:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Decompile original published launcher
+        shell: pwsh
+        run: |
+          dotnet tool install --global ilspycmd
+          $dest = Join-Path $env:RUNNER_TEMP 'branchline-original'
+          $source = Join-Path $env:RUNNER_TEMP 'branchline-recovered'
+          Expand-Archive -LiteralPath 'public/branchline-workspace-windows.zip' -DestinationPath $dest -Force
+          ilspycmd --project -o $source (Join-Path $dest 'Branchline Workspace.exe')
+          "Recovered source files:"
+          Get-ChildItem -LiteralPath $source -Recurse -File | ForEach-Object { $_.FullName.Substring($source.Length) }
+          "Navigation-related matches:"
+          Get-ChildItem -LiteralPath $source -Recurse -Filter '*.cs' | Select-String -Pattern 'Data Desk','Frame','Flyer','Menu','CoreWebView2Environment','userDataFolder','data-branchline-menu','ptg-menu-toggle' | Select-Object -First 140 | ForEach-Object { "$($_.Path.Substring($source.Length)):$($_.LineNumber):$($_.Line.Trim())" }
+          $main = Get-ChildItem -LiteralPath $source -Recurse -Filter '*.cs' | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'class MainForm|class WorkspaceForm|class MainWindow|WebView2 webView' } | Select-Object -First 1
+          if ($main) {
+            "MAIN SOURCE: $($main.FullName)"
+            Get-Content -LiteralPath $main.FullName | Select-Object -First 550
+          }
+          "RECOVERED_SOURCE=$source" >> $env:GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-branchline-windows-source-inspection
+          path: ${{ runner.temp }}/branchline-recovered/
+          retention-days: 3
+
+  linux-self-contained-decompiler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile a portable ILSpy decompiler for exact uploaded Windows launcher
+        shell: bash
+        run: |
+          mkdir -p /tmp/source-inspect
+          cd /tmp/source-inspect
+          dotnet new console -f net10.0
+          dotnet add package ICSharpCode.Decompiler --version 9.1.0.7988
+          cat > Program.cs <<'EOF'
+          using System;
+          using System.IO;
+          using ICSharpCode.Decompiler;
+          using ICSharpCode.Decompiler.CSharp;
+          using ICSharpCode.Decompiler.Metadata;
+          if (args.Length < 2) { Console.Error.WriteLine("Usage: inspect <exe-path> <output-directory>"); return 2; }
+          var output = args[1];
+          Directory.CreateDirectory(output);
+          var resolver = new UniversalAssemblyResolver(args[0], false, null);
+          var decompiler = new CSharpDecompiler(args[0], resolver, new DecompilerSettings());
+          var syntaxTree = decompiler.DecompileWholeModuleAsString();
+          File.WriteAllText(Path.Combine(output, "AllSource.cs"), syntaxTree);
+          Console.WriteLine("Decompiled " + args[0] + " => " + Path.Combine(output, "AllSource.cs"));
+          return 0;
+          EOF
+          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o /tmp/ilspy-standalone
+          test -x /tmp/ilspy-standalone/source-inspect
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable-linux-exact-exe-decompiler
+          path: /tmp/ilspy-standalone/
+          retention-days: 2
+
+  legacy-windows-framework-references:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gather framework references used by installed production executable
+        shell: pwsh
+        run: |
+          $framework = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
+          if (!(Test-Path $framework)) { throw "Missing .NET Framework reference assemblies: $framework" }
+          $dest = Join-Path $env:RUNNER_TEMP 'legacy-framework-references'
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Get-ChildItem -Path $framework -Filter '*.dll' | Copy-Item -Destination $dest
+          Expand-Archive -LiteralPath 'public/branchline-workspace-windows.zip' -DestinationPath (Join-Path $env:RUNNER_TEMP 'published-original') -Force
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'published-original\Microsoft.Web.WebView2.WinForms.dll') $dest
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'published-original\Microsoft.Web.WebView2.Core.dll') $dest
+          Write-Host ('Copied {0} framework references' -f (Get-ChildItem $dest -Filter '*.dll').Count)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-framework-references
+          path: ${{ runner.temp }}/legacy-framework-references/
+          retention-days: 2

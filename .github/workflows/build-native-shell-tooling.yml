@@ -1,0 +1,79 @@
+name: Build native shell tooling (inspection only; no deployment)
+on:
+  push:
+    branches:
+      - fix/windows-installed-navigation-20261123
+    paths:
+      - .github/workflows/build-native-shell-tooling.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-compiler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Produce self-contained Roslyn compiler for latest recovered Windows shell
+        shell: bash
+        run: |
+          mkdir /tmp/branchline-roslyn
+          cd /tmp/branchline-roslyn
+          dotnet new console -f net10.0
+          dotnet add package Microsoft.CodeAnalysis.CSharp --version 4.14.0
+          cat > Program.cs <<'EOF'
+          using System;
+          using System.IO;
+          using System.Linq;
+          using System.Text;
+          using System.Collections.Generic;
+          using Microsoft.CodeAnalysis;
+          using Microsoft.CodeAnalysis.CSharp;
+          if (args.Length != 5) {
+              Console.Error.WriteLine("Usage: branchline-roslyn <source.cs> <references-dir> <resources-dir> <icon.ico> <output.exe>");
+              return 2;
+          }
+          var source = File.ReadAllText(args[0], Encoding.UTF8);
+          var references = Directory.GetFiles(args[1], "*.dll")
+              .Select(x => MetadataReference.CreateFromFile(x)).ToArray();
+          var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), encoding: Encoding.UTF8);
+          var options = new CSharpCompilationOptions(
+              OutputKind.WindowsApplication,
+              mainTypeName: "BranchlineWorkspace",
+              optimizationLevel: OptimizationLevel.Release,
+              platform: Platform.X64,
+              deterministic: true,
+              allowUnsafe: true);
+          var c = CSharpCompilation.Create("Branchline Workspace", new[] {tree}, references, options);
+          var resourceNames = Directory.GetFiles(args[2], "*", SearchOption.TopDirectoryOnly)
+              .Where(f => !Path.GetFileName(f).EndsWith(".ico", StringComparison.OrdinalIgnoreCase))
+              .OrderBy(x => x, StringComparer.Ordinal)
+              .Select(f => new ResourceDescription(Path.GetFileName(f), () => File.OpenRead(f), isPublic: true)).ToArray();
+          using var icon = File.OpenRead(args[3]);
+          using var native = c.CreateDefaultWin32Resources(versionResource:true, noManifest:false, manifestContents:null, iconInIcoFormat: icon);
+          using var pe = File.Create(args[4]);
+          var result = c.Emit(pe, win32Resources:native, manifestResources:resourceNames);
+          foreach(var d in result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error || d.Severity == DiagnosticSeverity.Warning))
+              Console.WriteLine(d);
+          if (!result.Success) { File.Delete(args[4]); return 1; }
+          Console.WriteLine($"Compiled {args[4]}; resources={resourceNames.Length}; framework references={references.Length}");
+          return 0;
+          EOF
+          dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o /tmp/branchline-compiler-portable
+          test -x /tmp/branchline-compiler-portable/branchline-roslyn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable-linux-csharp-compiler-for-native-shell
+          path: /tmp/branchline-compiler-portable/
+          retention-days: 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: original-first-megasaver-ptg-header-assets
+          path: |
+            public/legacy-ptg/app-header.png
+            public/legacy-ptg/app-header-original.png
+            public/legacy-ptg/login-logo.png
+          retention-days: 2
