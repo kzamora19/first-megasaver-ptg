@@ -150,6 +150,28 @@ export async function runFixtureAcceptance(env,createClient) {
     assert.deepEqual(await ba.request({action:"permissions"}),{canApprove:true,canOverride:false});
     assert.deepEqual(await sa.request({action:"permissions"}),{canApprove:true,canOverride:true});
     await tl.replay();
+
+    // Protected shared assets: upload a disposable transparent PNG, verify
+    // actual list/read via fresh signed proof, then clean only that fixture.
+    const assetId=randomUUID(),assetPath="staging-ci/"+assetId+".png";
+    const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD/oAAAAASUVORK5CYII=","base64");
+    let uploaded=false,inserted=false;
+    try{
+      const upload=await admin.storage.from("flyer-shared-assets").upload(assetPath,png,{contentType:"image/png",upsert:false});
+      assert.equal(upload.error,null,"Upload isolated artwork fixture");uploaded=true;
+      const insert=await admin.from("flyer_shared_assets").insert({id:assetId,name:"Synthetic staging footer artwork",category:"backgrounds",storage_path:assetPath,mime_type:"image/png",byte_size:png.length,created_by:accounts["system-admin"].userId,updated_by:accounts["system-admin"].userId});
+      assert.equal(insert.error,null,"Insert isolated artwork metadata");inserted=true;
+      const listed=await tl.request({action:"assets-list",category:"backgrounds"});
+      assert.ok(listed.assets.some(a=>a.id===assetId),"Protected listing includes synthetic background");
+      const fetched=await tl.request({action:"asset-image",assetId});
+      assert.equal(fetched.mime,"image/png");
+      assert.deepEqual(Buffer.from(fetched.base64,"base64"),png,"Protected download preserves artwork bytes");
+      console.log("PASS: protected shared asset listing and private PNG retrieval");
+    }finally{
+      if(inserted){const removed=await admin.from("flyer_shared_assets").delete().eq("id",assetId);assert.equal(removed.error,null,"Remove only test metadata");}
+      if(uploaded){const removed=await admin.storage.from("flyer-shared-assets").remove([assetPath]);assert.equal(removed.error,null,"Remove only test artwork");}
+    }
+
     const projectId=randomUUID(),digest=randomBytes(32).toString("hex");
     const common={projectId,digest,scope:"front",warnings:[],blocking:[]};
     await tl.request({...common,action:"approve",format:"approval"},403);
