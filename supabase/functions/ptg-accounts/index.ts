@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@10.3.1";
 import {runCleanup} from "../_shared/retention-cleanup.mjs";
+import {remoteRetentionRequest, isRemoteRetentionProject} from "../_shared/retention-relay.ts";
 
 const projectUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -500,19 +501,33 @@ async function securityAction(session: Session, origin: string, body: Record<str
     if(!saved||!Number.isInteger(saved.inserted)||!Number.isInteger(saved.updated)||!Number.isInteger(saved.unchanged))throw new Error("SECURITY_WRITE_FAILED");
     return json(origin,{ok:true,count:saved.inserted+saved.updated,preserved:saved.unchanged});
   }
+  const storageProject=body.project===undefined?"ptg":body.project;
+  if(["securityStorageOverview","securityRetentionConfigure","securityRetentionHold","securityRetentionCleanup"].includes(String(action))&&storageProject!=="ptg"&&!isRemoteRetentionProject(storageProject))throw new Error("SECURITY_INPUT");
   if(action==="securityStorageOverview"){
+    if(storageProject!=="ptg"){
+      try{const result=await remoteRetentionRequest(session,storageProject,"overview");return json(origin,{ok:true,storage:result.data});}
+      catch{return json(origin,{ok:false,message:"This project's signed storage connection is not configured or unavailable."},503);}
+    }
     const {data,error}=await admin.rpc("ptg_storage_review",{p_actor_id:session.userId});
     if(error)throw new Error(error.code==="42501"?"PERMISSION_DENIED":"SECURITY_READ_FAILED");
     return json(origin,{ok:true,storage:data});
   }
   if(action==="securityRetentionConfigure"){
     if(typeof body.days!=="number"||!Number.isInteger(body.days)||typeof body.enabled!=="boolean"||body.confirmed!==true)throw new Error("SECURITY_INPUT");
+    if(storageProject!=="ptg"){
+      try{await remoteRetentionRequest(session,storageProject,"configure",{days:body.days,enabled:body.enabled,confirmed:true});return json(origin,{ok:true});}
+      catch{return json(origin,{ok:false,message:"Remote policy update not confirmed."},503);}
+    }
     const {error}=await admin.rpc("ptg_retention_configure",{p_actor_id:session.userId,p_days:body.days,p_enabled:body.enabled});
     if(error){if(error.code==="42501")throw new Error("PERMISSION_DENIED");if(error.code==="P0001")return json(origin,{ok:false,message:error.message},400);throw new Error("SECURITY_WRITE_FAILED");}
     return json(origin,{ok:true});
   }
   if(action==="securityRetentionHold"){
     if(typeof body.id!=="string"||!/^[0-9a-f-]{36}$/i.test(body.id)||typeof body.hold!=="boolean")throw new Error("SECURITY_INPUT");
+    if(storageProject!=="ptg"){
+      try{await remoteRetentionRequest(session,storageProject,"hold",{id:body.id,hold:body.hold});return json(origin,{ok:true});}
+      catch{return json(origin,{ok:false,message:"Remote file hold not confirmed."},503);}
+    }
     const {error}=await admin.rpc("ptg_retention_hold",{p_actor_id:session.userId,p_id:body.id,p_hold:body.hold});
     if(error){if(error.code==="42501")throw new Error("PERMISSION_DENIED");if(error.code==="P0001")return json(origin,{ok:false,message:error.message},400);throw new Error("SECURITY_WRITE_FAILED");}
     return json(origin,{ok:true});
@@ -522,6 +537,10 @@ async function securityAction(session: Session, origin: string, body: Record<str
     if(!dryRun&&(body.confirmed!==true||Deno.env.get("RETENTION_RUNTIME_ENABLED")!=="true"))throw new Error("PERMISSION_DENIED");
     const fileId=body.id===undefined?null:body.id;
     if(fileId!==null&&(typeof fileId!=="string"||!/^[0-9a-f-]{36}$/i.test(fileId)))throw new Error("SECURITY_INPUT");
+    if(storageProject!=="ptg"){
+      try{const result=await remoteRetentionRequest(session,storageProject,"cleanup",{dryRun,confirmed:!dryRun,...(fileId?{id:fileId}:{})});return json(origin,{ok:true,cleanup:result.cleanup});}
+      catch{return json(origin,{ok:false,message:"Remote cleanup not confirmed. Review the destination before retrying."},503);}
+    }
     const result=await runCleanup({admin,actorId:session.userId,dryRun,fileId});
     return json(origin,{ok:true,cleanup:result});
   }

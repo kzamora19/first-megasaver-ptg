@@ -69,6 +69,7 @@ async function getSession(request: Request): Promise<ActiveSession | null> {
 
 
 import { safeMemoNotices } from "./projection.mjs";
+import {remoteRetentionRequest,REMOTE_RETENTION_PROJECTS} from "../_shared/retention-relay.ts";
 Deno.serve(async request => {
   const origin=request.headers.get("origin")??"";
   if(!allowedOrigins.has(origin))return new Response(JSON.stringify(fail("Request origin is not allowed.")),{status:403,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
@@ -83,6 +84,14 @@ Deno.serve(async request => {
     if(session.role==="SYSTEM_ADMIN"){
       const {data,error}=await admin.rpc("ptg_retention_notices",{p_actor_id:session.userId});
       if(!error&&Array.isArray(data))retentionNotices=data.filter(n=>n&&typeof n.id==="string"&&n.id.startsWith("retention:")&&typeof n.title==="string"&&typeof n.body==="string");
+      const remote=await Promise.all(Object.entries(REMOTE_RETENTION_PROJECTS).map(async ([key,config])=>{
+        try{const result=await remoteRetentionRequest(session,key,"notices");
+          if(!Array.isArray(result.data))return [];
+          return result.data.filter(n=>n&&typeof n.id==="string"&&n.id.startsWith("retention:")&&typeof n.title==="string"&&typeof n.body==="string")
+            .map(n=>({id:key+":"+n.id,title:config.label+" · "+n.title,body:n.body}));
+        }catch{return [];}
+      }));
+      retentionNotices.push(...remote.flat());
     }
     const since=new Date(Date.now()-14*86400000).toISOString();
     const {data:memos,error:memoError}=await admin.from("price_memos").select("id,memo_id,period,imported_at,memo_type,branch_id,product_count")
