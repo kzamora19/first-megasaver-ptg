@@ -57,7 +57,7 @@ try{
   await page.getByRole("heading",{name:"Storage Management",exact:true}).waitFor({timeout:30000});
   await page.getByText("ptg-protected-assets",{exact:true}).waitFor();
   const section=page.locator("section.admin-card").filter({has:page.getByRole("heading",{name:"Storage Management",exact:true})}).first();
-  const picker=section.getByLabel("Project",{exact:true});
+  const picker=section.getByRole("combobox",{name:"Project",exact:true});
   assert.equal(await picker.inputValue(),"ptg");
   await page.getByRole("heading",{name:"Retention audit log"}).waitFor();
   await page.getByText("60 days · disabled",{exact:true}).waitFor();
