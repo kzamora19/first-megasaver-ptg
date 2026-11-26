@@ -31,11 +31,12 @@ export async function runCleanup({admin,actorId,dryRun=true,fileId=null}){
    const {error:removeError}=await bucket.remove([claim.path]);
    if(removeError)throw Error("Deletion not confirmed");
    stage="verify-absence";
-   const {data:exists,error:existsError}=await bucket.exists(claim.path);
-   // Older Storage clients may surface an expected HTTP 404 as an error.
-   // A 404 alone never proves deletion: finish independently checks exact object metadata.
-   const status=Number(existsError?.status??existsError?.statusCode??existsError?.originalError?.status);
-   if(exists!==false||(existsError&&status!==404))throw Error("Object absence not confirmed");
+   // HEAD/exists has inconsistent missing-object responses across Storage versions.
+   // Require a successful exact-parent list, an unambiguous page, and no exact name.
+   // Finalization separately verifies absence of the exact database storage object.
+   const split=claim.path.lastIndexOf("/"),parent=claim.path.slice(0,split),leaf=claim.path.slice(split+1);
+   const {data:listed,error:listError}=await bucket.list(parent,{search:leaf,limit:100,offset:0});
+   if(listError||!Array.isArray(listed)||listed.length>=100||listed.some(o=>!o||typeof o.name!=="string"||o.name===leaf))throw Error("Object absence not confirmed");
    stage="finalize";
    await finish("deleted");report.deleted++;
   }catch{

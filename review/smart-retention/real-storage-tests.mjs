@@ -36,9 +36,9 @@ sql("UPDATE private.ptg_retention_policy SET release_authorized=true WHERE singl
 ok(await admin.rpc("ptg_retention_configure",{p_actor_id:actor,p_days:60,p_enabled:true}),"Enable synthetic cleanup only");
 const report=await runCleanup({admin,actorId:actor,dryRun:false});
 assert.equal(report.deleted,1,JSON.stringify(report));assert.equal(report.review,0,JSON.stringify(report));
-const gone=await bucket.exists(paths[0].path);
-assert.equal(gone.data,false,"Verify expired original absent");
-if(gone.error)assert.equal(Number(gone.error.status??gone.error.statusCode??gone.error.originalError?.status),404,"Only an explicit missing-object response is acceptable");
+const old=paths[0].path,split=old.lastIndexOf("/"),leaf=old.slice(split+1);
+const gone=ok(await bucket.list(old.slice(0,split),{search:leaf,limit:100,offset:0}),"Verify expired original absent");
+assert.ok(Array.isArray(gone)&&gone.length<100&&!gone.some(o=>o.name===leaf),"Expired original still present");
 for(const p of paths.slice(1))assert.equal(ok(await bucket.exists(p.path),"Verify protected version"),true);
 const final=ok(await admin.rpc("ptg_storage_review",{p_actor_id:actor}),"Final overview");
 assert.equal(final.eligible,0);assert.equal(final.reclaimedBytes,paths[0].bytes);
