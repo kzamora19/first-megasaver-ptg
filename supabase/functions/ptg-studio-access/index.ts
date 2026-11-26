@@ -56,12 +56,14 @@ async function validSourceSession(userId:string,sessionId:string){
   const row=sessionResult.data,profile=profileResult.data;
   if(sessionResult.error || profileResult.error || !row || !profile ||
      !sessionIsLive(row,profile) || !allowedPtgStudioRole(profile)) return null;
+  let branchCode="";
   if(row.branch_id){
     const {data:branch,error}=await admin.from("branches")
-      .select("status,operational_status").eq("id",row.branch_id).maybeSingle();
+      .select("status,operational_status,branch_code").eq("id",row.branch_id).maybeSingle();
     if(error || !branch || branch.status!=="ACTIVE" || branch.operational_status!=="ON")return null;
+    branchCode=String(branch.branch_code??"");
   }
-  return {row,profile};
+  return {row,profile,branchCode};
 }
 function workspaceIdentity(profile: { display_name?: string | null; role_key: string; legacy_role?: string | null }) {
   return {
@@ -208,6 +210,7 @@ async function prove(request:Request,body:Record<string,unknown>){
    workspaceIdentity:workspaceIdentity(active.profile),
    actorId:record.user_id,
    roleKey:active.profile.role_key,
+   branchCode:active.branchCode,
    canManage:active.profile.role_key==="SYSTEM_ADMIN"||active.profile.role_key==="BRANCH_ADMIN"});
 }
 
