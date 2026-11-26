@@ -1,0 +1,55 @@
+name: Smart retention review only
+on:
+  push:
+    branches: [feature/smart-retention-review-20261126]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/feature/smart-retention-review-20261126'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GITHUB_PAGES: 'true'
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_review_only_not_a_real_key
+      NEXT_PUBLIC_PTG_USE_EDGE_AUTH: 'true'
+      NEXT_PUBLIC_PTG_USE_EDGE_DATA: 'true'
+      NEXT_PUBLIC_PTG_USE_EDGE_ASSETS: 'true'
+      NEXT_PUBLIC_PTG_USE_EDGE_ACCOUNTS: 'true'
+      NEXT_PUBLIC_SALES_TRACKER_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SALES_TRACKER_SUPABASE_PUBLISHABLE_KEY: sb_publishable_review_only_not_a_real_key
+      NEXT_PUBLIC_PTG_ENABLE_BATCH_IMPORT_WRITES: 'false'
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic-fixture-only
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test database candidates in disposable PostgreSQL
+        run: |
+          for file in fixture.sql catalog.sql registry.sql storage-review.sql catalog-tests.sql registry-tests.sql; do
+            docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -v ON_ERROR_STOP=1 -d postgres < "review/smart-retention/$file"
+          done
+      - name: Test cleanup Storage API adapter and existing import plans
+        run: node --test review/smart-retention/cleanup-tests.mjs lib/ptg/batch-import.test.mjs tests/widget-memo-projection.test.mjs
+      - run: npm install --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check updated server endpoints
+        run: deno check supabase/functions/ptg-products/index.ts supabase/functions/ptg-accounts/index.ts supabase/functions/ptg-widget-announcements/index.ts supabase/functions/ptg-retention-worker/index.ts
