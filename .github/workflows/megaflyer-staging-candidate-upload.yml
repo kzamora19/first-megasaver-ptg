@@ -1,0 +1,63 @@
+name: MegaFlyer isolated private candidate upload
+on:
+  pull_request:
+    branches: [feature/studio-gateway-pages-refresh-20261121]
+    paths: ['.github/workflows/megaflyer-staging-candidate-upload.yml']
+permissions:
+  contents: read
+jobs:
+  stage-only:
+    if: ${{ github.head_ref == 'feature/studio-review-role-contract-20261126' && github.event.pull_request.head.repo.full_name == github.repository && vars.STUDIO_HOSTED_ACCEPTANCE_APPROVED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: studio-integration-staging
+    env:
+      STUDIO_STAGING_SUPABASE_URL: ${{ secrets.STUDIO_STAGING_SUPABASE_URL }}
+      STUDIO_STAGING_ADMIN_SECRET_KEY: ${{ secrets.STUDIO_STAGING_ADMIN_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: kzamora19/flyer-studio
+          ref: 5ae4b8910c2536d04ef96053b6422a9fde82a43e
+          path: candidate
+      - uses: actions/checkout@v4
+        with:
+          repository: kzamora19/flyer-studio
+          ref: 8906c710de8f72f0607109c142518588df87e207
+          path: historical-build
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Rebuild pinned private candidate
+        run: |
+          mkdir -p candidate/scripts candidate/staging
+          cp historical-build/scripts/build-private-flyer.mjs candidate/scripts/
+          cp historical-build/staging/editor-storage-bridge.js candidate/staging/
+          node candidate/scripts/build-private-flyer.mjs "$RUNNER_TEMP/flyer-candidate"
+      - name: Upload and verify immutable staging-only private object
+        env:
+          CANDIDATE_FILE: ${{ runner.temp }}/flyer-candidate/private/studio.html
+        run: |
+          npm install --ignore-scripts --no-save --no-package-lock @supabase/supabase-js@2.89.0
+          node --input-type=module <<'NODE'
+          import {createClient} from '@supabase/supabase-js';
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import assert from 'node:assert/strict';
+          const url=process.env.STUDIO_STAGING_SUPABASE_URL;
+          assert.equal(url,'https://rlfdvmiqkbitetatxkju.supabase.co','Only isolated staging is permitted');
+          const key=process.env.STUDIO_STAGING_ADMIN_SECRET_KEY;
+          assert.ok(key?.length>=32&&!key.startsWith('sb_publishable_'),'Staging admin key required');
+          const body=readFileSync(process.env.CANDIDATE_FILE);
+          const hash=b=>createHash('sha256').update(b).digest('hex');
+          const expected='9689e8479853705fd5bb0bcac66a194cad6d761749fdd321883794a6b2f0b9a2';
+          assert.equal(body.length,1661361);
+          assert.equal(hash(body),expected,'Candidate hash must match passing independent build');
+          assert.ok(body.toString('utf8',0,128).startsWith('<!-- PRIVATE EDITOR BUNDLE'));
+          const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+          const bucket=client.storage.from('flyer-editor-release'),path='releases/'+expected.slice(0,16)+'/studio.html';
+          const {error}=await bucket.upload(path,body,{contentType:'text/html',cacheControl:'0',upsert:false});
+          if(error&&!/already exists|duplicate|conflict/i.test(error.message||''))throw Error('Private staging upload failed');
+          const {data,error:readError}=await bucket.download(path);
+          assert.equal(readError,null);assert.equal(hash(Buffer.from(await data.arrayBuffer())),expected);
+          console.log('PASS: isolated private candidate uploaded and SHA-256 verified:',expected);
+          NODE
