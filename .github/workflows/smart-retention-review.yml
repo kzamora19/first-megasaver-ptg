@@ -48,6 +48,11 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit
       - run: npm run build
+      - name: Verify actual exported Storage Management UI (synthetic sessions, intercepted network)
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node review/smart-retention/storage-browser-tests.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
